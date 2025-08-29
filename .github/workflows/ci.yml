@@ -17,8 +17,7 @@ jobs:
       - name: Show runner info
         run: |
           uname -a
-          which bash
-          bash --version
+          docker --version || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,24 +29,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      # ---- Diagnostics: show the script and its endings/permissions
-      - name: Inspect script
+      # 👇 Inline the LocalNet bring-up; no external .sh file needed
+      - name: Start AlgoKit LocalNet (inline)
+        shell: bash
         run: |
-          ls -l scripts/ci
-          file scripts/ci/start_localnet.sh || true
-          sed -n '1,40p' scripts/ci/start_localnet.sh | cat -A
+          set -euo pipefail
+          python -m pip install --user algokit
+          export PATH="$HOME/.local/bin:$PATH"
+          algokit --version || true
 
-      # Normalize Windows CRLF -> LF so bash can run it
-      - name: Convert line endings (LF)
-        run: sed -i 's/\r$//' scripts/ci/start_localnet.sh
+          echo "Starting LocalNet..."
+          algokit localnet start
 
-      # Make it executable (defensive)
-      - name: Make CI scripts executable (Linux)
-        run: chmod +x scripts/ci/start_localnet.sh
-
-      # IMPORTANT: run VIA BASH (not direct path)
-      - name: Start AlgoKit LocalNet
-        run: bash scripts/ci/start_localnet.sh
+          echo "Waiting for algod and indexer..."
+          TIMEOUT=180
+          waited=0
+          until curl -sS http://localhost:4001/health > /dev/null 2>&1; do
+            sleep 3; waited=$((waited+3)); if [ $waited -ge $TIMEOUT ]; then echo "algod not ready"; exit 1; fi
+          done
+          waited=0
+          until curl -sS http://localhost:8980/health > /dev/null 2>&1; do
+            sleep 3; waited=$((waited+3)); if [ $waited -ge $TIMEOUT ]; then echo "indexer not ready"; exit 1; fi
+          done
+          echo "LocalNet is up."
 
       - name: Run smoke tests
         run: pytest -q
