@@ -1,10 +1,10 @@
 
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { PeraWalletConnect } from "@perawallet/connect";
 
 const pera = new PeraWalletConnect();
 
-export default function App() {
+export default function App(): JSX.Element {
   const [account, setAccount] = useState<string | null>(null);
   const network = (import.meta.env.VITE_NETWORK as string) ?? "TESTNET";
 
@@ -18,13 +18,13 @@ export default function App() {
         if (!mounted) return;
         if (accounts && accounts.length > 0) setAccount(accounts[0]);
 
-        // WalletConnect v1-style disconnect listener (types differ across versions)
+        // Support both v1/v2 event APIs defensively
         const conn: any = (pera as any).connector;
         if (conn?.on) conn.on("disconnect", () => setAccount(null));
+        // @ts-ignore
+        if ((pera as any).on) (pera as any).on("disconnect", () => setAccount(null));
       })
-      .catch(() => {
-        /* no previous session, ignore */
-      });
+      .catch(() => { /* no previous session */ });
 
     return () => {
       mounted = false;
@@ -43,28 +43,22 @@ export default function App() {
   const handleDisconnect = useCallback(async () => {
     try {
       await pera.disconnect();
-    } catch {
-      /* ignore */
-    } finally {
-      setAccount(null);
-    }
+    } catch { /* ignore */ }
+    setAccount(null);
   }, []);
 
   return (
     <div style={{ fontFamily: "system-ui, Arial", padding: 24 }}>
       <h1>Trust Game MVP</h1>
       <p>
-        <strong>Network:</strong> {network} (Pera supports TestNet; LocalNet is
-        SDK/CI only)
+        <strong>Network:</strong> {network} (Pera supports TestNet; LocalNet is SDK/CI only)
       </p>
 
       {!account ? (
         <button onClick={handleConnect}>Connect Pera Wallet</button>
       ) : (
         <div>
-          <p>
-            <strong>Connected:</strong> {account}
-          </p>
+          <p><strong>Connected:</strong> {account}</p>
           <button onClick={handleDisconnect}>Disconnect</button>
         </div>
       )}
