@@ -17,7 +17,8 @@ jobs:
       - name: Show runner info
         run: |
           uname -a
-          docker --version || true
+          which bash
+          bash --version
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -28,6 +29,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+
+      # ---- Diagnostics: show the script and its endings/permissions
+      - name: Inspect script
+        run: |
+          ls -l scripts/ci
+          file scripts/ci/start_localnet.sh || true
+          sed -n '1,40p' scripts/ci/start_localnet.sh | cat -A
 
       # Normalize Windows CRLF -> LF so bash can run it
       - name: Convert line endings (LF)
@@ -43,5 +51,3 @@ jobs:
 
       - name: Run smoke tests
         run: pytest -q
-  
-
