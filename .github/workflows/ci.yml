@@ -29,14 +29,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      # 👇 make the script executable (Windows often strips exec bit)
+      # Normalize Windows CRLF -> LF so bash can run it
+      - name: Convert line endings (LF)
+        run: sed -i 's/\r$//' scripts/ci/start_localnet.sh
+
+      # Make it executable (defensive)
       - name: Make CI scripts executable (Linux)
         run: chmod +x scripts/ci/start_localnet.sh
 
-      # 👇 run explicitly with bash to avoid "Permission denied"
+      # IMPORTANT: run VIA BASH (not direct path)
       - name: Start AlgoKit LocalNet
         run: bash scripts/ci/start_localnet.sh
 
       - name: Run smoke tests
         run: pytest -q
+  
 
