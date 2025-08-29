@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/polyfills.ts","./src/vite-env.d.ts","./src/types/perawallet-connect.d.ts"],"version":"5.9.2"}
+{"root":["./src/app.tsx","./src/deploy.ts","./src/main.tsx","./src/polyfills.ts","./src/vite-env.d.ts","./src/types/perawallet-connect.d.ts"],"version":"5.9.2"}

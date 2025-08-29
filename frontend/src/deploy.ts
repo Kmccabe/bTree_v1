@@ -1,6 +1,7 @@
-
+// frontend/src/deploy.ts
 import algosdk from "algosdk";
 
+/** Minimal placeholder contract (approves all except Update/Delete unless creator) */
 export const APPROVAL_TEAL = `#pragma version 8
 txn OnCompletion
 int DeleteApplication
@@ -31,23 +32,31 @@ int 1
 return
 `;
 
-async function api(path: string, init?: RequestInit) {
+/** Simple helper for our serverless API calls */
+async function api<T = any>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(path, init);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    throw new Error(`API ${path} failed: ${r.status} ${txt}`);
+  }
+  return r.json() as Promise<T>;
 }
 
-export async function deployPlaceholderApp(from: string) {
-  // 1) Get suggested params from serverless proxy
-  const params = await api("/api/params");
+/** Build an unsigned app-create txn; Pera will sign it */
+export async function deployPlaceholderApp(fromAddr: string): Promise<{
+  txn: algosdk.Transaction;
+  b64: string;
+}> {
+  // 1) Suggested params (proxied via /api/params)
+  const params = await api<any>("/api/params");
 
-  // 2) Compile TEAL via serverless (algod compile)
-  const approval = await api("/api/compile", {
+  // 2) Compile TEAL via serverless (Algod /v2/teal/compile)
+  const approval = await api<{ result: string }>("/api/compile", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source: APPROVAL_TEAL }),
   });
-  const clear = await api("/api/compile", {
+  const clear = await api<{ result: string }>("/api/compile", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source: CLEAR_TEAL }),
@@ -56,17 +65,21 @@ export async function deployPlaceholderApp(from: string) {
   const approvalProg = new Uint8Array(Buffer.from(approval.result, "base64"));
   const clearProg = new Uint8Array(Buffer.from(clear.result, "base64"));
 
-  // 3) Build ApplicationCreate transaction
+  // 3) Normalize Algod params -> pass as any to satisfy SDK typings variance
+  const sp = {
+    fee: Number(params.fee ?? params["min-fee"] ?? 1000),
+    flatFee: false,
+    firstRound: Number(params["last-round"]),
+    lastRound: Number(params["last-round"]) + 1000,
+    genesisHash: params["genesishashb64"],
+    genesisID: params["genesis-id"],
+  } as any;
+
+  // 4) Build txn using the OBJECT helper; cast the whole object to any
+  const note = new TextEncoder().encode("bTree v1 placeholder app");
   const txn = algosdk.makeApplicationCreateTxnFromObject({
-    from,
-    suggestedParams: {
-      fee: params.fee,
-      flatFee: false,
-      firstRound: params["last-round"],
-      lastRound: params["last-round"] + 1000,
-      genesisHash: params["genesishashb64"],
-      genesisID: params["genesis-id"],
-    },
+    from: fromAddr,
+    suggestedParams: sp as any,
     onComplete: algosdk.OnApplicationComplete.NoOpOC,
     approvalProgram: approvalProg,
     clearProgram: clearProg,
@@ -74,9 +87,10 @@ export async function deployPlaceholderApp(from: string) {
     numGlobalInts: 0,
     numLocalByteSlices: 0,
     numLocalInts: 0,
-    note: new TextEncoder().encode("bTree v1 placeholder app"),
-  });
+    note,
+  } as any);
 
+  // 5) Base64-encode for WalletConnect signing
   const b64 = Buffer.from(txn.toByte()).toString("base64");
   return { txn, b64 };
 }
