@@ -1,4 +1,3 @@
-
 name: CI
 
 on:
@@ -10,14 +9,15 @@ on:
 jobs:
   localnet-tests:
     runs-on: ubuntu-latest
-    services:
-      docker:
-        image: docker:24.0-dind
-        options: >-
-          --privileged
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Show runner info
+        run: |
+          uname -a
+          docker --version || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -29,8 +29,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      # 👇 make the script executable (Windows often strips exec bit)
+      - name: Make CI scripts executable (Linux)
+        run: chmod +x scripts/ci/start_localnet.sh
+
+      # 👇 run explicitly with bash to avoid "Permission denied"
       - name: Start AlgoKit LocalNet
-        run: scripts/ci/start_localnet.sh
+        run: bash scripts/ci/start_localnet.sh
 
       - name: Run smoke tests
         run: pytest -q
+
