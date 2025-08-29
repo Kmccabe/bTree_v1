@@ -1,5 +1,4 @@
-
-// frontend/api/_algod.ts
+/// <reference types="node" />
 export function algodHeaders() {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = process.env.TESTNET_ALGOD_TOKEN || "";

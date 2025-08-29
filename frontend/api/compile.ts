@@ -1,4 +1,4 @@
-
+/// <reference types="node" />
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { algodHeaders, algodUrl } from "./_algod";
 
