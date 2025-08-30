@@ -38,7 +38,9 @@ CHECKLIST.md      # Day-by-day checklist to Sept 9
 
 4. **Vercel**
    - Connect `frontend/` to Vercel
-   - Add env vars from `.env.example` (use the TESTNET_* ones)
+   - Add env vars from `frontend/.env.example`:
+     - Serverless functions: `TESTNET_ALGOD_URL`, `TESTNET_ALGOD_TOKEN`
+     - Client (optional): `VITE_NETWORK=TESTNET`
    - Deploy
 
 ## Notes

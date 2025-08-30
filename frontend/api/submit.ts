@@ -21,8 +21,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const resp = await fetch(algodUrl("/v2/transactions"), {
       method: "POST",
       headers,
-      // Node fetch accepts Uint8Array; cast keeps TS happy across DOM/Node lib combos
-      body: raw as unknown as BodyInit,
+      // Node fetch accepts Uint8Array; using 'any' avoids DOM BodyInit typing in Node builds
+      body: raw as any,
     });
 
     const text = await resp.text();

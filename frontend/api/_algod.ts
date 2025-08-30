@@ -1,13 +1,13 @@
 /// <reference types="node" />
 export function algodHeaders() {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const token = process.env.TESTNET_ALGOD_TOKEN || "";
+  const token = process.env.TESTNET_ALGOD_TOKEN || process.env.VITE_TESTNET_ALGOD_TOKEN || "";
   if (token) headers["X-API-Key"] = token;
   return headers;
 }
 
 export function algodUrl(path: string) {
-  const base = process.env.TESTNET_ALGOD_URL;
-  if (!base) throw new Error("TESTNET_ALGOD_URL env not set on server");
+  const base = process.env.TESTNET_ALGOD_URL || process.env.VITE_TESTNET_ALGOD_URL;
+  if (!base) throw new Error("TESTNET_ALGOD_URL (or VITE_TESTNET_ALGOD_URL) env not set on server");
   return base.replace(/\/$/, "") + path;
 }

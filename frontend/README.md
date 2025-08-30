@@ -13,5 +13,6 @@ npm run dev
 ```
 
 ## Vercel
-- Add the `VITE_TESTNET_*` env vars in Vercel project settings.
+- Set server envs (Functions): `TESTNET_ALGOD_URL`, `TESTNET_ALGOD_TOKEN`.
+- Optionally set client envs: `VITE_NETWORK=TESTNET` (defaults to TESTNET).
 - Deploy.
