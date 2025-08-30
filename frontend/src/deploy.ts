@@ -54,8 +54,8 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
   };
 }> {
   // Normalize and validate sender address early
-  const normalizedFrom = (fromAddr ?? "").toString().trim().toUpperCase();
-  if (!algosdk.isValidAddress(normalizedFrom)) {
+  const from = (fromAddr ?? "").toString().trim();
+  if (!algosdk.isValidAddress(from)) {
     throw new Error(`Invalid Algorand address: '${fromAddr}'`);
   }
   // 1) Suggested params (proxied via /api/params)
@@ -85,6 +85,9 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
     flatFee: true,
     firstValid: firstRound,
     lastValid: firstRound + 1000,
+    // include round aliases for broader SDK compatibility
+    firstRound,
+    lastRound: firstRound + 1000,
     genesisHash: params["genesishashb64"],
     genesisID: params["genesis-id"],
   } as unknown as algosdk.SuggestedParams;
@@ -92,14 +95,14 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
   // 4) Build txn using the OBJECT helper; cast the whole object to any
   const note = new TextEncoder().encode("bTree v1 placeholder app");
   // Extra guard: ensure address decodes
-  const decoded = algosdk.decodeAddress(normalizedFrom);
-  console.debug("deployPlaceholderApp: from", normalizedFrom, "decoded", decoded);
+  const decoded = algosdk.decodeAddress(from);
+  console.debug("deployPlaceholderApp: from", from, "decoded", decoded);
   console.debug("deployPlaceholderApp: suggestedParams", suggestedParams);
   console.debug("deployPlaceholderApp: approval len", approvalProg.length, "clear len", clearProg.length);
   let txn: algosdk.Transaction;
   try {
     txn = algosdk.makeApplicationCreateTxnFromObject({
-      from: normalizedFrom,
+      sender: from,
       suggestedParams,
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       approvalProgram: approvalProg,
@@ -109,11 +112,15 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
       numLocalByteSlices: 0,
       numLocalInts: 0,
       note,
+      appArgs: [],
+      accounts: [],
+      foreignApps: [],
+      foreignAssets: [],
     } as any);
   } catch (e) {
     console.error("makeApplicationCreateTxnFromObject failed", e);
     console.error("Object passed:", {
-      from: normalizedFrom,
+      sender: from,
       suggestedParams,
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       approvalLen: approvalProg.length,
@@ -131,7 +138,7 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
       suggestedParams,
       approvalLen: approvalProg.length,
       clearLen: clearProg.length,
-      from: normalizedFrom,
+      from,
     },
   };
 }

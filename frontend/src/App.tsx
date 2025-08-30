@@ -24,7 +24,7 @@ export default function App(): JSX.Element {
     pera.reconnectSession().then((accounts) => {
       if (!mounted) return;
       if (accounts && accounts.length > 0) {
-        const a = (accounts[0] ?? "").toString().trim().toUpperCase();
+        const a = (accounts[0] ?? "").toString().trim();
         setAccount(a);
       }
       const conn: any = (pera as any).connector;
@@ -38,7 +38,7 @@ export default function App(): JSX.Element {
     try {
       const accounts = await pera.connect();
       if (accounts && accounts.length > 0) {
-        const a = (accounts[0] ?? "").toString().trim().toUpperCase();
+        const a = (accounts[0] ?? "").toString().trim();
         setAccount(a);
       }
     } catch (err) {
