@@ -82,8 +82,9 @@ export default function PhaseControl({ appId, account, network }: Props) {
 
       // 3) build NoOp using v3-friendly helper
       const appArgs = [te.encode("set_phase"), itob8(phase)];
+      const fromAddr = (account as string).trim();
       const txn = algosdk.makeApplicationCallTxnFromObject({
-        from: account as string,
+        from: fromAddr,
         appIndex: resolvedAppId as number,
         onComplete: algosdk.OnApplicationComplete.NoOpOC,
         appArgs,
@@ -91,7 +92,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
       } as any);
 
       // 4) sign with Pera and submit
-      const raw = await signWithPera(txn, account);
+      const raw = await signWithPera(txn, fromAddr);
       const signedTxnBase64 = Buffer.from(raw).toString("base64");
 
       const resp = await fetch("/api/submit", {
@@ -109,7 +110,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     }
   }
 
-  const disabled = !resolvedAppId || !account;
+  const disabled = !resolvedAppId || !account || !algosdk.isValidAddress(account);
 
   return (
     <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 12, borderRadius: 8, background: "#fff" }}>
