@@ -97,6 +97,22 @@ export default function App(): JSX.Element {
     }
   }, [account]);
 
+  const txExplorerUrl = useMemo(() => {
+    if (!txid) return null;
+    const net = (network || "").toUpperCase();
+    if (net === "TESTNET") return `https://testnet.algoexplorer.io/tx/${txid}`;
+    if (net === "MAINNET") return `https://algoexplorer.io/tx/${txid}`;
+    return null;
+  }, [txid, network]);
+
+  const appExplorerUrl = useMemo(() => {
+    if (!appId) return null;
+    const net = (network || "").toUpperCase();
+    if (net === "TESTNET") return `https://app.dappflow.org/explorer/application/${appId}?network=testnet`;
+    if (net === "MAINNET") return `https://app.dappflow.org/explorer/application/${appId}?network=mainnet`;
+    return null;
+  }, [appId, network]);
+
   const handlePingParams = useCallback(async () => {
     setParamsErr(null);
     setParamsInfo(null);
@@ -136,8 +152,22 @@ export default function App(): JSX.Element {
       {!isValidAccount && account && (
         <p style={{ color: "#b00" }}>Connected address looks invalid. Reconnect your wallet.</p>
       )}
-      {txid && <p>TxID: <code>{txid}</code></p>}
-      {appId && <p>✅ App ID: <strong>{appId}</strong></p>}
+      {txid && (
+        <p>
+          TxID: <code>{txid}</code>
+          {txExplorerUrl && (
+            <> — <a href={txExplorerUrl} target="_blank" rel="noreferrer">View on AlgoExplorer</a></>
+          )}
+        </p>
+      )}
+      {appId && (
+        <p>
+          ✅ App ID: <strong>{appId}</strong>
+          {appExplorerUrl && (
+            <> — <a href={appExplorerUrl} target="_blank" rel="noreferrer">Open in Dappflow</a></>
+          )}
+        </p>
+      )}
 
       <div style={{ marginTop: 24, border: "1px dashed #bbb", padding: 12, borderRadius: 6, background: "#fafafa" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
