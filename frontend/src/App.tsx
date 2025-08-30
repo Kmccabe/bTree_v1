@@ -1,13 +1,10 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import * as algosdk from "algosdk";
-import { PeraWalletConnect } from "@perawallet/connect";
+import { pera } from "./wallet";
 import { deployPlaceholderApp } from "./deploy";
 import ExportCSVButton from "./components/ExportCSVButton";
 import PhaseControl from "./components/PhaseControl";
-
-
-const pera = new PeraWalletConnect();
 
 export default function App(): JSX.Element {
   const [account, setAccount] = useState<string | null>(null);
