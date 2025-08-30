@@ -71,17 +71,21 @@ export default function PhaseControl({ appId, account, network }: Props) {
       // 1) fetch algorand params from API
       const p = await fetch("/api/params").then((r) => r.json());
       const last = Number(p["last-round"] ?? p["lastRound"] ?? 0);
+      const minFee = Number(p["min-fee"] ?? p.fee ?? 1000) || 1000;
+      const gh = (p["genesis-hash"] ?? p.genesishashb64 ?? p.genesisHash) as string;
 
-      // 2) normalize to SuggestedParams (typesafe)
+      // 2) normalize to SuggestedParams with broad SDK compatibility
       const sp: algosdk.SuggestedParams = {
-        fee: Number(p.fee ?? p["min-fee"] ?? 1000),
+        fee: minFee,
+        minFee: minFee,
         flatFee: true,
-        // v3 types use firstValid/lastValid
         firstValid: last,
         lastValid: last + 1000,
+        // include legacy aliases for certain SDK helpers
+        firstRound: last as any,
+        lastRound: (last + 1000) as any,
         genesisID: (p["genesis-id"] ?? p.genesisID) as string,
-        // v3 types accept Uint8Array for genesisHash
-        genesisHash: fromB64((p["genesis-hash"] ?? p.genesisHash) as string),
+        genesisHash: fromB64(gh),
       } as any;
 
       // 3) build NoOp using v3-friendly helper
