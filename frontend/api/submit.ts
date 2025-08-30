@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { algodHeaders, algodUrl } from "./_algod";
+import { algodHeaders, algodUrl } from "./_algod.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
