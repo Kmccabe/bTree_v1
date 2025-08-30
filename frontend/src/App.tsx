@@ -100,17 +100,45 @@ export default function App(): JSX.Element {
   const txExplorerUrl = useMemo(() => {
     if (!txid) return null;
     const net = (network || "").toUpperCase();
-    if (net === "TESTNET") return `https://testnet.algoexplorer.io/tx/${txid}`;
-    if (net === "MAINNET") return `https://algoexplorer.io/tx/${txid}`;
+    if (net === "TESTNET") return `https://explorer.perawallet.app/tx/${txid}?network=testnet`;
+    if (net === "MAINNET") return `https://explorer.perawallet.app/tx/${txid}`;
     return null;
   }, [txid, network]);
 
   const appExplorerUrl = useMemo(() => {
     if (!appId) return null;
     const net = (network || "").toUpperCase();
-    if (net === "TESTNET") return `https://app.dappflow.org/explorer/application/${appId}?network=testnet`;
-    if (net === "MAINNET") return `https://app.dappflow.org/explorer/application/${appId}?network=mainnet`;
+    if (net === "TESTNET") return `https://explorer.perawallet.app/application/${appId}?network=testnet`;
+    if (net === "MAINNET") return `https://explorer.perawallet.app/application/${appId}`;
     return null;
+  }, [appId, network]);
+
+  const txJsonUrl = useMemo(() => {
+    if (!txid) return null;
+    const net = (network || "").toUpperCase();
+    const base = net === "TESTNET" ? "https://testnet-idx.algonode.cloud" : "https://mainnet-idx.algonode.cloud";
+    return `${base}/v2/transactions/${txid}`;
+  }, [txid, network]);
+
+  const appJsonUrl = useMemo(() => {
+    if (!appId) return null;
+    const net = (network || "").toUpperCase();
+    const base = net === "TESTNET" ? "https://testnet-idx.algonode.cloud" : "https://mainnet-idx.algonode.cloud";
+    return `${base}/v2/applications/${appId}`;
+  }, [appId, network]);
+
+  const loraTxUrl = useMemo(() => {
+    if (!txid) return null;
+    const net = (network || "").toLowerCase();
+    const chain = net === "mainnet" ? "mainnet" : "testnet";
+    return `https://lora.algokit.io/${chain}/tx/${txid}`;
+  }, [txid, network]);
+
+  const loraAppUrl = useMemo(() => {
+    if (!appId) return null;
+    const net = (network || "").toLowerCase();
+    const chain = net === "mainnet" ? "mainnet" : "testnet";
+    return `https://lora.algokit.io/${chain}/application/${appId}`;
   }, [appId, network]);
 
   const handlePingParams = useCallback(async () => {
@@ -156,7 +184,13 @@ export default function App(): JSX.Element {
         <p>
           TxID: <code>{txid}</code>
           {txExplorerUrl && (
-            <> — <a href={txExplorerUrl} target="_blank" rel="noreferrer">View on AlgoExplorer</a></>
+            <> — <a href={txExplorerUrl} target="_blank" rel="noreferrer">View in Pera Explorer</a></>
+          )}
+          {txJsonUrl && (
+            <> — <a href={txJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
+          )}
+          {loraTxUrl && (
+            <> — <a href={loraTxUrl} target="_blank" rel="noreferrer">View in Lora</a></>
           )}
         </p>
       )}
@@ -164,7 +198,13 @@ export default function App(): JSX.Element {
         <p>
           ✅ App ID: <strong>{appId}</strong>
           {appExplorerUrl && (
-            <> — <a href={appExplorerUrl} target="_blank" rel="noreferrer">Open in Dappflow</a></>
+            <> — <a href={appExplorerUrl} target="_blank" rel="noreferrer">Open in Pera Explorer</a></>
+          )}
+          {appJsonUrl && (
+            <> — <a href={appJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
+          )}
+          {loraAppUrl && (
+            <> — <a href={loraAppUrl} target="_blank" rel="noreferrer">Open in Lora</a></>
           )}
         </p>
       )}
