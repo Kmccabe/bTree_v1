@@ -16,6 +16,8 @@ export default function App(): JSX.Element {
   const [debugOpen, setDebugOpen] = useState<boolean>(import.meta.env.DEV);
   const [paramsInfo, setParamsInfo] = useState<null | { fee?: any; lastRound?: any; genesisID?: any }>(null);
   const [paramsErr, setParamsErr] = useState<string | null>(null);
+  const [spInfo, setSpInfo] = useState<null | any>(null);
+  const [progLens, setProgLens] = useState<null | { approvalLen: number; clearLen: number }>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -60,7 +62,9 @@ export default function App(): JSX.Element {
       setAppId(null);
       console.debug("Deploying with account:", account);
       // build unsigned txn
-      const { b64 } = await deployPlaceholderApp(account);
+      const { b64, debug } = await deployPlaceholderApp(account);
+      setSpInfo(debug?.suggestedParams ?? null);
+      setProgLens({ approvalLen: debug?.approvalLen ?? 0, clearLen: debug?.clearLen ?? 0 });
       // request signature from Pera
       // @ts-ignore
       const signed = await pera.signTransaction([{ txn: b64 }]);
@@ -155,6 +159,22 @@ export default function App(): JSX.Element {
             )}
             {paramsErr && (
               <div style={{ marginTop: 6, color: "#b00" }}>params error: {paramsErr}</div>
+            )}
+            {spInfo && (
+              <div style={{ marginTop: 10 }}>
+                <div><strong>suggestedParams</strong></div>
+                <div>fee: {String((spInfo as any).fee)} (flatFee: {String((spInfo as any).flatFee)})</div>
+                <div>minFee: {String((spInfo as any).minFee)}</div>
+                <div>firstValid: {String((spInfo as any).firstValid)} → lastValid: {String((spInfo as any).lastValid)}</div>
+                <div>genesisID: {String((spInfo as any).genesisID)}</div>
+                <div>genesisHash: {String((spInfo as any).genesisHash)}</div>
+              </div>
+            )}
+            {progLens && (
+              <div style={{ marginTop: 6 }}>
+                <div>approval length: {progLens.approvalLen}</div>
+                <div>clear length: {progLens.clearLen}</div>
+              </div>
             )}
           </div>
         )}
