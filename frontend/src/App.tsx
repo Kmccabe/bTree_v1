@@ -4,6 +4,7 @@ import * as algosdk from "algosdk";
 import { PeraWalletConnect } from "@perawallet/connect";
 import { deployPlaceholderApp } from "./deploy";
 import ExportCSVButton from "./components/ExportCSVButton";
+import PhaseControl from "./components/PhaseControl";
 
 
 const pera = new PeraWalletConnect();
@@ -136,7 +137,11 @@ export default function App(): JSX.Element {
     return `https://lora.algokit.io/${chain}/application/${appId}`;
   }, [appId, network]);
 
-  // Pera Explorer cooldown removed while links are disabled
+  const resolvedAppId = useMemo(() => {
+  const envId = (import.meta.env.VITE_TESTNET_APP_ID as string) || "";
+  return appId ?? (envId ? Number(envId) : undefined);
+}, [appId]);
+
 
   const manifestText = useMemo(() => {
     const lines: string[] = ["Experiment Manifest"]; // title line
@@ -147,11 +152,10 @@ export default function App(): JSX.Element {
   }, [manifest]);
 
     // Resolve App ID for export: prefer live appId from deploy; otherwise use .env value
-  const resolvedAppId = useMemo(() => {
+  const exportAppId = useMemo(() => {
     const envId = (import.meta.env.VITE_TESTNET_APP_ID as string) || "";
     return appId ?? (envId ? Number(envId) : undefined);
   }, [appId]);
-
 
   const handleCopyManifest = useCallback(async () => {
     try {
@@ -249,6 +253,10 @@ export default function App(): JSX.Element {
       <div style={{ marginTop: 16 }}>
         <ExportCSVButton appId={resolvedAppId} />
       </div>
+      <div style={{ marginTop: 16 }}>
+        <PhaseControl appId={resolvedAppId} account={account} network={network} />
+      </div>
+
       {false && (
         <p style={{ marginTop: 4, color: "#666" }}>
           Pera Explorer links are disabled for now.
