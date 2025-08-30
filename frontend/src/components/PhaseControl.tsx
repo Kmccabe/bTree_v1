@@ -2,7 +2,7 @@
 // cspell:ignore itob
 import React, { useMemo, useState } from "react";
 import * as algosdk from "algosdk";
-import { pera } from "../wallet";
+import { pera, ensurePeraSession } from "../wallet";
 import { Buffer } from "buffer"; // ensure Buffer exists in browser builds
 
 type Props = {
@@ -64,6 +64,9 @@ export default function PhaseControl({ appId, account, network }: Props) {
       if (!account) throw new Error("Wallet not connected");
       if (!algosdk.isValidAddress(account)) throw new Error("Invalid wallet address");
       setBusy(phase);
+
+      // Make sure Pera session is initialized to avoid wallet SDK init errors
+      await ensurePeraSession();
 
       // 1) fetch algorand params from API
       const p = await fetch("/api/params").then((r) => r.json());
