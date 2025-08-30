@@ -4,7 +4,7 @@
   "artifacts": {
     "approval": {
       "file": "approval.teal",
-      "sha256": "8855dee863327984733aba01be6af9e4a0ba2235e6b073acf65d109aa40e8b93"
+      "sha256": "1e58fc4e6123953e13381bc2c2d9a9e46aa5c5bc959ed46bfd4cff26811773c5"
     },
     "clear": {
       "file": "clear.teal",
