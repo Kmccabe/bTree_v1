@@ -192,7 +192,13 @@ export default function App(): JSX.Element {
                 <div>minFee: {String((spInfo as any).minFee)}</div>
                 <div>firstValid: {String((spInfo as any).firstValid)} → lastValid: {String((spInfo as any).lastValid)}</div>
                 <div>genesisID: {String((spInfo as any).genesisID)}</div>
-                <div>genesisHash: {String((spInfo as any).genesisHash)}</div>
+                <div>
+                  genesisHash: {
+                    String((spInfo as any).genesisHash instanceof Uint8Array
+                      ? (window as any).Buffer.from((spInfo as any).genesisHash).toString("base64")
+                      : (spInfo as any).genesisHash)
+                  }
+                </div>
               </div>
             )}
             {progLens && (

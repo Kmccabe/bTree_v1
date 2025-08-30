@@ -79,6 +79,7 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
   // 3) Normalize Algod params -> pass as any to satisfy SDK typings variance
   const minFee = Number(params["min-fee"]) || 1000;
   const firstRound = Number(params["last-round"]) || 0;
+  const genesisHashB64 = (params["genesis-hash"] || params["genesishashb64"] || params["genesisHash"]) as string | Uint8Array | undefined;
   const suggestedParams = {
     fee: minFee,
     minFee: minFee,
@@ -88,7 +89,7 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
     // include round aliases for broader SDK compatibility
     firstRound,
     lastRound: firstRound + 1000,
-    genesisHash: params["genesis-hash"] || params["genesishashb64"],
+    genesisHash: typeof genesisHashB64 === "string" ? algosdk.base64ToBytes(genesisHashB64) : (genesisHashB64 as Uint8Array | undefined),
     genesisID: params["genesis-id"],
   } as unknown as algosdk.SuggestedParams;
 
