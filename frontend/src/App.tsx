@@ -65,35 +65,13 @@ export default function App(): JSX.Element {
       const { txn, b64, debug } = await deployPlaceholderApp(account);
       setSpInfo(debug?.suggestedParams ?? null);
       setProgLens({ approvalLen: debug?.approvalLen ?? 0, clearLen: debug?.clearLen ?? 0 });
-      // request signature from Pera; try Uint8Array first, then base64 fallback
-      const unsignedBytes = txn.toByte();
-      const txnsToSignBytes = [{ txn: unsignedBytes }];
-      const txnsToSignB64 = [{ txn: Buffer.from(unsignedBytes).toString("base64") }];
-      console.debug("signTransaction param check:", {
-        isArray: Array.isArray(txnsToSignBytes),
-        firstType: typeof (txnsToSignBytes as any)[0]?.txn,
-        firstIsUint8: (txnsToSignBytes as any)[0]?.txn instanceof Uint8Array,
-      });
-      let signed: any;
-      try {
-        // @ts-ignore
-        signed = await pera.signTransaction(txnsToSignBytes as any);
-      } catch (e) {
-        console.warn("signTransaction(Uint8Array) failed, retrying with base64", e);
-        // @ts-ignore
-        signed = await pera.signTransaction(txnsToSignB64 as any);
-      }
-      const signedFirst = Array.isArray(signed) ? signed[0] : signed;
-      let signedTxnBase64: string;
-      if (signedFirst instanceof Uint8Array) {
-        signedTxnBase64 = Buffer.from(signedFirst).toString("base64");
-      } else if (typeof signedFirst === "string") {
-        signedTxnBase64 = signedFirst;
-      } else if (signedFirst && typeof signedFirst === "object" && "blob" in signedFirst) {
-        signedTxnBase64 = Buffer.from((signedFirst as any).blob).toString("base64");
-      } else {
-        throw new Error("Unrecognized signTransaction return shape");
-      }
+      // request signature from Pera using Transaction object groups (per v1.4.x types)
+      console.debug("signTransaction param check: using groups [[{ txn }]]");
+      // @ts-ignore - library types expect Transaction
+      const signed: Uint8Array[] = await pera.signTransaction([[{ txn }]]);
+      const first = signed && Array.isArray(signed) ? signed[0] : null;
+      if (!first || !(first instanceof Uint8Array)) throw new Error("Pera returned unexpected signature payload");
+      const signedTxnBase64 = Buffer.from(first).toString("base64");
       // submit via serverless
       const resp = await fetch("/api/submit", {
         method: "POST",
