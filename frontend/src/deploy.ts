@@ -47,6 +47,11 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
   txn: algosdk.Transaction;
   b64: string;
 }> {
+  // Normalize and validate sender address early
+  const normalizedFrom = (fromAddr ?? "").toString().trim().toUpperCase();
+  if (!algosdk.isValidAddress(normalizedFrom)) {
+    throw new Error(`Invalid Algorand address: '${fromAddr}'`);
+  }
   // 1) Suggested params (proxied via /api/params)
   const params = await api<any>("/api/params");
 
@@ -78,7 +83,7 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
   // 4) Build txn using the OBJECT helper; cast the whole object to any
   const note = new TextEncoder().encode("bTree v1 placeholder app");
   const txn = algosdk.makeApplicationCreateTxnFromObject({
-    from: fromAddr,
+    from: normalizedFrom,
     suggestedParams: sp as any,
     onComplete: algosdk.OnApplicationComplete.NoOpOC,
     approvalProgram: approvalProg,

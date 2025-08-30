@@ -16,7 +16,10 @@ export default function App(): JSX.Element {
     let mounted = true;
     pera.reconnectSession().then((accounts) => {
       if (!mounted) return;
-      if (accounts && accounts.length > 0) setAccount(accounts[0]);
+      if (accounts && accounts.length > 0) {
+        const a = (accounts[0] ?? "").toString().trim().toUpperCase();
+        setAccount(a);
+      }
       const conn: any = (pera as any).connector;
       if (conn?.on) conn.on("disconnect", () => setAccount(null));
       if ((pera as any).on) (pera as any).on("disconnect", () => setAccount(null));
@@ -27,7 +30,10 @@ export default function App(): JSX.Element {
   const handleConnect = useCallback(async () => {
     try {
       const accounts = await pera.connect();
-      if (accounts && accounts.length > 0) setAccount(accounts[0]);
+      if (accounts && accounts.length > 0) {
+        const a = (accounts[0] ?? "").toString().trim().toUpperCase();
+        setAccount(a);
+      }
     } catch (err) {
       console.error("Pera connect failed:", err);
     }
