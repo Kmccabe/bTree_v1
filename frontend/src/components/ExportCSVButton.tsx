@@ -1,64 +1,78 @@
 import React, { useMemo, useState } from "react";
 
-// Reads appId from (1) prop, (2) ?appId= query, (3) VITE_TESTNET_APP_ID
-function useAppId(fallback?: string | number) {
-  return useMemo(() => {
-    if (fallback) return String(fallback);
+type Props = { appId?: string | number };
+
+export default function ExportCSVButton({ appId }: Props) {
+  // Resolve app id from prop → ?appId= → VITE_TESTNET_APP_ID
+  const resolvedAppId = useMemo(() => {
+    if (appId) return String(appId);
     const url = new URL(window.location.href);
     const q = url.searchParams.get("appId");
     if (q) return q;
     const env = import.meta.env.VITE_TESTNET_APP_ID as string | undefined;
     return env ?? "";
-  }, [fallback]);
-}
+  }, [appId]);
 
-/**
- * ExportCSVButton
- * - Renders a link to /api/export?appId=... with optional min/max rounds
- * - Works in Vercel/`vercel dev` (serverless available)
- * - If running pure `vite dev` (no /api), you can optionally set VITE_PUBLIC_API_BASE
- *   to your deployed domain (e.g. https://btree-v1.vercel.app).
- */
-export default function ExportCSVButton(props: { appId?: string | number }) {
-  const appId = useAppId(props.appId);
   const [minRound, setMinRound] = useState<string>("");
   const [maxRound, setMaxRound] = useState<string>("");
-
-  // Detect if we're on pure Vite dev (5173) where /api/* won't exist
+  const [busy, setBusy] = useState(false);
   const isPureVite = typeof window !== "undefined" && window.location.port === "5173";
-  const base = isPureVite
-    ? (import.meta.env.VITE_PUBLIC_API_BASE as string | undefined) || ""
-    : ""; // relative works on Vercel / vercel dev
+  const base =
+    isPureVite && (import.meta.env.VITE_PUBLIC_API_BASE as string | undefined)
+      ? (import.meta.env.VITE_PUBLIC_API_BASE as string).replace(/\/$/, "")
+      : "";
 
   const href = useMemo(() => {
-    if (!appId) return "#";
-    const params = new URLSearchParams({ appId: String(appId) });
-    if (minRound) params.set("minRound", minRound);
-    if (maxRound) params.set("maxRound", maxRound);
-    const prefix = base ? base.replace(/\/$/, "") : "";
-    return `${prefix}/api/export?${params.toString()}`;
-  }, [appId, minRound, maxRound, base]);
+    if (!resolvedAppId) return "#";
+    const p = new URLSearchParams({ appId: String(resolvedAppId) });
+    if (minRound) p.set("minRound", minRound);
+    if (maxRound) p.set("maxRound", maxRound);
+    return `${base}/api/export?${p.toString()}`;
+  }, [resolvedAppId, minRound, maxRound, base]);
 
-  const disabled = !appId;
+  async function prefillFromIndexer() {
+    if (!resolvedAppId) return;
+    try {
+      setBusy(true);
+      const idx =
+        (import.meta.env.VITE_TESTNET_INDEXER_URL as string) ||
+        "https://testnet-idx.algonode.cloud";
+      const r = await fetch(`${idx.replace(/\/$/, "")}/v2/applications/${resolvedAppId}`);
+      const j = await r.json();
+      const created = j?.application?.["created-at-round"];
+      if (created) setMinRound(String(created));
+    } catch {
+      // ignore
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const disabled = !resolvedAppId || (isPureVite && !base); // /api not available under pure vite
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl p-4 border border-gray-200">
-      <div className="text-sm font-medium">Export CSV</div>
-      <div className="text-xs text-gray-600">
-        {isPureVite && !base ? (
-          <span>
-            API routes aren’t available under <code>vite dev</code>. Run{" "}
-            <code>npx vercel dev</code> or set{" "}
-            <code>VITE_PUBLIC_API_BASE</code> to your deployed domain.
-          </span>
-        ) : (
-          <span>Exports on-chain events via the Indexer.</span>
-        )}
+    <div
+      style={{
+        marginTop: 16,
+        border: "1px solid #ddd",
+        padding: 12,
+        borderRadius: 8,
+        background: "#fff",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <strong>Export CSV</strong>
+      </div>
+      <div style={{ marginTop: 6, color: "#444", fontSize: 13 }}>
+        Exports on-chain events via the Indexer.{" "}
+        <span style={{ color: "#666" }}>
+          (Optional filters: <em>round</em> range. Leave blank for all.)
+        </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
         <input
-          className="border rounded-md px-2 py-1 text-sm"
+          style={{ border: "1px solid #ccc", borderRadius: 6, padding: "6px 8px", fontSize: 13, minWidth: 180 }}
           type="text"
           inputMode="numeric"
           placeholder="minRound (optional)"
@@ -66,7 +80,7 @@ export default function ExportCSVButton(props: { appId?: string | number }) {
           onChange={(e) => setMinRound(e.target.value)}
         />
         <input
-          className="border rounded-md px-2 py-1 text-sm"
+          style={{ border: "1px solid #ccc", borderRadius: 6, padding: "6px 8px", fontSize: 13, minWidth: 180 }}
           type="text"
           inputMode="numeric"
           placeholder="maxRound (optional)"
@@ -75,22 +89,47 @@ export default function ExportCSVButton(props: { appId?: string | number }) {
         />
         <a
           href={href}
-          className={`px-3 py-1.5 rounded-md text-sm font-semibold ${
-            disabled
-              ? "bg-gray-200 text-gray-500 pointer-events-none"
-              : "bg-black text-white hover:opacity-90"
-          }`}
-          download // hint browser to download
+          download
+          style={{
+            pointerEvents: disabled ? "none" : "auto",
+            opacity: disabled ? 0.5 : 1,
+            background: "#111",
+            color: "#fff",
+            padding: "8px 12px",
+            borderRadius: 6,
+            textDecoration: "none",
+            fontWeight: 600,
+            fontSize: 13,
+          }}
         >
-          {disabled ? "App ID required" : "Download CSV"}
+          Download CSV
         </a>
+        <button
+          onClick={prefillFromIndexer}
+          disabled={!resolvedAppId || busy}
+          style={{
+            background: "#f5f5f5",
+            border: "1px solid #ccc",
+            padding: "8px 12px",
+            borderRadius: 6,
+            fontSize: 13,
+            cursor: busy ? "wait" : "pointer",
+          }}
+          title="Fetch the app's created-at-round from the Indexer and fill minRound"
+        >
+          {busy ? "Prefilling…" : "Prefill min from Indexer"}
+        </button>
       </div>
 
-      {!appId && (
-        <div className="text-xs text-red-600">
-          No App ID found. Pass <code>?appId=</code> in URL, set{" "}
-          <code>VITE_TESTNET_APP_ID</code> in <code>.env.local</code>, or pass{" "}
-          <code>&lt;ExportCSVButton appId=... /&gt;</code>.
+      {!resolvedAppId && (
+        <div style={{ marginTop: 8, color: "#b00", fontSize: 12 }}>
+          No App ID found. Deploy once, open with <code>?appId=…</code>, or set <code>VITE_TESTNET_APP_ID</code>.
+        </div>
+      )}
+      {isPureVite && !base && (
+        <div style={{ marginTop: 8, color: "#b07", fontSize: 12 }}>
+          API routes aren’t available under <code>vite dev</code>. Run <code>npx vercel dev</code> or set{" "}
+          <code>VITE_PUBLIC_API_BASE</code> to your deployed domain.
         </div>
       )}
     </div>
