@@ -3,6 +3,8 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import * as algosdk from "algosdk";
 import { PeraWalletConnect } from "@perawallet/connect";
 import { deployPlaceholderApp } from "./deploy";
+import ExportCSVButton from "./components/ExportCSVButton";
+
 
 const pera = new PeraWalletConnect();
 
@@ -144,6 +146,13 @@ export default function App(): JSX.Element {
     return lines.join("\n");
   }, [manifest]);
 
+    // Resolve App ID for export: prefer live appId from deploy; otherwise use .env value
+  const resolvedAppId = useMemo(() => {
+    const envId = (import.meta.env.VITE_TESTNET_APP_ID as string) || "";
+    return appId ?? (envId ? Number(envId) : undefined);
+  }, [appId]);
+
+
   const handleCopyManifest = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(manifestText);
@@ -236,6 +245,10 @@ export default function App(): JSX.Element {
           </div>
         </div>
       )}
+            {/* Export CSV button */}
+      <div style={{ marginTop: 16 }}>
+        <ExportCSVButton appId={resolvedAppId} />
+      </div>
       {false && (
         <p style={{ marginTop: 4, color: "#666" }}>
           Pera Explorer links are disabled for now.
