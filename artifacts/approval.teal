@@ -2,19 +2,19 @@
 txn ApplicationID
 int 0
 ==
-bnz main_l18
+bnz main_l20
 txn OnCompletion
 int OptIn
 ==
-bnz main_l17
+bnz main_l19
 txn OnCompletion
 int UpdateApplication
 ==
-bnz main_l16
+bnz main_l18
 txn OnCompletion
 int DeleteApplication
 ==
-bnz main_l15
+bnz main_l17
 txn OnCompletion
 int NoOp
 ==
@@ -27,19 +27,28 @@ int 0
 return
 main_l8:
 txna ApplicationArgs 0
+byte "set_phase"
+==
+bnz main_l16
+txna ApplicationArgs 0
 byte "reg"
 ==
-bnz main_l14
+bnz main_l15
 txna ApplicationArgs 0
 byte "commit"
 ==
-bnz main_l13
+bnz main_l14
 txna ApplicationArgs 0
 byte "reveal"
 ==
-bnz main_l12
+bnz main_l13
 err
-main_l12:
+main_l13:
+byte "phase"
+app_global_get
+int 3
+==
+assert
 txn Sender
 byte "r"
 app_local_get
@@ -82,7 +91,12 @@ byte "reveal"
 log
 int 1
 return
-main_l13:
+main_l14:
+byte "phase"
+app_global_get
+int 2
+==
+assert
 txn Sender
 byte "r"
 app_local_get
@@ -106,7 +120,12 @@ byte "commit"
 log
 int 1
 return
-main_l14:
+main_l15:
+byte "phase"
+app_global_get
+int 1
+==
+assert
 txn Sender
 byte "r"
 app_local_get
@@ -127,26 +146,50 @@ byte "reg"
 log
 int 1
 return
-main_l15:
-txn Sender
-byte "exp"
-app_global_get
-==
-assert
-int 1
-return
 main_l16:
 txn Sender
 byte "exp"
 app_global_get
 ==
 assert
+txna ApplicationArgs 1
+btoi
+int 1
+>=
+assert
+txna ApplicationArgs 1
+btoi
+int 4
+<=
+assert
+byte "phase"
+txna ApplicationArgs 1
+btoi
+app_global_put
+byte "phase"
+log
 int 1
 return
 main_l17:
+txn Sender
+byte "exp"
+app_global_get
+==
+assert
 int 1
 return
 main_l18:
+txn Sender
+byte "exp"
+app_global_get
+==
+assert
+int 1
+return
+main_l19:
+int 1
+return
+main_l20:
 byte "exp"
 txn Sender
 app_global_put
