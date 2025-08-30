@@ -2,11 +2,11 @@
 # Trust Game Experiment App – Daily Checklist (Deadline: Sept 9)
 
 ## 📅 Aug 29 (Fri) – Kick-off
-- [ ] Repo created (`contracts/`, `frontend/`, `scripts/`, `tests/`, `infra/`)
-- [ ] `.env.local` set with **LocalNet** + **TestNet** endpoints
-- [ ] `algokit localnet start` runs, algod/indexer reachable (SDK only)
-- [ ] Pera in **Developer Mode → TestNet**, account funded from dispenser
-- [ ] Vercel deploy live, “Connect Pera Wallet” works (TestNet)
+- [x] Repo created (`contracts/`, `frontend/`, `scripts/`, `tests/`, `infra/`)
+- [x] `.env.local` set with **LocalNet** + **TestNet** endpoints
+- [x] `algokit localnet start` runs, algod/indexer reachable (SDK only)
+- [x] Pera in **Developer Mode → TestNet**, account funded from dispenser
+- [x] Vercel deploy live, “Connect Pera Wallet” works (TestNet)
 
 ## 📅 Aug 30 (Sat) – Contract scaffold
 - [ ] Algorand Python skeleton contract written (methods stubbed)
