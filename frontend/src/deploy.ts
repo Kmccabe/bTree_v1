@@ -88,7 +88,7 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
     // include round aliases for broader SDK compatibility
     firstRound,
     lastRound: firstRound + 1000,
-    genesisHash: params["genesishashb64"],
+    genesisHash: params["genesis-hash"] || params["genesishashb64"],
     genesisID: params["genesis-id"],
   } as unknown as algosdk.SuggestedParams;
 
