@@ -1,0 +1,47 @@
+#pragma version 8
+txn ApplicationID
+int 0
+==
+bnz main_l8
+txn OnCompletion
+int UpdateApplication
+==
+bnz main_l7
+txn OnCompletion
+int DeleteApplication
+==
+bnz main_l6
+int 1
+bnz main_l5
+err
+main_l5:
+int 1
+return
+main_l6:
+txn Sender
+byte "exp"
+app_global_get
+==
+assert
+int 1
+return
+main_l7:
+txn Sender
+byte "exp"
+app_global_get
+==
+assert
+int 1
+return
+main_l8:
+byte "exp"
+txn Sender
+app_global_put
+byte "phase"
+int 0
+app_global_put
+byte "n"
+int 0
+app_global_put
+int 1
+return

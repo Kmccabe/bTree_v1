@@ -10,17 +10,37 @@ End-to-end scaffold for a Trust Game experiment on Algorand. Wallet flows run on
 - Aug 29 (Kick‑off) checklist complete. See `CHECKLIST.md` for the remaining schedule to Sept 9.
 - Contracts are placeholders; the UI can connect Pera and deploy a minimal app to TestNet via serverless APIs.
 
+Starter scaffold toward the Sept 9 deadline.
+
+- **Wallet flows:** Pera on **TestNet** (wallet signs; no mnemonics on server)
+- **LocalNet:** for SDK/CI tests only (AlgoKit)
+- **Hosting:** Frontend on **Vercel** (serverless `/api/*` to proxy Algod)
+
 ## Repository Structure
 ```
-contracts/        # Algorand Python (algopy/PyTeal) contract skeletons
-frontend/         # React + Vite + TypeScript app with Pera (TestNet)
-  ├─ api/         # Vercel serverless endpoints (Algod proxy, compile, submit)
-  └─ src/         # Client app (Pera connect, deploy placeholder app)
-infra/            # AlgoKit + LocalNet notes
-scripts/          # Export/verification scripts (placeholders)
-tests/            # pytest tests (LocalNet health, placeholders)
-CHECKLIST.md      # Day-by-day plan to Sept 9
-CLAUDE.md         # Architecture and dev guide (more detail)
+contracts/                      # PyTeal scaffold + build script → artifacts/*.teal
+  trust_game_app_scaffold.py    # current scaffold (keep your trust_game_app.py notes too)
+  build.py
+  requirements.txt
+frontend/                       # React + Vite + TypeScript app (Pera on TestNet)
+  api/                          # Vercel serverless routes (Algod proxy)
+    params.ts                   # GET /api/params
+    compile.ts                  # POST /api/compile
+    submit.ts                   # POST /api/submit
+    pending.ts                  # GET  /api/pending?txid=...
+    _algod.ts                   # shared helper (URL + headers)
+  src/
+    App.tsx                     # UI (Pera connect, admin-gated deploy, Manifest card)
+    deploy.ts                   # builds unsigned app-create txn (Pera signs)
+    components/ManifestCard.tsx
+tests/
+  contract/
+    test_build_and_compile.py   # compiles TEAL on LocalNet
+    test_happy_path_stub.py     # placeholder, skipped
+docs/
+  DATA_EXPORT.md                # CSV/export plan
+  INTEGRITY.md                  # finalize() digest plan
+artifacts/                      # generated TEAL + manifest (via contracts/build.py)
 ```
 
 ## Prerequisites
@@ -111,3 +131,115 @@ Add a CI badge after pushing to GitHub and enabling Actions:
 ```
 ![CI](https://github.com/<your-org>/<your-repo>/actions/workflows/ci.yml/badge.svg)
 ```
+## Environment Variables
+
+### Vercel (serverless functions; `process.env`)
+Set in **Project → Settings → Environment Variables** for **Production, Preview, Development**:
+
+~~~
+TESTNET_ALGOD_URL = https://testnet-api.algonode.cloud
+TESTNET_ALGOD_TOKEN =
+~~~
+
+### Vite client (browser; `import.meta.env`)
+Create/update **`frontend/.env.local`**:
+
+~~~
+VITE_NETWORK=TESTNET
+VITE_TESTNET_APP_ID=              # optional; display a known app id
+VITE_TESTNET_ALGOD_URL=https://testnet-api.algonode.cloud
+VITE_TESTNET_INDEXER_URL=https://testnet-idx.algonode.cloud
+VITE_TESTNET_ALGOD_TOKEN=
+~~~
+
+### Local serverless (only for `vercel dev`)
+Create **`frontend/.env`**:
+
+~~~
+TESTNET_ALGOD_URL=https://testnet-api.algonode.cloud
+TESTNET_ALGOD_TOKEN=
+~~~
+
+---
+
+## Quick Start
+
+### 1) LocalNet (SDK tests)
+Requires Docker + AlgoKit:
+~~~
+algokit localnet start
+~~~
+
+### 2) Build contract artifacts
+~~~
+python -m pip install -r contracts/requirements.txt
+python contracts/build.py
+# → artifacts/approval.teal, artifacts/clear.teal, artifacts/contract.manifest.json
+~~~
+
+### 3) Run tests (compile TEAL against LocalNet)
+~~~
+python -m pip install requests py-algorand-sdk
+pytest -q
+~~~
+
+### 4) Frontend (local)
+~~~
+cd frontend
+npm i
+npm run dev          # UI at http://localhost:5173 (no /api routes)
+# or to run serverless routes locally:
+npx vercel dev       # app + /api at http://localhost:3000
+~~~
+
+### 5) Vercel (hosting)
+- **Root Directory:** `frontend/`
+- **Build Command:** `npm run build`
+- **Output Directory:** `dist`
+- Add the **server** env vars above; deploy.
+- Verify:
+  - `https://<app>/api/health` → `{ ok: true }`
+  - `https://<app>/api/params` → JSON with `"last-round"`
+
+---
+
+## Using the app
+
+- Click **Connect Pera Wallet** (make sure your Pera app is on **TestNet**).
+- **Manifest card** shows network, App ID, TxID (when available), and a **Copy Manifest** button for reproducibility.
+- **Admin controls:** add `?admin=1` to the URL to reveal **Deploy to TestNet**.  
+  The app-create transaction is built client-side and **signed in Pera**; the serverless route only forwards it to Algod.
+
+---
+
+## CI (GitHub Actions)
+
+Make sure your workflow:
+1) Installs contract deps (`pyteal`, `requests`)
+2) Runs `python contracts/build.py`
+3) Starts LocalNet (Docker-in-Docker)
+4) Runs `pytest -q`
+
+Badge:
+~~~
+![CI](https://github.com/Kmccabe/bTree_v1/actions/workflows/ci.yml/badge.svg)
+~~~
+
+---
+
+## Milestones
+
+- **Aug 29**: Frontend + wallet-only deploy; API routes; LocalNet health ✅  
+- **Aug 30**: Contract scaffold + artifacts + LocalNet compile test ✅  
+- **Aug 31 – Sept 3**: Implement register/commit/reveal/settle + tests  
+- **Sept 4 – 6**: Exporter (CSV), integrity digest, docs  
+- **Sept 7 – 9**: Polish, walkthrough, dry run
+
+---
+
+## Troubleshooting
+
+- **`Unexpected token '<' ... not valid JSON`** during deploy: you’re hitting Vite preview (no functions). Use the deployed site or `npx vercel dev`.
+- **`Cannot find module './_algod'`**: ensure `frontend/api/_algod.ts` exists and imports use the correct relative path.
+- **`process` not found in API TS**: `npm i -D @types/node` and add `/// <reference types="node" />` at top of API files.
+- **TypeScript types for algosdk params**: we cast `SuggestedParams` to `any` in `deploy.ts` to be compatible across SDK versions.
