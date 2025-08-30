@@ -61,7 +61,8 @@ export default function PhaseControl({ appId, account, network }: Props) {
     try {
       setErr(null);
       if (!resolvedAppId) throw new Error("No App ID");
-      if (!account || !algosdk.isValidAddress(account)) throw new Error("Connect a valid Pera account");
+      if (!account) throw new Error("Wallet not connected");
+      if (!algosdk.isValidAddress(account)) throw new Error("Invalid wallet address");
       setBusy(phase);
 
       // 1) fetch algorand params from API
@@ -83,6 +84,11 @@ export default function PhaseControl({ appId, account, network }: Props) {
       // 3) build NoOp using v3-friendly helper
       const appArgs = [te.encode("set_phase"), itob8(phase)];
       const fromAddr = (account as string).trim();
+      
+      // Additional validation before creating transaction
+      if (!fromAddr || fromAddr === "") throw new Error("Address is empty");
+      if (!algosdk.isValidAddress(fromAddr)) throw new Error("Address is invalid for transaction");
+      
       const txn = algosdk.makeApplicationCallTxnFromObject({
         from: fromAddr,
         appIndex: resolvedAppId as number,
