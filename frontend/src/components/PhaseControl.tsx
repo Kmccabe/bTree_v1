@@ -26,11 +26,11 @@ const fromB64 = (s: string) => Uint8Array.from(Buffer.from(s, "base64"));
 
 // Some versions of @perawallet/connect typings don’t expose signTransaction.
 // Use a small helper with a safe cast and fallback to signTransactions if present.
-async function signWithPera(txn: algosdk.Transaction, account: string): Promise<Uint8Array> {
+async function signWithPera(txn: algosdk.Transaction): Promise<Uint8Array> {
   const anyPera: any = pera as any;
   const sign = anyPera.signTransaction || anyPera.signTransactions;
   if (!sign) throw new Error("Pera sign method is unavailable");
-  const groups = await sign.call(pera, [[{ txn, signers: [account] }]]);
+  const groups = await sign.call(pera, [[{ txn }]]);
   const maybe = Array.isArray(groups) ? groups[0] : groups;
   const raw: Uint8Array | undefined = Array.isArray(maybe) ? (maybe[0] as any) : (maybe as any);
   if (!(raw && raw instanceof Uint8Array)) throw new Error("No signature from Pera");
@@ -90,7 +90,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
       if (!algosdk.isValidAddress(fromAddr)) throw new Error("Address is invalid for transaction");
       
       const txn = algosdk.makeApplicationCallTxnFromObject({
-        from: fromAddr,
+        sender: fromAddr,
         appIndex: resolvedAppId as number,
         onComplete: algosdk.OnApplicationComplete.NoOpOC,
         appArgs,
@@ -98,7 +98,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
       } as any);
 
       // 4) sign with Pera and submit
-      const raw = await signWithPera(txn, fromAddr);
+      const raw = await signWithPera(txn);
       const signedTxnBase64 = Buffer.from(raw).toString("base64");
 
       const resp = await fetch("/api/submit", {
