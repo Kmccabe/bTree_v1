@@ -2,7 +2,7 @@
 // cspell:ignore itob
 import React, { useMemo, useState } from "react";
 import * as algosdk from "algosdk";
-import { PeraWalletConnect } from "@perawallet/connect";
+import { pera } from "../wallet";
 import { Buffer } from "buffer"; // ensure Buffer exists in browser builds
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
   network?: string; // display only
 };
 
-const pera = new PeraWalletConnect();
+// use shared Pera instance from wallet.ts
 
 function itob8(n: number): Uint8Array {
   const b = new Uint8Array(8);
