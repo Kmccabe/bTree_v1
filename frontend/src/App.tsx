@@ -18,6 +18,9 @@ export default function App(): JSX.Element {
   const [paramsErr, setParamsErr] = useState<string | null>(null);
   const [spInfo, setSpInfo] = useState<null | any>(null);
   const [progLens, setProgLens] = useState<null | { approvalLen: number; clearLen: number }>(null);
+  const [peraReady, setPeraReady] = useState(false);
+  const [peraCountdown, setPeraCountdown] = useState<number | null>(null);
+  const PERA_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes
 
   useEffect(() => {
     let mounted = true;
@@ -141,6 +144,26 @@ export default function App(): JSX.Element {
     return `https://lora.algokit.io/${chain}/application/${appId}`;
   }, [appId, network]);
 
+  // Pera explorer cooldown: show links only after a short delay post-deploy
+  useEffect(() => {
+    if (!txid && !appId) return; // nothing to wait for
+    setPeraReady(false);
+    const start = Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, PERA_COOLDOWN_MS - elapsed);
+      setPeraCountdown(Math.ceil(remaining / 1000));
+      if (remaining <= 0) {
+        setPeraReady(true);
+        clearInterval(intId);
+      }
+    };
+    tick();
+    const intId = setInterval(tick, 1000);
+    return () => clearInterval(intId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txid, appId]);
+
   const handlePingParams = useCallback(async () => {
     setParamsErr(null);
     setParamsInfo(null);
@@ -183,29 +206,34 @@ export default function App(): JSX.Element {
       {txid && (
         <p>
           TxID: <code>{txid}</code>
-          {txExplorerUrl && (
-            <> — <a href={txExplorerUrl} target="_blank" rel="noreferrer">View in Pera Explorer</a></>
+          {loraTxUrl && (
+            <> — <a href={loraTxUrl} target="_blank" rel="noreferrer">View in Lora</a></>
           )}
           {txJsonUrl && (
             <> — <a href={txJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
           )}
-          {loraTxUrl && (
-            <> — <a href={loraTxUrl} target="_blank" rel="noreferrer">View in Lora</a></>
+          {txExplorerUrl && peraReady && (
+            <> — <a href={txExplorerUrl} target="_blank" rel="noreferrer">View in Pera Explorer</a></>
           )}
         </p>
       )}
       {appId && (
         <p>
           ✅ App ID: <strong>{appId}</strong>
-          {appExplorerUrl && (
-            <> — <a href={appExplorerUrl} target="_blank" rel="noreferrer">Open in Pera Explorer</a></>
+          {loraAppUrl && (
+            <> — <a href={loraAppUrl} target="_blank" rel="noreferrer">Open in Lora</a></>
           )}
           {appJsonUrl && (
             <> — <a href={appJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
           )}
-          {loraAppUrl && (
-            <> — <a href={loraAppUrl} target="_blank" rel="noreferrer">Open in Lora</a></>
+          {appExplorerUrl && peraReady && (
+            <> — <a href={appExplorerUrl} target="_blank" rel="noreferrer">Open in Pera Explorer</a></>
           )}
+        </p>
+      )}
+      {!!(txid || appId) && !peraReady && (
+        <p style={{ marginTop: 4, color: "#666" }}>
+          Pera Explorer may take a few minutes to index. Links will appear{typeof peraCountdown === 'number' ? ` in ~${peraCountdown}s` : ''}.
         </p>
       )}
 
