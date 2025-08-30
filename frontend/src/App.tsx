@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import algosdk from "algosdk";
+import * as algosdk from "algosdk";
 import { PeraWalletConnect } from "@perawallet/connect";
 import { deployPlaceholderApp } from "./deploy";
 

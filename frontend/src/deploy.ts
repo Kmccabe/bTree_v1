@@ -1,5 +1,5 @@
 // frontend/src/deploy.ts
-import algosdk from "algosdk";
+import * as algosdk from "algosdk";
 
 /** Minimal placeholder contract (approves all except Update/Delete unless creator) */
 export const APPROVAL_TEAL = `#pragma version 8
@@ -71,17 +71,24 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
   const clearProg = new Uint8Array(Buffer.from(clear.result, "base64"));
 
   // 3) Normalize Algod params -> pass as any to satisfy SDK typings variance
+  const minFee = Number(params["min-fee"] ?? 1000) || 1000;
+  const lastRound = Number(params["last-round"]) || 0;
   const sp = {
-    fee: Number(params.fee ?? params["min-fee"] ?? 1000),
-    flatFee: false,
-    firstRound: Number(params["last-round"]),
-    lastRound: Number(params["last-round"]) + 1000,
+    fee: minFee,
+    flatFee: true,
+    // Provide both naming conventions to be safe across SDK variants
+    firstRound: lastRound,
+    lastRound: lastRound + 1000,
+    firstValid: lastRound,
+    lastValid: lastRound + 1000,
     genesisHash: params["genesishashb64"],
     genesisID: params["genesis-id"],
   } as any;
 
   // 4) Build txn using the OBJECT helper; cast the whole object to any
   const note = new TextEncoder().encode("bTree v1 placeholder app");
+  // Extra guard: ensure address decodes
+  algosdk.decodeAddress(normalizedFrom);
   const txn = algosdk.makeApplicationCreateTxnFromObject({
     from: normalizedFrom,
     suggestedParams: sp as any,
