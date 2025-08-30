@@ -12,15 +12,13 @@ export default function App(): JSX.Element {
   const [deploying, setDeploying] = useState(false);
   const [txid, setTxid] = useState<string | null>(null);
   const [appId, setAppId] = useState<number | null>(null);
+  const [manifest, setManifest] = useState<null | { txid?: string; appId?: number; timestamp?: string }>(null);
   const isValidAccount = useMemo(() => account ? algosdk.isValidAddress(account) : false, [account]);
   const [debugOpen, setDebugOpen] = useState<boolean>(import.meta.env.DEV);
   const [paramsInfo, setParamsInfo] = useState<null | { fee?: any; lastRound?: any; genesisID?: any }>(null);
   const [paramsErr, setParamsErr] = useState<string | null>(null);
   const [spInfo, setSpInfo] = useState<null | any>(null);
   const [progLens, setProgLens] = useState<null | { approvalLen: number; clearLen: number }>(null);
-  const [peraReady, setPeraReady] = useState(false);
-  const [peraCountdown, setPeraCountdown] = useState<number | null>(null);
-  const PERA_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes
 
   useEffect(() => {
     let mounted = true;
@@ -83,14 +81,20 @@ export default function App(): JSX.Element {
       });
       const j = await resp.json();
       if (!resp.ok) throw new Error(JSON.stringify(j));
-      setTxid(j.txId || j.txid);
+      const submittedTxId = j.txId || j.txid;
+      setTxid(submittedTxId);
+      setManifest({ txid: submittedTxId, timestamp: new Date().toISOString() });
 
       // poll pending info a few times for app-id
       for (let i = 0; i < 15; i++) {
         await new Promise(r => setTimeout(r, 2000));
         const p = await fetch("/api/pending?txid=" + (j.txId || j.txid)).then(r => r.json());
         const app = p["application-index"];
-        if (app) { setAppId(app); break; }
+        if (app) {
+          setAppId(app);
+          setManifest((m) => ({ ...(m || {}), appId: app }));
+          break;
+        }
       }
     } catch (e) {
       console.error(e);
@@ -100,21 +104,7 @@ export default function App(): JSX.Element {
     }
   }, [account]);
 
-  const txExplorerUrl = useMemo(() => {
-    if (!txid) return null;
-    const net = (network || "").toUpperCase();
-    if (net === "TESTNET") return `https://explorer.perawallet.app/tx/${txid}?network=testnet`;
-    if (net === "MAINNET") return `https://explorer.perawallet.app/tx/${txid}`;
-    return null;
-  }, [txid, network]);
-
-  const appExplorerUrl = useMemo(() => {
-    if (!appId) return null;
-    const net = (network || "").toUpperCase();
-    if (net === "TESTNET") return `https://explorer.perawallet.app/application/${appId}?network=testnet`;
-    if (net === "MAINNET") return `https://explorer.perawallet.app/application/${appId}`;
-    return null;
-  }, [appId, network]);
+  // Pera Explorer links disabled for now
 
   const txJsonUrl = useMemo(() => {
     if (!txid) return null;
@@ -144,25 +134,31 @@ export default function App(): JSX.Element {
     return `https://lora.algokit.io/${chain}/application/${appId}`;
   }, [appId, network]);
 
-  // Pera explorer cooldown: show links only after a short delay post-deploy
-  useEffect(() => {
-    if (!txid && !appId) return; // nothing to wait for
-    setPeraReady(false);
-    const start = Date.now();
-    const tick = () => {
-      const elapsed = Date.now() - start;
-      const remaining = Math.max(0, PERA_COOLDOWN_MS - elapsed);
-      setPeraCountdown(Math.ceil(remaining / 1000));
-      if (remaining <= 0) {
-        setPeraReady(true);
-        clearInterval(intId);
-      }
-    };
-    tick();
-    const intId = setInterval(tick, 1000);
-    return () => clearInterval(intId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txid, appId]);
+  // Pera Explorer cooldown removed while links are disabled
+
+  const manifestText = useMemo(() => {
+    const lines: string[] = ["Experiment Manifest"]; // title line
+    if (manifest?.appId) lines.push(`App ID: ${manifest.appId}`);
+    if (manifest?.txid) lines.push(`TxID: ${manifest.txid}`);
+    if (manifest?.timestamp) lines.push(`Timestamp: ${manifest.timestamp}`);
+    return lines.join("\n");
+  }, [manifest]);
+
+  const handleCopyManifest = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(manifestText);
+      alert("Manifest copied to clipboard");
+    } catch {
+      // Fallback: create a temporary textarea
+      const ta = document.createElement("textarea");
+      ta.value = manifestText;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      alert("Manifest copied to clipboard");
+    }
+  }, [manifestText]);
 
   const handlePingParams = useCallback(async () => {
     setParamsErr(null);
@@ -212,9 +208,7 @@ export default function App(): JSX.Element {
           {txJsonUrl && (
             <> — <a href={txJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
           )}
-          {txExplorerUrl && peraReady && (
-            <> — <a href={txExplorerUrl} target="_blank" rel="noreferrer">View in Pera Explorer</a></>
-          )}
+          {/* Pera Explorer link hidden for now */}
         </p>
       )}
       {appId && (
@@ -226,14 +220,25 @@ export default function App(): JSX.Element {
           {appJsonUrl && (
             <> — <a href={appJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
           )}
-          {appExplorerUrl && peraReady && (
-            <> — <a href={appExplorerUrl} target="_blank" rel="noreferrer">Open in Pera Explorer</a></>
-          )}
+          {/* Pera Explorer link hidden for now */}
         </p>
       )}
-      {!!(txid || appId) && !peraReady && (
+      {(manifest?.txid || manifest?.appId) && (
+        <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 12, borderRadius: 8, background: "#fff" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <strong>Experiment Manifest</strong>
+            <button onClick={handleCopyManifest}>Copy</button>
+          </div>
+          <div style={{ marginTop: 8, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, lineHeight: 1.6 }}>
+            {manifest?.appId && <div>App ID: {manifest.appId}</div>}
+            {manifest?.txid && <div>TxID: {manifest.txid}</div>}
+            {manifest?.timestamp && <div>Timestamp: {manifest.timestamp}</div>}
+          </div>
+        </div>
+      )}
+      {false && (
         <p style={{ marginTop: 4, color: "#666" }}>
-          Pera Explorer may take a few minutes to index. Links will appear{typeof peraCountdown === 'number' ? ` in ~${peraCountdown}s` : ''}.
+          Pera Explorer links are disabled for now.
         </p>
       )}
 
