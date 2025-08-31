@@ -2,7 +2,7 @@
 // cspell:ignore itob
 import React, { useMemo, useState } from "react";
 import * as algosdk from "algosdk";
-import { pera, ensurePeraSession } from "../wallet";
+import { useWallet } from "@txnlab/use-wallet-react";
 import { Buffer } from "buffer"; // ensure Buffer exists in browser builds
 
 type Props = {
@@ -24,20 +24,11 @@ function itob8(n: number): Uint8Array {
 const te = new TextEncoder();
 const fromB64 = (s: string) => Uint8Array.from(Buffer.from(s, "base64"));
 
-// Some versions of @perawallet/connect typings don’t expose signTransaction.
-// Use a small helper with a safe cast and fallback to signTransactions if present.
-async function signWithPera(txn: algosdk.Transaction): Promise<Uint8Array> {
-  const anyPera: any = pera as any;
-  const sign = anyPera.signTransaction || anyPera.signTransactions;
-  if (!sign) throw new Error("Pera sign method is unavailable");
-  const groups = await sign.call(pera, [[{ txn }]]);
-  const maybe = Array.isArray(groups) ? groups[0] : groups;
-  const raw: Uint8Array | undefined = Array.isArray(maybe) ? (maybe[0] as any) : (maybe as any);
-  if (!(raw && raw instanceof Uint8Array)) throw new Error("No signature from Pera");
-  return raw;
-}
+// Signing uses use-wallet-react hook
 
 export default function PhaseControl({ appId, account, network }: Props) {
+  const { activeAddress, activeAccount, signTransactions } = useWallet();
+  const connectedAddress = activeAddress || activeAccount?.address || null;
   const [busy, setBusy] = useState<number | null>(null);
   const [lastTxId, setLastTxId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -61,12 +52,10 @@ export default function PhaseControl({ appId, account, network }: Props) {
     try {
       setErr(null);
       if (!resolvedAppId) throw new Error("No App ID");
-      if (!account) throw new Error("Wallet not connected");
-      if (!algosdk.isValidAddress(account)) throw new Error("Invalid wallet address");
+      const sender = (account ?? connectedAddress) || null;
+      if (!sender) throw new Error("Wallet not connected");
+      if (!algosdk.isValidAddress(sender)) throw new Error("Invalid wallet address");
       setBusy(phase);
-
-      // Make sure Pera session is initialized to avoid wallet SDK init errors
-      await ensurePeraSession();
 
       // 1) fetch algorand params from API
       const p = await fetch("/api/params").then((r) => r.json());
@@ -90,7 +79,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
 
       // 3) build NoOp using v3-friendly helper
       const appArgs = [te.encode("set_phase"), itob8(phase)];
-      const fromAddr = (account as string).trim();
+      const fromAddr = (sender as string).trim();
       
       // Additional validation before creating transaction
       if (!fromAddr || fromAddr === "") throw new Error("Address is empty");
@@ -105,7 +94,8 @@ export default function PhaseControl({ appId, account, network }: Props) {
       } as any);
 
       // 4) sign with Pera and submit
-      const raw = await signWithPera(txn);
+      const signed = await signTransactions([txn]);
+      const raw = signed?.[0];
       const signedTxnBase64 = Buffer.from(raw).toString("base64");
 
       const resp = await fetch("/api/submit", {
@@ -123,7 +113,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     }
   }
 
-  const disabled = !resolvedAppId || !account || !algosdk.isValidAddress(account);
+  const disabled = !resolvedAppId || !(account ?? connectedAddress) || !algosdk.isValidAddress((account ?? connectedAddress) as string);
 
   return (
     <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 12, borderRadius: 8, background: "#fff" }}>
@@ -174,9 +164,9 @@ export default function PhaseControl({ appId, account, network }: Props) {
 
       {disabled && (
         <div style={{ marginTop: 8, color: "#b07", fontSize: 12 }}>
-          Connect Pera and ensure an App ID (deploy once or set <code>VITE_TESTNET_APP_ID</code>).
-        </div>
-      )}
-    </div>
+          Connect wallet and ensure an App ID (deploy once or set <code>VITE_TESTNET_APP_ID</code>).
+      </div>
+    )}
+  </div>
   );
 }

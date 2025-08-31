@@ -1,13 +1,14 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import * as algosdk from "algosdk";
-import { pera } from "./wallet";
+import { useWallet } from "@txnlab/use-wallet-react";
 import { deployPlaceholderApp } from "./deploy";
 import ExportCSVButton from "./components/ExportCSVButton";
 import PhaseControl from "./components/PhaseControl";
 
 export default function App(): JSX.Element {
-  const [account, setAccount] = useState<string | null>(null);
+  const { activeAddress, activeAccount, connect, disconnect, signTransactions } = useWallet();
+  const account = activeAddress || activeAccount?.address || null;
   const network = (import.meta.env.VITE_NETWORK as string) ?? "TESTNET";
   const [deploying, setDeploying] = useState(false);
   const [txid, setTxid] = useState<string | null>(null);
@@ -20,56 +21,34 @@ export default function App(): JSX.Element {
   const [spInfo, setSpInfo] = useState<null | any>(null);
   const [progLens, setProgLens] = useState<null | { approvalLen: number; clearLen: number }>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    pera.reconnectSession().then((accounts) => {
-      if (!mounted) return;
-      if (accounts && accounts.length > 0) {
-        const a = (accounts[0] ?? "").toString().trim();
-        setAccount(a);
-      }
-      const conn: any = (pera as any).connector;
-      if (conn?.on) conn.on("disconnect", () => setAccount(null));
-      if ((pera as any).on) (pera as any).on("disconnect", () => setAccount(null));
-    }).catch(() => {});
-    return () => { mounted = false; };
-  }, []);
+  // use-wallet-react manages session restoration; no manual reconnect needed
+  useEffect(() => {}, []);
 
   const handleConnect = useCallback(async () => {
-    try {
-      const accounts = await pera.connect();
-      if (accounts && accounts.length > 0) {
-        const a = (accounts[0] ?? "").toString().trim();
-        setAccount(a);
-      }
-    } catch (err) {
-      console.error("Pera connect failed:", err);
-    }
+    try { await connect("pera"); } catch (err) { console.error("Connect failed:", err); }
   }, []);
 
   const handleDisconnect = useCallback(async () => {
-    try { await pera.disconnect(); } catch {}
-    setAccount(null);
+    try { await disconnect(); } catch {}
   }, []);
 
   const handleDeploy = useCallback(async () => {
-    if (!account || !algosdk.isValidAddress(account)) {
-      alert("No valid Algorand address connected. Please reconnect Pera.");
+    const sender = account;
+    if (!sender || !algosdk.isValidAddress(sender)) {
+      alert("No valid Algorand address connected. Please connect wallet.");
       return;
     }
     try {
       setDeploying(true);
       setTxid(null);
       setAppId(null);
-      console.debug("Deploying with account:", account);
+      console.debug("Deploying with account:", sender);
       // build unsigned txn
-      const { txn, b64, debug } = await deployPlaceholderApp(account);
+      const { txn, b64, debug } = await deployPlaceholderApp(sender);
       setSpInfo(debug?.suggestedParams ?? null);
       setProgLens({ approvalLen: debug?.approvalLen ?? 0, clearLen: debug?.clearLen ?? 0 });
-      // request signature from Pera using Transaction object groups (per v1.4.x types)
-      console.debug("signTransaction param check: using groups [[{ txn }]]");
-      // @ts-ignore - library types expect Transaction
-      const signed: Uint8Array[] = await pera.signTransaction([[{ txn }]]);
+      // request signature via use-wallet-react
+      const signed: Uint8Array[] = await signTransactions([txn]);
       const first = signed && Array.isArray(signed) ? signed[0] : null;
       if (!first || !(first instanceof Uint8Array)) throw new Error("Pera returned unexpected signature payload");
       const signedTxnBase64 = Buffer.from(first).toString("base64");
@@ -189,7 +168,7 @@ export default function App(): JSX.Element {
   return (
     <div style={{ fontFamily: "system-ui, Arial", padding: 24 }}>
       <h1>bTree v1 — Trust Game MVP</h1>
-      <p><strong>Network:</strong> {network} (wallet = Pera on TestNet)</p>
+      <p><strong>Network:</strong> {network} (wallet = use-wallet/Pera)</p>
 
       {!account ? (
         <button onClick={handleConnect}>Connect Pera Wallet</button>
