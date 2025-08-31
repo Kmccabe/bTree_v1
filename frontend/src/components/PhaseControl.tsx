@@ -94,7 +94,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
       } as any);
 
       // 4) sign with Pera and submit
-      const signed = await signTransactions([txn]);
+      const signed = await signTransactions([txn.toByte()]);
       const raw = signed?.[0];
       const signedTxnBase64 = Buffer.from(raw).toString("base64");
 

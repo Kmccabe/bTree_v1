@@ -2,23 +2,28 @@
 import "./polyfills";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { WalletProvider } from "@txnlab/use-wallet";
-import { PeraWalletConnect } from "@perawallet/connect";
+import { WalletProvider, useInitializeProviders, PROVIDER_ID } from "@txnlab/use-wallet";
+import * as algosdk from "algosdk";
+import React from "react";
 
 const root = createRoot(document.getElementById("root")!);
-
-// Configure wallet connectors for use-wallet-react (Pera only for now)
-const providers = [
-  { id: "pera", provider: new PeraWalletConnect() },
-];
 
 // Map Vite env to use-wallet network id
 const envNetwork = (import.meta.env.VITE_NETWORK as string | undefined) || "TESTNET";
 const network = envNetwork.toLowerCase() === "mainnet" ? "mainnet" : "testnet";
 
-root.render(
-  <WalletProvider providers={providers} network={network}>
-    <App />
-  </WalletProvider>
-);
+function Root() {
+  const providers = useInitializeProviders({
+    providers: [PROVIDER_ID.PERA],
+    algosdkStatic: algosdk,
+    nodeConfig: { network },
+  });
+  return (
+    <WalletProvider value={providers}>
+      <App />
+    </WalletProvider>
+  );
+}
+
+root.render(<Root />);
 

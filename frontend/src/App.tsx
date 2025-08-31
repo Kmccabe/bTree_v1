@@ -1,13 +1,13 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import * as algosdk from "algosdk";
-import { useWallet } from "@txnlab/use-wallet";
+import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
 import { deployPlaceholderApp } from "./deploy";
 import ExportCSVButton from "./components/ExportCSVButton";
 import PhaseControl from "./components/PhaseControl";
 
 export default function App(): JSX.Element {
-  const { activeAddress, activeAccount, connect, disconnect, signTransactions } = useWallet();
+  const { activeAddress, activeAccount, clients, signTransactions } = useWallet();
   const account = activeAddress || activeAccount?.address || null;
   const network = (import.meta.env.VITE_NETWORK as string) ?? "TESTNET";
   const [deploying, setDeploying] = useState(false);
@@ -25,12 +25,12 @@ export default function App(): JSX.Element {
   useEffect(() => {}, []);
 
   const handleConnect = useCallback(async () => {
-    try { await connect("pera"); } catch (err) { console.error("Connect failed:", err); }
-  }, []);
+    try { await clients?.[PROVIDER_ID.PERA]?.connect(); } catch (err) { console.error("Connect failed:", err); }
+  }, [clients]);
 
   const handleDisconnect = useCallback(async () => {
-    try { await disconnect(); } catch {}
-  }, []);
+    try { await clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {}
+  }, [clients]);
 
   const handleDeploy = useCallback(async () => {
     const sender = account;
@@ -47,8 +47,8 @@ export default function App(): JSX.Element {
       const { txn, b64, debug } = await deployPlaceholderApp(sender);
       setSpInfo(debug?.suggestedParams ?? null);
       setProgLens({ approvalLen: debug?.approvalLen ?? 0, clearLen: debug?.clearLen ?? 0 });
-      // request signature via use-wallet-react
-      const signed: Uint8Array[] = await signTransactions([txn]);
+      // request signature via use-wallet
+      const signed: Uint8Array[] = await signTransactions([txn.toByte()]);
       const first = signed && Array.isArray(signed) ? signed[0] : null;
       if (!first || !(first instanceof Uint8Array)) throw new Error("Pera returned unexpected signature payload");
       const signedTxnBase64 = Buffer.from(first).toString("base64");
