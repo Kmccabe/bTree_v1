@@ -63,32 +63,19 @@ export default function App(): JSX.Element {
   }, [clients, providers]);
 
   const handleDisconnect = useCallback(async () => {
+    try { await providers?.find(p => p.metadata.id === PROVIDER_ID.PERA)?.disconnect(); } catch {}
     try { await clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {}
-  }, [clients]);
+    try { toast.info("Disconnected from wallet"); } catch {}
+  }, [clients, providers, toast]);
 
-  // Ensure provider is marked active when accounts are present
+  // Ensure provider is marked active when accounts are present (no auto-reconnect after manual disconnect)
   useEffect(() => {
     const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
-    const client = clients?.[PROVIDER_ID.PERA];
-    if (!p || !client) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        // If no accounts loaded yet, try reconnect
-        if (!Array.isArray(p.accounts) || p.accounts.length === 0) {
-          const wallet = await client.reconnect(() => {});
-          if (cancelled) return;
-          if (wallet && wallet.accounts && wallet.accounts.length) {
-            if (!p.isActive) p.setActiveProvider();
-          }
-        } else {
-          // Accounts present: ensure provider is active
-          if (!p.isActive) p.setActiveProvider();
-        }
-      } catch {}
-    })();
-    return () => { cancelled = true; };
-  }, [providers, clients, activeAccount]);
+    if (!p) return;
+    if (Array.isArray(p.accounts) && p.accounts.length > 0 && !p.isActive) {
+      try { p.setActiveProvider(); } catch {}
+    }
+  }, [providers]);
 
   const handleDeploy = useCallback(async () => {
     const sender = account;
