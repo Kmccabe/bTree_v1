@@ -30,12 +30,12 @@ function Root() {
           : "https://betanet-api.algonode.cloud",
     },
   });
-  // No client-side network toggling; use VITE_NETWORK env instead
+  const autoReconnect = ((import.meta.env.VITE_WALLET_AUTO_RECONNECT as string | undefined) || "").toLowerCase() === "true";
   React.useEffect(() => {
-    if (providers) {
-      reconnectProviders(providers).catch(() => {});
-    }
-  }, [providers]);
+    if (!autoReconnect || !providers) return;
+    reconnectProviders(providers).catch(() => {});
+  }, [providers, autoReconnect]);
+  // No client-side network toggling; use VITE_NETWORK env instead
   if (!providers) return null;
   return (
     <WalletProvider value={providers}>
