@@ -37,23 +37,34 @@ export default function App(): JSX.Element {
     const peraClient = clients?.[PROVIDER_ID.PERA];
     if (!peraClient) return;
     try {
-      let wallet = await peraClient.connect(() => {});
+      await peraClient.connect(() => {});
       const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
-      p?.setActiveProvider();
-      const target = wallet?.accounts?.[0]?.address || p?.accounts?.[0]?.address;
-      if (target) p?.setActiveAccount(target);
+      if (p && !p.isActive) p.setActiveProvider();
+      // Wait briefly for provider.accounts to populate, then set first account if available
+      if (p) {
+        for (let i = 0; i < 20; i++) {
+          if (Array.isArray(p.accounts) && p.accounts.length > 0) break;
+          await new Promise(r => setTimeout(r, 100));
+        }
+        if (Array.isArray(p.accounts) && p.accounts.length > 0) {
+          p.setActiveAccount(p.accounts[0].address);
+        }
+      }
     } catch (err: any) {
       // If a session exists, fall back to reconnect
       if (String(err?.message || err).toLowerCase().includes("currently connected")) {
         try {
-          const wallet = await peraClient.reconnect(() => {});
+          await peraClient.reconnect(() => {});
           const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
-          p?.setActiveProvider();
-          const target = wallet?.accounts?.[0]?.address || p?.accounts?.[0]?.address;
-          if (target) {
-            // prefer wallet-provided address if present in provider accounts
-            const found = p?.accounts?.find(a => a.address === target)?.address || p?.accounts?.[0]?.address;
-            if (found) p?.setActiveAccount(found);
+          if (p && !p.isActive) p.setActiveProvider();
+          if (p) {
+            for (let i = 0; i < 20; i++) {
+              if (Array.isArray(p.accounts) && p.accounts.length > 0) break;
+              await new Promise(r => setTimeout(r, 100));
+            }
+            if (Array.isArray(p.accounts) && p.accounts.length > 0) {
+              p.setActiveAccount(p.accounts[0].address);
+            }
           }
         } catch (e) {
           console.error("Reconnect failed:", e);
