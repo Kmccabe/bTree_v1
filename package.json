@@ -1,0 +1,25 @@
+{
+  "name": "btree_v1",
+  "version": "1.0.0",
+  "description": "Minimal, production‑oriented scaffold for running a Trust Game on Algorand TestNet. The app is built with React + Vite, uses Pera Wallet for signing, and deploys on Vercel with serverless routes that proxy Algod.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kmccabe/bTree_v1.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Kmccabe/bTree_v1/issues"
+  },
+  "homepage": "https://github.com/Kmccabe/bTree_v1#readme"
+}
