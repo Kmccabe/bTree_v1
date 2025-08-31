@@ -66,7 +66,7 @@ export async function buildAppOptInTxnBlob(args: {
   const sp = args.sp ?? (await getSuggestedParams());
 
   const txn: Transaction = algosdk.makeApplicationOptInTxnFromObject({
-    from: sender,
+    sender: sender,
     appIndex: appId,
     suggestedParams: sp,
   });
@@ -86,7 +86,7 @@ export async function buildAppNoOpTxnBlob(args: {
   const sp = args.sp ?? (await getSuggestedParams());
 
   const txn: Transaction = algosdk.makeApplicationNoOpTxnFromObject({
-    from: sender,
+    sender: sender,
     appIndex: appId,
     appArgs,
     suggestedParams: sp,
