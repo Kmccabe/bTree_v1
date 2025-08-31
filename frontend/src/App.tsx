@@ -2,6 +2,13 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import * as algosdk from "algosdk";
 import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
+import {
+  getSuggestedParams as getParams,
+  buildAppOptInTxnBlob,
+  buildAppNoOpTxnBlob,
+  signAndSubmit,
+  type WalletSigner as Signer,
+} from "./chain/tx";
 import { deployPlaceholderApp } from "./deploy";
 import ExportCSVButton from "./components/ExportCSVButton";
 import PhaseControl from "./components/PhaseControl";
@@ -32,6 +39,20 @@ export default function App(): JSX.Element {
   const [paramsErr, setParamsErr] = useState<string | null>(null);
   const [spInfo, setSpInfo] = useState<null | any>(null);
   const [progLens, setProgLens] = useState<null | { approvalLen: number; clearLen: number }>(null);
+
+  // --- On-Chain Smoke Test state ---
+  const [smAppId, setSmAppId] = useState<number>(Number((import.meta as any).env?.VITE_APP_ID || 0));
+  const [smFakeId, setSmFakeId] = useState<string>("SMOKE_TEST");
+  const [smMicroAlgos, setSmMicroAlgos] = useState<number>(100000);
+  const [smBusy, setSmBusy] = useState<string | null>(null);
+  const [smLastTxId, setSmLastTxId] = useState<string | null>(null);
+  const [smConfirmedRound, setSmConfirmedRound] = useState<number | null>(null);
+  const [smError, setSmError] = useState<string | null>(null);
+  const netLower = (network || "TESTNET").toLowerCase();
+  const txUrl = (txId: string) =>
+    netLower === "mainnet"
+      ? `https://algoexplorer.io/tx/${txId}`
+      : `https://testnet.algoexplorer.io/tx/${txId}`;
 
   // use-wallet-react manages session restoration; no manual reconnect needed
   useEffect(() => {}, []);
@@ -76,6 +97,109 @@ export default function App(): JSX.Element {
       try { p.setActiveProvider(); } catch {}
     }
   }, [providers]);
+
+  // --- On-Chain Smoke Test helpers ---
+  const str = useCallback((s: string) => new TextEncoder().encode(s), []);
+  const u64 = useCallback((n: number) => {
+    if (!Number.isInteger(n) || n < 0) throw new Error("u64: value must be a non-negative integer");
+    let v = BigInt(n);
+    const out = new Uint8Array(8);
+    for (let i = 7; i >= 0; i--) { out[i] = Number(v & 0xffn); v >>= 8n; }
+    return out;
+  }, []);
+
+  const requireWallet = useCallback(() => {
+    if (!account) {
+      try { toast.info(`Connect wallet (Pera) on ${netLower} to run smoke test.`); } catch {}
+      return false;
+    }
+    return true;
+  }, [account, netLower, toast]);
+
+  const pollConfirmedRound = useCallback(async (txId: string): Promise<number | null> => {
+    for (let i = 0; i < 15; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const r = await fetch(`/api/pending?txid=${txId}`);
+        const j = await r.json();
+        const confirmed = j["confirmed-round"];
+        if (confirmed) return Number(confirmed);
+      } catch {}
+    }
+    return null;
+  }, []);
+
+  const signer: Signer = useCallback((txns) => signTransactions(txns), [signTransactions]);
+
+  const smokeGetParams = useCallback(async () => {
+    setSmBusy("Get Params"); setSmError(null); setSmLastTxId(null); setSmConfirmedRound(null);
+    try {
+      const p = await getParams();
+      const round = (p as any).lastRound ?? (p as any)["last-round"] ?? (p as any).firstRound;
+      toast.success(`Params OK (round ${String(round)})`);
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      setSmError(msg);
+      toast.error(`Get Params failed: ${msg}`);
+    } finally { setSmBusy(null); }
+  }, [toast]);
+
+  const smokeOptIn = useCallback(async () => {
+    if (!requireWallet()) return;
+    if (!Number.isInteger(smAppId) || smAppId <= 0) { toast.error("Enter a valid App ID (> 0)"); return; }
+    setSmBusy("Opt-In"); setSmError(null); setSmLastTxId(null); setSmConfirmedRound(null);
+    try {
+      const blob = await buildAppOptInTxnBlob({ appId: smAppId, sender: account! });
+      const { txId } = await signAndSubmit([blob], signer);
+      setSmLastTxId(txId);
+      const cr = await pollConfirmedRound(txId);
+      if (cr) setSmConfirmedRound(cr);
+      toast.success("Opt-In submitted");
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      setSmError(msg);
+      toast.error(`Opt-In failed: ${msg}`);
+    } finally { setSmBusy(null); }
+  }, [requireWallet, smAppId, account, signer, pollConfirmedRound, toast]);
+
+  const smokeRegister = useCallback(async () => {
+    if (!requireWallet()) return;
+    if (!Number.isInteger(smAppId) || smAppId <= 0) { toast.error("Enter a valid App ID (> 0)"); return; }
+    setSmBusy("Register"); setSmError(null); setSmLastTxId(null); setSmConfirmedRound(null);
+    try {
+      const args = [str("register"), str(smFakeId)];
+      const blob = await buildAppNoOpTxnBlob({ appId: smAppId, sender: account!, appArgs: args });
+      const { txId } = await signAndSubmit([blob], signer);
+      setSmLastTxId(txId);
+      const cr = await pollConfirmedRound(txId);
+      if (cr) setSmConfirmedRound(cr);
+      toast.success("Register submitted");
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      setSmError(msg);
+      toast.error(`Register failed: ${msg}`);
+    } finally { setSmBusy(null); }
+  }, [requireWallet, smAppId, smFakeId, account, signer, pollConfirmedRound, str, toast]);
+
+  const smokeBid = useCallback(async () => {
+    if (!requireWallet()) return;
+    if (!Number.isInteger(smAppId) || smAppId <= 0) { toast.error("Enter a valid App ID (> 0)"); return; }
+    if (!Number.isInteger(smMicroAlgos) || smMicroAlgos < 0) { toast.error("Enter a non-negative integer bid"); return; }
+    setSmBusy("Place Bid"); setSmError(null); setSmLastTxId(null); setSmConfirmedRound(null);
+    try {
+      const args = [str("bid"), u64(smMicroAlgos)];
+      const blob = await buildAppNoOpTxnBlob({ appId: smAppId, sender: account!, appArgs: args });
+      const { txId } = await signAndSubmit([blob], signer);
+      setSmLastTxId(txId);
+      const cr = await pollConfirmedRound(txId);
+      if (cr) setSmConfirmedRound(cr);
+      toast.success("Bid submitted");
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      setSmError(msg);
+      toast.error(`Bid failed: ${msg}`);
+    } finally { setSmBusy(null); }
+  }, [requireWallet, smAppId, smMicroAlgos, account, signer, pollConfirmedRound, str, u64, toast]);
 
   const handleDeploy = useCallback(async () => {
     const sender = account;
@@ -350,6 +474,46 @@ export default function App(): JSX.Element {
                 <div>clear length: {progLens.clearLen}</div>
               </div>
             )}
+            {/* On-Chain Smoke Test card */}
+            <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 8, padding: 12, background: "#fff" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <strong>On-Chain Smoke Test</strong>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span>App ID</span>
+                  <input type="number" value={smAppId} onChange={(e)=>setSmAppId(Number(e.target.value||0))} />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span>Fake ID</span>
+                  <input type="text" value={smFakeId} onChange={(e)=>setSmFakeId(e.target.value)} />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span>Bid (microAlgos)</span>
+                  <input type="number" min={0} value={smMicroAlgos} onChange={(e)=>setSmMicroAlgos(Number(e.target.value||0))} />
+                </label>
+              </div>
+              <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button disabled={!!smBusy} onClick={smokeGetParams}>Get Params</button>
+                <button disabled={!account || smAppId<=0 || !!smBusy} onClick={smokeOptIn}>Opt-In</button>
+                <button disabled={!account || smAppId<=0 || !!smBusy} onClick={smokeRegister}>Register</button>
+                <button disabled={!account || smAppId<=0 || !!smBusy} onClick={smokeBid}>Place Bid</button>
+              </div>
+              {(smLastTxId || smError) && (
+                <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>
+                  {smLastTxId && (
+                    <div>
+                      <div>txId: <code>{smLastTxId}</code></div>
+                      {smConfirmedRound && <div>confirmed-round: {smConfirmedRound}</div>}
+                      <div><a href={txUrl(smLastTxId)} target="_blank" rel="noreferrer">View in Explorer</a></div>
+                    </div>
+                  )}
+                  {smError && (
+                    <div style={{ color: "#b00" }}>error: {smError}</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
