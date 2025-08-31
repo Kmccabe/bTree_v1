@@ -49,10 +49,10 @@ export default function App(): JSX.Element {
   const [smConfirmedRound, setSmConfirmedRound] = useState<number | null>(null);
   const [smError, setSmError] = useState<string | null>(null);
   const netLower = (network || "TESTNET").toLowerCase();
-  const txUrl = (txId: string) =>
-    netLower === "mainnet"
-      ? `https://algoexplorer.io/tx/${txId}`
-      : `https://testnet.algoexplorer.io/tx/${txId}`;
+  const txUrl = (txId: string) => {
+    const chain = netLower === "mainnet" ? "mainnet" : "testnet";
+    return `https://lora.algokit.io/${chain}/tx/${txId}`;
+  };
 
   // use-wallet-react manages session restoration; no manual reconnect needed
   useEffect(() => {}, []);
@@ -505,7 +505,7 @@ export default function App(): JSX.Element {
                     <div>
                       <div>txId: <code>{smLastTxId}</code></div>
                       {smConfirmedRound && <div>confirmed-round: {smConfirmedRound}</div>}
-                      <div><a href={txUrl(smLastTxId)} target="_blank" rel="noreferrer">View in Explorer</a></div>
+                      <div><a href={txUrl(smLastTxId)} target="_blank" rel="noreferrer">View in Lora</a></div>
                     </div>
                   )}
                   {smError && (
