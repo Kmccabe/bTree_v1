@@ -38,19 +38,22 @@ export async function getSuggestedParams(): Promise<SuggestedParams> {
 
 /** Normalizes server response into algosdk.SuggestedParams */
 function normalizeSuggestedParams(p: any): SuggestedParams {
+  // Mirror the working normalization used in deploy.ts
+  const minFee = Number(p["min-fee"]) || Number(p.fee) || Number(p["fee"]) || 1000;
+  const baseRound = Number(p["last-round"]) || Number(p.lastRound) || Number(p.firstRound) || 0;
   const gh = p.genesisHash ?? p["genesis-hash"] ?? p["genesishashb64"]; // may be b64 string
   const genesisHash = typeof gh === "string" ? algosdk.base64ToBytes(gh) : gh;
-  const lastRound = Number(p.lastRound ?? p["last-round"] ?? 0);
-  const firstRound = Number(p.firstRound ?? p["first-round"] ?? lastRound);
-  const computedLast = lastRound ? lastRound + 1000 : firstRound + 1000;
+  const firstRound = baseRound;
+  const lastRound = baseRound + 1000;
   return {
-    flatFee: p.flatFee ?? p["flat-fee"] ?? true,
-    fee: Number(p.fee ?? p["fee"] ?? p["min-fee"] ?? 1000),
-    firstRound,
-    lastRound: computedLast,
-    firstValid: firstRound,
-    lastValid: computedLast,
-    genesisHash,
+    fee: minFee,
+    minFee: minFee as any,
+    flatFee: true,
+    firstValid: firstRound as any,
+    lastValid: lastRound as any,
+    firstRound: firstRound as any,
+    lastRound: lastRound as any,
+    genesisHash: genesisHash as any,
     genesisID: p.genesisID ?? p["genesis-id"],
   } as unknown as SuggestedParams;
 }
