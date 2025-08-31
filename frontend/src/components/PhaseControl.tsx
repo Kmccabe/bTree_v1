@@ -6,11 +6,11 @@ import { useWallet } from "@txnlab/use-wallet";
 import { Buffer } from "buffer"; // ensure Buffer exists in browser builds
 import { useToast } from "./Toaster";
 import {
-  getSuggestedParams as getParams,
-  buildAppOptInTxnBlob,
-  buildAppNoOpTxnBlob,
-  signAndSubmit,
-  type WalletSigner as Signer,
+  getParams,
+  optInApp,
+  register as registerAction,
+  placeBid as placeBidAction,
+  type Signer,
 } from "../chain/tx";
 
 type Props = {
@@ -78,14 +78,6 @@ export default function PhaseControl({ appId, account, network }: Props) {
   }, [netLower]);
 
   const signer: Signer = useCallback((txns) => signTransactions(txns), [signTransactions]);
-  const str = useCallback((s: string) => new TextEncoder().encode(s), []);
-  const u64 = useCallback((n: number) => {
-    if (!Number.isInteger(n) || n < 0) throw new Error("u64: value must be a non-negative integer");
-    let v = BigInt(n);
-    const out = new Uint8Array(8);
-    for (let i = 7; i >= 0; i--) { out[i] = Number(v & 0xffn); v >>= 8n; }
-    return out;
-  }, []);
   const pollConfirmedRound = useCallback(async (txId: string): Promise<number | null> => {
     for (let i = 0; i < 15; i++) {
       await new Promise(r => setTimeout(r, 2000));
@@ -126,8 +118,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     const sender = connectedAddress || account;
     if (!sender) throw new Error(`Connect wallet on ${netLower} to opt-in.`);
     if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
-    const blob = await buildAppOptInTxnBlob({ appId: ocAppId, sender });
-    const { txId } = await signAndSubmit([blob], signer);
+    const { txId } = await optInApp({ appId: ocAppId, sender, sign: signer });
     const cr = await pollConfirmedRound(txId);
     if (cr) setOcConfirmedRound(cr);
     try { toast.success("Opt-In submitted"); } catch {}
@@ -139,28 +130,24 @@ export default function PhaseControl({ appId, account, network }: Props) {
     if (!sender) throw new Error(`Connect wallet on ${netLower} to register.`);
     if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
     if (!fakeId) throw new Error("Enter a Fake ID string.");
-    const args = [str("register"), str(fakeId)];
-    const blob = await buildAppNoOpTxnBlob({ appId: ocAppId, sender, appArgs: args });
-    const { txId } = await signAndSubmit([blob], signer);
+    const { txId } = await registerAction({ appId: ocAppId, sender, fakeId, sign: signer });
     const cr = await pollConfirmedRound(txId);
     if (cr) setOcConfirmedRound(cr);
     try { toast.success("Register submitted"); } catch {}
     return { txId, confirmedRound: cr } as any;
-  }), [connectedAddress, account, ocAppId, fakeId, signer, pollConfirmedRound, str, netLower, toast]);
+  }), [connectedAddress, account, ocAppId, fakeId, signer, pollConfirmedRound, netLower, toast]);
 
   const onBid = useCallback(() => run("Place Bid", async () => {
     const sender = connectedAddress || account;
     if (!sender) throw new Error(`Connect wallet on ${netLower} to place a bid.`);
     if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
     if (!Number.isInteger(microAlgos) || microAlgos < 0) throw new Error("Bid must be a non-negative integer (µAlgos).");
-    const args = [str("bid"), u64(microAlgos)];
-    const blob = await buildAppNoOpTxnBlob({ appId: ocAppId, sender, appArgs: args });
-    const { txId } = await signAndSubmit([blob], signer);
+    const { txId } = await placeBidAction({ appId: ocAppId, sender, microAlgos, sign: signer });
     const cr = await pollConfirmedRound(txId);
     if (cr) setOcConfirmedRound(cr);
     try { toast.success("Bid submitted"); } catch {}
     return { txId, confirmedRound: cr } as any;
-  }), [connectedAddress, account, ocAppId, microAlgos, signer, pollConfirmedRound, str, u64, netLower, toast]);
+  }), [connectedAddress, account, ocAppId, microAlgos, signer, pollConfirmedRound, netLower, toast]);
 
   async function setPhase(phase: number) {
     try {
