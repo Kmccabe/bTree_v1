@@ -5,6 +5,7 @@ import App from "./App";
 import { WalletProvider, useInitializeProviders, PROVIDER_ID } from "@txnlab/use-wallet";
 import * as algosdk from "algosdk";
 import React from "react";
+import { PeraWalletConnect } from "@perawallet/connect";
 
 const root = createRoot(document.getElementById("root")!);
 
@@ -14,9 +15,19 @@ const network = envNetwork.toLowerCase() === "mainnet" ? "mainnet" : "testnet";
 
 function Root() {
   const providers = useInitializeProviders({
-    providers: [PROVIDER_ID.PERA],
+    providers: [
+      { id: PROVIDER_ID.PERA, clientStatic: PeraWalletConnect },
+    ],
     algosdkStatic: algosdk,
-    nodeConfig: { network },
+    nodeConfig: {
+      network,
+      nodeServer:
+        network === "mainnet"
+          ? "https://mainnet-api.algonode.cloud"
+          : network === "testnet"
+          ? "https://testnet-api.algonode.cloud"
+          : "https://betanet-api.algonode.cloud",
+    },
   });
   return (
     <WalletProvider value={providers}>

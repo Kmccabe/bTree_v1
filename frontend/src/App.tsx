@@ -25,7 +25,7 @@ export default function App(): JSX.Element {
   useEffect(() => {}, []);
 
   const handleConnect = useCallback(async () => {
-    try { await clients?.[PROVIDER_ID.PERA]?.connect(); } catch (err) { console.error("Connect failed:", err); }
+    try { await clients?.[PROVIDER_ID.PERA]?.connect(() => {}); } catch (err) { console.error("Connect failed:", err); }
   }, [clients]);
 
   const handleDisconnect = useCallback(async () => {
