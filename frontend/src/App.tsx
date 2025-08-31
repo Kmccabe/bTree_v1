@@ -7,7 +7,7 @@ import ExportCSVButton from "./components/ExportCSVButton";
 import PhaseControl from "./components/PhaseControl";
 
 export default function App(): JSX.Element {
-  const { activeAddress, activeAccount, clients, signTransactions } = useWallet();
+  const { activeAddress, activeAccount, clients, providers, signTransactions, status } = useWallet();
   const account = activeAddress || activeAccount?.address || null;
   const network = (import.meta.env.VITE_NETWORK as string) ?? "TESTNET";
   const [deploying, setDeploying] = useState(false);
@@ -25,8 +25,16 @@ export default function App(): JSX.Element {
   useEffect(() => {}, []);
 
   const handleConnect = useCallback(async () => {
-    try { await clients?.[PROVIDER_ID.PERA]?.connect(() => {}); } catch (err) { console.error("Connect failed:", err); }
-  }, [clients]);
+    try {
+      await clients?.[PROVIDER_ID.PERA]?.connect(() => {});
+      const p = providers?.find(p => p.id === PROVIDER_ID.PERA);
+      p?.setActiveProvider();
+      const first = p?.accounts?.[0]?.address;
+      if (first) p?.setActiveAccount(first);
+    } catch (err) {
+      console.error("Connect failed:", err);
+    }
+  }, [clients, providers]);
 
   const handleDisconnect = useCallback(async () => {
     try { await clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {}
@@ -249,6 +257,7 @@ export default function App(): JSX.Element {
             <div>Network: {network}</div>
             <div>Account: {account || "(none)"}</div>
             <div>Valid: {String(isValidAccount)}</div>
+            <div>Status: {status}</div>
             <div>Location: {typeof window !== 'undefined' ? window.location.origin : ''}</div>
             <div style={{ marginTop: 8 }}>
               <button onClick={handlePingParams}>Ping /api/params</button>

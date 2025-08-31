@@ -2,7 +2,7 @@
 import "./polyfills";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { WalletProvider, useInitializeProviders, PROVIDER_ID } from "@txnlab/use-wallet";
+import { WalletProvider, useInitializeProviders, PROVIDER_ID, reconnectProviders } from "@txnlab/use-wallet";
 import * as algosdk from "algosdk";
 import React from "react";
 import { PeraWalletConnect } from "@perawallet/connect";
@@ -29,6 +29,11 @@ function Root() {
           : "https://betanet-api.algonode.cloud",
     },
   });
+  React.useEffect(() => {
+    if (providers) {
+      reconnectProviders(providers).catch(() => {});
+    }
+  }, [providers]);
   return (
     <WalletProvider value={providers}>
       <App />
