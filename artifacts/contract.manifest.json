@@ -1,0 +1,14 @@
+{
+  "contract": "bTree v1 \u2014 Trust Game (scaffold)",
+  "teal_version": 8,
+  "artifacts": {
+    "approval": {
+      "file": "approval.teal",
+      "sha256": "28634121ab04e02fab0cb5b817e1ec16484b7d0c0da92ce14c53bc6bf3e6a7ab"
+    },
+    "clear": {
+      "file": "clear.teal",
+      "sha256": "a69a29f69697c008832d227a0201957797f2772924aafd1ce4e6eea1e9951d83"
+    }
+  }
+}

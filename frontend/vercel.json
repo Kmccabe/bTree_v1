@@ -1,0 +1,8 @@
+{
+  "redirects": [
+    { "source": "/favicon.ico", "destination": "/favicon.svg", "permanent": false }
+  ],
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
+}

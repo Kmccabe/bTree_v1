@@ -1,113 +1,228 @@
-# bTree v1 — Trust Game Experiment (Algorand + Pera/TestNet)
+# bTree v1 — Trust Game MVP (Algorand + Pera/TestNet)
 
-End-to-end scaffold for a Trust Game experiment on Algorand. Wallet flows run on Pera Wallet (TestNet). LocalNet is used for SDK- and CI-driven tests. The frontend is designed to deploy on Vercel with simple serverless helpers for Algod access.
+Minimal, production‑oriented scaffold for running a Trust Game on Algorand TestNet. The app is built with React + Vite, uses Pera Wallet for signing, and deploys on Vercel with serverless routes that proxy Algod.
 
-- Wallet: Pera on TestNet (no mnemonics in-browser)
-- Networks: TestNet for users; LocalNet for tests/CI
-- Hosting: Vercel for `frontend/` (serverless `/api/*`) 
+- Wallet: Pera (TestNet; no mnemonics in‑browser)
+- Chain access: Vercel serverless functions → Algod
+- Hosting: Vercel (Root Directory = `frontend/`)
+- Contracts: Placeholder TEAL for now; upgradeable to full Trust Game logic
 
-## Current Status
-- Aug 29 (Kick‑off) checklist complete. See `CHECKLIST.md` for the remaining schedule to Sept 9.
-- Contracts are placeholders; the UI can connect Pera and deploy a minimal app to TestNet via serverless APIs.
+---
 
-## Repository Structure
-```
-contracts/        # Algorand Python (algopy/PyTeal) contract skeletons
-frontend/         # React + Vite + TypeScript app with Pera (TestNet)
-  ├─ api/         # Vercel serverless endpoints (Algod proxy, compile, submit)
-  └─ src/         # Client app (Pera connect, deploy placeholder app)
-infra/            # AlgoKit + LocalNet notes
-scripts/          # Export/verification scripts (placeholders)
-tests/            # pytest tests (LocalNet health, placeholders)
-CHECKLIST.md      # Day-by-day plan to Sept 9
-CLAUDE.md         # Architecture and dev guide (more detail)
-```
+## Update: Wallet Integration (use-wallet v2)
 
-## Prerequisites
-- Node.js 18+ and npm
-- Python 3.10+ and `pip`
-- Docker and AlgoKit (for LocalNet)
-- Vercel CLI (optional but recommended for local serverless): `npm i -g vercel`
-- Pera Wallet (enable TestNet in Developer Mode)
+The frontend now uses `@txnlab/use-wallet` v2 with the Pera provider and UI improvements:
 
-## Environment
-Create `frontend/.env.local` from the example and fill the TestNet endpoints/tokens as needed:
+- Provider init lives in `frontend/src/main.tsx` using `useInitializeProviders` and `<WalletProvider>`.
+- No forced chainId; make sure Pera’s network matches `VITE_NETWORK`.
+- Optional auto‑restore on load via `VITE_WALLET_AUTO_RECONNECT=true` (default: disabled).
+- Account selector appears when multiple accounts are available (`frontend/src/components/AccountSelector.tsx`).
+- Non‑blocking toasts replace browser alerts (`frontend/src/components/Toaster.tsx`).
+- The Debug Panel includes “Force Reconnect” and “Reset Wallet Session” actions for recovery.
 
-```
-cp frontend/.env.example frontend/.env.local
-```
+Note: This supersedes earlier mentions of a shared `src/wallet.ts` Pera instance; the app now relies on `@txnlab/use-wallet` hooks and provider.
 
-Key variables (see `frontend/.env.example`):
-- Server (Vercel Functions): `TESTNET_ALGOD_URL`, `TESTNET_ALGOD_TOKEN`
-- Client (Vite): `VITE_NETWORK=TESTNET`, `VITE_TESTNET_ALGOD_URL`, `VITE_TESTNET_INDEXER_URL`
+---
 
-## Local Development
-1) Start LocalNet (optional; used by SDK tests and CI):
-```
-algokit localnet start
-```
+## Quick Start
 
-2) Start Vercel dev for serverless APIs (`/api/*` on :3000):
-```
-cd frontend
-vercel dev
-```
+Local (with serverless APIs):
 
-3) Start the Vite dev server in a separate terminal (proxies `/api` to :3000):
+1) Install deps
 ```
 cd frontend
 npm install
+```
+
+2) Create `frontend/.env` for serverless routes (Algonode needs no token)
+```
+TESTNET_ALGOD_URL=https://testnet-api.algonode.cloud
+TESTNET_ALGOD_TOKEN=
+```
+
+3) Run serverless and UI in two terminals
+```
+# Terminal A (serverless):
+npx vercel dev
+
+# Terminal B (Vite UI):
 npm run dev
 ```
 
-4) In Pera Wallet: enable Developer Mode → TestNet, and fund your wallet from the TestNet dispenser.
+4) Open http://localhost:5173, connect Pera (TestNet), click Deploy, then use Phase Control.
 
-The app lets you connect Pera and deploy a placeholder application. The client compiles simple TEAL via `/api/compile`, builds an app‑create transaction, asks Pera to sign, then submits via `/api/submit`. Pending info (`/api/pending`) is polled to display the resulting App ID.
+Deploy to Vercel (summary):
 
-Relevant code:
-- `frontend/src/App.tsx` (Pera connect, deploy flow)
-- `frontend/src/deploy.ts` (compile TEAL + build app‑create txn)
-- `frontend/api` (serverless: Algod proxy, compile, params, submit)
+- Root Directory: `frontend/`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Env vars: set TESTNET_ALGOD_URL/TESTNET_ALGOD_TOKEN (serverless) and optional VITE_* (client)
 
-## Deploy to Vercel
-1) Push `frontend/` to a Git repo and import the project in Vercel.
-2) Set Project Environment Variables from `frontend/.env.example`:
-   - `TESTNET_ALGOD_URL`, `TESTNET_ALGOD_TOKEN`
-   - Optional client var: `VITE_NETWORK=TESTNET`
-3) Deploy. After deploy, open the site and connect Pera on TestNet.
+---
 
-## Runbook
-- Provision: Enable TestNet in Pera (Developer Mode) and fund the wallet from the TestNet dispenser.
-- Configure: Create `frontend/.env.local` and set TestNet Algod URL/token; for local dev, run `vercel dev` and `npm run dev` in `frontend/`.
-- Deploy (current): In the app, connect Pera and click “Deploy to TestNet”. Record the TxID and App ID shown in the Manifest box. Verify via provided Lora/Indexer JSON links.
-- Operate (upcoming): Registration, pairing, commit/reveal, settlement, and CSV export follow the dates in `CHECKLIST.md`. These flows are scaffolded but not yet implemented.
-- Verify/Export (upcoming): Use the exporter endpoint to retrieve CSV and compute digest once implemented.
-- Local testing: Run `algokit localnet start`, then `pytest` for SDK/health checks.
+## Project Structure
 
-## Contracts
-- Placeholder contract scaffold: `contracts/trust_game_app.py`
-- Planned features (per `CLAUDE.md`): registration, pairing, commit/reveal, settlement, event logs, final digest.
-
-## Tests
-Install Python dev deps and run pytest:
 ```
-pip install -r requirements-dev.txt
-pytest
+contracts/                      # PyTeal scaffold + build script (optional now)
+  build.py
+  requirements.txt
+frontend/                       # React + Vite + TypeScript app (Pera on TestNet)
+  api/                          # Serverless routes (Algod proxy)
+    _algod.ts                   # URL + headers helper
+    params.ts                   # GET  /api/params
+    compile.ts                  # POST /api/compile
+    submit.ts                   # POST /api/submit
+    pending.ts                  # GET  /api/pending?txid=...
+  public/
+    favicon.svg
+  src/
+    App.tsx                     # Pera connect, deploy, debug panel
+    deploy.ts                   # Build unsigned app-create txn (wallet signs)
+    components/PhaseControl.tsx # Admin phase switching via app call
+    wallet.ts                   # Shared Pera instance across the app
+    polyfills.ts                # Buffer/process/global shims for browser
+  index.html
+  package.json
 ```
+
+---
+
+## Prerequisites
+
+- Node.js 18+ and npm
+- Vercel CLI (optional, for local serverless): `npm i -g vercel`
+- Pera Wallet (Developer Mode + TestNet enabled, funded TestNet account)
+
+Optional (for contracts/tests):
+- Python 3.10+
+- Docker + AlgoKit for LocalNet
+
+---
+
+## Environment Variables
+
+Set these in Vercel → Project → Settings → Environment Variables for Production/Preview/Development (serverless), and in `frontend/.env.local` for local client build.
+
+Serverless (used by `/api/*`, stored securely in Vercel):
+
+```
+TESTNET_ALGOD_URL   = https://testnet-api.algonode.cloud
+TESTNET_ALGOD_TOKEN =            # blank for Algonode, or your provider key
+```
+
+Client (Vite build‑time, safe to expose):
+
+```
+VITE_NETWORK              = TESTNET
+VITE_TESTNET_APP_ID       =            # optional; shows a known app id
+VITE_TESTNET_ALGOD_URL    = https://testnet-api.algonode.cloud
+VITE_TESTNET_INDEXER_URL  = https://testnet-idx.algonode.cloud
+```
+
+Local serverless (only for `vercel dev`):
+
+```
+# frontend/.env
+TESTNET_ALGOD_URL=https://testnet-api.algonode.cloud
+TESTNET_ALGOD_TOKEN=
+```
+
+---
+
+## Local Development
+
+1) Install and run the frontend
+
+```
+cd frontend
+npm install
+npm run dev         # Vite UI at http://localhost:5173
+```
+
+2) (Optional) Run serverless API routes locally
+
+```
+cd frontend
+npx vercel dev      # http://localhost:3000 (includes /api/*)
+```
+
+When both are running, Vite proxies `/api/*` to Vercel dev.
+
+---
+
+## Deploying to Vercel
+
+Project settings:
+
+- Root Directory: `frontend/`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Node.js: 18+
+- Environment Variables: set the Serverless and Client values above
+
+First deploy:
+
+1) Push to your Git host and import the repo into Vercel.
+2) Confirm the Root Directory and env vars.
+3) Deploy and visit the site.
+
+Post‑deploy health checks:
+
+- `https://<your-app>/api/health` → `{ ok: true }`
+- `https://<your-app>/api/params` → JSON with `"last-round"`
+
+---
+
+## Using the App
+
+1) Connect Pera Wallet (ensure the wallet is on TestNet).
+2) Deploy placeholder app (creates a minimal TEAL app on TestNet via wallet‑signed transaction).
+3) Use Phase Control to switch experiment phases (NoOp application calls).
+
 Notes:
-- `tests/test_localnet_ports.py` checks LocalNet health; ensure `algokit localnet start` is running before that test.
+- Transactions are built client‑side and signed in Pera; serverless routes only forward the signed bytes to Algod.
+- A shared `PeraWalletConnect` instance (`src/wallet.ts`) is used across the app to avoid session mismatch.
 
-## Roadmap
-- The daily plan with acceptance gates is in `CHECKLIST.md`. Aug 29 is complete; next steps include contract scaffolding, registration/pairing, commit/reveal, settlement, CSV export, digest verification, and end‑to‑end UX.
-- `CLAUDE.md` contains an architecture overview and dev workflow that complements this README.
+---
+
+## API Routes
+
+- `GET  /api/health`      – basic health check
+- `GET  /api/params`      – fetch Algod suggested params
+- `POST /api/compile`     – compile TEAL source
+- `POST /api/submit`      – submit a signed transaction (base64)
+- `GET  /api/pending`     – pending info for a txid
+
+---
+
+## Implementation Details
+
+- SuggestedParams normalization (SDK v3‑friendly):
+  - `fee`/`minFee` (≥ 1000), `flatFee: true`
+  - `firstValid`/`lastValid` and `firstRound`/`lastRound` aliases
+  - `genesisID` and base64‑decoded `genesisHash`
+- Polyfills for browser builds (`Buffer`, `process`, `global`) are provided in `src/polyfills.ts`.
+- `frontend/public/favicon.svg` is included; `/favicon.ico` redirects to it via `vercel.json`.
+
+---
 
 ## Troubleshooting
-- Pera not connecting or invalid address in UI: re‑enable Developer Mode → TestNet and reconnect.
-- `/api/*` 404 in local dev: run `vercel dev` (port 3000) alongside `npm run dev` so Vite can proxy `/api` to serverless.
-- Algod/Indexer failures in tests: confirm LocalNet is started (see `infra/ALGOKIT.md`).
 
-## CI
-Add a CI badge after pushing to GitHub and enabling Actions:
-```
-![CI](https://github.com/<your-org>/<your-repo>/actions/workflows/ci.yml/badge.svg)
-```
+- Wallet init error ("PeraWalletConnect was not initialized correctly"):
+  - We call `reconnectSession()` before signing and share a single Pera instance. Reconnect wallet if needed.
+- Zero‑fee rejection ("txgroup had 0 in fees"):
+  - Params are normalized to enforce a non‑zero fee; refresh and retry.
+- `/api/*` returns HTML/404 locally:
+  - Run `npx vercel dev` alongside `npm run dev` so `/api` is routed.
+- Vercel deploys not triggered on push:
+  - Set Root Directory = `frontend/`, resync the Git integration, or create a blank commit:
+    - `git commit --allow-empty -m "chore: trigger deploy" && git push`
+
+---
+
+## Roadmap
+
+- Replace placeholder TEAL with full Trust Game contract
+- Registration, pairing, commit/reveal, settlement flows
+- CSV export and integrity digest
+- LocalNet + CI test coverage

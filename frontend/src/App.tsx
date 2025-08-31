@@ -1,13 +1,26 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import * as algosdk from "algosdk";
-import { PeraWalletConnect } from "@perawallet/connect";
+import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
 import { deployPlaceholderApp } from "./deploy";
-
-const pera = new PeraWalletConnect();
+import ExportCSVButton from "./components/ExportCSVButton";
+import PhaseControl from "./components/PhaseControl";
+import AccountSelector from "./components/AccountSelector";
+import { useToast } from "./components/Toaster";
 
 export default function App(): JSX.Element {
-  const [account, setAccount] = useState<string | null>(null);
+  const {
+    activeAddress,
+    activeAccount,
+    clients,
+    providers,
+    connectedAccounts,
+    connectedActiveAccounts,
+    signTransactions,
+    status,
+  } = useWallet();
+  const toast = useToast();
+  const account = activeAddress || activeAccount?.address || null;
   const network = (import.meta.env.VITE_NETWORK as string) ?? "TESTNET";
   const [deploying, setDeploying] = useState(false);
   const [txid, setTxid] = useState<string | null>(null);
@@ -20,56 +33,67 @@ export default function App(): JSX.Element {
   const [spInfo, setSpInfo] = useState<null | any>(null);
   const [progLens, setProgLens] = useState<null | { approvalLen: number; clearLen: number }>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    pera.reconnectSession().then((accounts) => {
-      if (!mounted) return;
-      if (accounts && accounts.length > 0) {
-        const a = (accounts[0] ?? "").toString().trim();
-        setAccount(a);
-      }
-      const conn: any = (pera as any).connector;
-      if (conn?.on) conn.on("disconnect", () => setAccount(null));
-      if ((pera as any).on) (pera as any).on("disconnect", () => setAccount(null));
-    }).catch(() => {});
-    return () => { mounted = false; };
-  }, []);
+  // use-wallet-react manages session restoration; no manual reconnect needed
+  useEffect(() => {}, []);
 
   const handleConnect = useCallback(async () => {
-    try {
-      const accounts = await pera.connect();
-      if (accounts && accounts.length > 0) {
-        const a = (accounts[0] ?? "").toString().trim();
-        setAccount(a);
-      }
-    } catch (err) {
-      console.error("Pera connect failed:", err);
+    const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
+    const peraClient = clients?.[PROVIDER_ID.PERA];
+    if (!p) {
+      console.warn("Pera provider not initialized yet");
+      return;
     }
-  }, []);
+    try {
+      // Prefer high-level Provider.connect (manages state and activation)
+      await p.connect();
+      if (!p.isActive) p.setActiveProvider();
+    } catch (err: any) {
+      const msg = String(err?.message || err).toLowerCase();
+      if (msg.includes("currently connected") && peraClient) {
+        try {
+          await peraClient.reconnect(() => {});
+          if (!p.isActive) p.setActiveProvider();
+        } catch (e) {
+          console.error("Reconnect failed:", e);
+        }
+      } else {
+        console.error("Connect failed:", err);
+      }
+    }
+  }, [clients, providers]);
 
   const handleDisconnect = useCallback(async () => {
-    try { await pera.disconnect(); } catch {}
-    setAccount(null);
-  }, []);
+    try { await providers?.find(p => p.metadata.id === PROVIDER_ID.PERA)?.disconnect(); } catch {}
+    try { await clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {}
+    try { toast.info("Disconnected from wallet"); } catch {}
+  }, [clients, providers, toast]);
+
+  // Ensure provider is marked active when accounts are present (no auto-reconnect after manual disconnect)
+  useEffect(() => {
+    const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
+    if (!p) return;
+    if (Array.isArray(p.accounts) && p.accounts.length > 0 && !p.isActive) {
+      try { p.setActiveProvider(); } catch {}
+    }
+  }, [providers]);
 
   const handleDeploy = useCallback(async () => {
-    if (!account || !algosdk.isValidAddress(account)) {
-      alert("No valid Algorand address connected. Please reconnect Pera.");
+    const sender = account;
+    if (!sender || !algosdk.isValidAddress(sender)) {
+      try { toast.error("Connect a valid Algorand address first"); } catch {}
       return;
     }
     try {
       setDeploying(true);
       setTxid(null);
       setAppId(null);
-      console.debug("Deploying with account:", account);
+      console.debug("Deploying with account:", sender);
       // build unsigned txn
-      const { txn, b64, debug } = await deployPlaceholderApp(account);
+      const { txn, b64, debug } = await deployPlaceholderApp(sender);
       setSpInfo(debug?.suggestedParams ?? null);
       setProgLens({ approvalLen: debug?.approvalLen ?? 0, clearLen: debug?.clearLen ?? 0 });
-      // request signature from Pera using Transaction object groups (per v1.4.x types)
-      console.debug("signTransaction param check: using groups [[{ txn }]]");
-      // @ts-ignore - library types expect Transaction
-      const signed: Uint8Array[] = await pera.signTransaction([[{ txn }]]);
+      // request signature via use-wallet
+      const signed: Uint8Array[] = await signTransactions([txn.toByte()]);
       const first = signed && Array.isArray(signed) ? signed[0] : null;
       if (!first || !(first instanceof Uint8Array)) throw new Error("Pera returned unexpected signature payload");
       const signedTxnBase64 = Buffer.from(first).toString("base64");
@@ -98,7 +122,7 @@ export default function App(): JSX.Element {
       }
     } catch (e) {
       console.error(e);
-      alert("Deploy failed: " + (e as Error).message);
+      try { toast.error("Deploy failed: " + (e as Error).message); } catch {}
     } finally {
       setDeploying(false);
     }
@@ -134,7 +158,11 @@ export default function App(): JSX.Element {
     return `https://lora.algokit.io/${chain}/application/${appId}`;
   }, [appId, network]);
 
-  // Pera Explorer cooldown removed while links are disabled
+  const resolvedAppId = useMemo(() => {
+  const envId = (import.meta.env.VITE_TESTNET_APP_ID as string) || "";
+  return appId ?? (envId ? Number(envId) : undefined);
+}, [appId]);
+
 
   const manifestText = useMemo(() => {
     const lines: string[] = ["Experiment Manifest"]; // title line
@@ -144,10 +172,16 @@ export default function App(): JSX.Element {
     return lines.join("\n");
   }, [manifest]);
 
+    // Resolve App ID for export: prefer live appId from deploy; otherwise use .env value
+  const exportAppId = useMemo(() => {
+    const envId = (import.meta.env.VITE_TESTNET_APP_ID as string) || "";
+    return appId ?? (envId ? Number(envId) : undefined);
+  }, [appId]);
+
   const handleCopyManifest = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(manifestText);
-      alert("Manifest copied to clipboard");
+      try { toast.success("Manifest copied to clipboard"); } catch {}
     } catch {
       // Fallback: create a temporary textarea
       const ta = document.createElement("textarea");
@@ -156,7 +190,7 @@ export default function App(): JSX.Element {
       ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
-      alert("Manifest copied to clipboard");
+      try { toast.success("Manifest copied to clipboard"); } catch {}
     }
   }, [manifestText]);
 
@@ -179,16 +213,19 @@ export default function App(): JSX.Element {
   return (
     <div style={{ fontFamily: "system-ui, Arial", padding: 24 }}>
       <h1>bTree v1 — Trust Game MVP</h1>
-      <p><strong>Network:</strong> {network} (wallet = Pera on TestNet)</p>
+      <p><strong>Network:</strong> {network} (wallet = use-wallet/Pera)</p>
 
-      {!account ? (
-        <button onClick={handleConnect}>Connect Pera Wallet</button>
-      ) : (
-        <div>
-          <p><strong>Connected:</strong> {account}</p>
-          <button onClick={handleDisconnect}>Disconnect</button>
-        </div>
-      )}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+        {!account ? (
+          <button onClick={handleConnect}>Connect Pera Wallet</button>
+        ) : (
+          <>
+            <p style={{ margin: 0 }}><strong>Connected:</strong> {account}</p>
+            <button onClick={handleDisconnect}>Disconnect</button>
+          </>
+        )}
+        <AccountSelector />
+      </div>
 
       <hr />
       <h3>Deploy placeholder app (no mnemonic; Pera signs)</h3>
@@ -236,6 +273,14 @@ export default function App(): JSX.Element {
           </div>
         </div>
       )}
+            {/* Export CSV button */}
+      <div style={{ marginTop: 16 }}>
+        <ExportCSVButton appId={resolvedAppId} />
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <PhaseControl appId={resolvedAppId} account={account} network={network} />
+      </div>
+
       {false && (
         <p style={{ marginTop: 4, color: "#666" }}>
           Pera Explorer links are disabled for now.
@@ -252,6 +297,23 @@ export default function App(): JSX.Element {
             <div>Network: {network}</div>
             <div>Account: {account || "(none)"}</div>
             <div>Valid: {String(isValidAccount)}</div>
+            <div>Status: {status}</div>
+            <div>connectedAccounts: {connectedAccounts.length}</div>
+            <div>connectedActiveAccounts: {connectedActiveAccounts.length}</div>
+            <div>providers: {providers?.length ?? 0}</div>
+            <div>pera.isActive: {String(!!providers?.find(p=>p.metadata.id===PROVIDER_ID.PERA)?.isActive)}</div>
+            <div>
+              pera.accounts:
+              {(() => {
+                const p = providers?.find(p=>p.metadata.id===PROVIDER_ID.PERA);
+                const addrs = (p?.accounts||[]).map(a=>a.address).join(", ");
+                return " [" + addrs + "]";
+              })()}
+            </div>
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.reconnect(() => {}); } catch {} }}>Force Reconnect</button>
+              <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {} }}>Reset Wallet Session</button>
+            </div>
             <div>Location: {typeof window !== 'undefined' ? window.location.origin : ''}</div>
             <div style={{ marginTop: 8 }}>
               <button onClick={handlePingParams}>Ping /api/params</button>
