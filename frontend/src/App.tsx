@@ -27,7 +27,7 @@ export default function App(): JSX.Element {
   const handleConnect = useCallback(async () => {
     try {
       await clients?.[PROVIDER_ID.PERA]?.connect(() => {});
-      const p = providers?.find(p => p.id === PROVIDER_ID.PERA);
+      const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
       p?.setActiveProvider();
       const first = p?.accounts?.[0]?.address;
       if (first) p?.setActiveAccount(first);
