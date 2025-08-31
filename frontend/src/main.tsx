@@ -2,7 +2,7 @@
 import "./polyfills";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { WalletProvider } from "@txnlab/use-wallet-react";
+import { WalletProvider } from "@txnlab/use-wallet";
 import { PeraWalletConnect } from "@perawallet/connect";
 
 const root = createRoot(document.getElementById("root")!);

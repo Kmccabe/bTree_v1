@@ -1,7 +1,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import * as algosdk from "algosdk";
-import { useWallet } from "@txnlab/use-wallet-react";
+import { useWallet } from "@txnlab/use-wallet";
 import { deployPlaceholderApp } from "./deploy";
 import ExportCSVButton from "./components/ExportCSVButton";
 import PhaseControl from "./components/PhaseControl";

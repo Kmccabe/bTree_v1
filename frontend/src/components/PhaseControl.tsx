@@ -2,7 +2,7 @@
 // cspell:ignore itob
 import React, { useMemo, useState } from "react";
 import * as algosdk from "algosdk";
-import { useWallet } from "@txnlab/use-wallet-react";
+import { useWallet } from "@txnlab/use-wallet";
 import { Buffer } from "buffer"; // ensure Buffer exists in browser builds
 
 type Props = {
