@@ -1,9 +1,17 @@
 // frontend/src/components/PhaseControl.tsx
 // cspell:ignore itob
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import * as algosdk from "algosdk";
 import { useWallet } from "@txnlab/use-wallet";
 import { Buffer } from "buffer"; // ensure Buffer exists in browser builds
+import { useToast } from "./Toaster";
+import {
+  getSuggestedParams as getParams,
+  buildAppOptInTxnBlob,
+  buildAppNoOpTxnBlob,
+  signAndSubmit,
+  type WalletSigner as Signer,
+} from "../chain/tx";
 
 type Props = {
   appId?: number | string;
@@ -29,6 +37,7 @@ const fromB64 = (s: string) => Uint8Array.from(Buffer.from(s, "base64"));
 export default function PhaseControl({ appId, account, network }: Props) {
   const { activeAddress, activeAccount, signTransactions } = useWallet();
   const connectedAddress = activeAddress || activeAccount?.address || null;
+  const toast = useToast();
   const [busy, setBusy] = useState<number | null>(null);
   const [lastTxId, setLastTxId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -47,6 +56,111 @@ export default function PhaseControl({ appId, account, network }: Props) {
     const chain = (network || "TESTNET").toLowerCase() === "mainnet" ? "mainnet" : "testnet";
     return `https://lora.algokit.io/${chain}/tx/${lastTxId}`;
   }, [lastTxId, network]);
+
+  // --- On-Chain Actions state ---
+  const defaultId = useMemo(() => {
+    const env = (import.meta.env.VITE_TESTNET_APP_ID as string) || "";
+    return Number(env || resolvedAppId || 0) || 0;
+  }, [resolvedAppId]);
+  const [ocAppId, setOcAppId] = useState<number>(defaultId);
+  const [fakeId, setFakeId] = useState<string>(
+    "SMOKE_" + new Date().toISOString().slice(0, 10)
+  );
+  const [microAlgos, setMicroAlgos] = useState<number>(100000);
+  const [ocBusy, setOcBusy] = useState<string | null>(null);
+  const [ocLastTxId, setOcLastTxId] = useState<string | null>(null);
+  const [ocConfirmedRound, setOcConfirmedRound] = useState<number | null>(null);
+  const [ocError, setOcError] = useState<string | null>(null);
+  const netLower = (import.meta.env.VITE_NETWORK as string | undefined || "testnet").toLowerCase();
+  const txUrl = useCallback((txId: string) => {
+    const chain = netLower === "mainnet" ? "mainnet" : "testnet";
+    return `https://lora.algokit.io/${chain}/tx/${txId}`;
+  }, [netLower]);
+
+  const signer: Signer = useCallback((txns) => signTransactions(txns), [signTransactions]);
+  const str = useCallback((s: string) => new TextEncoder().encode(s), []);
+  const u64 = useCallback((n: number) => {
+    if (!Number.isInteger(n) || n < 0) throw new Error("u64: value must be a non-negative integer");
+    let v = BigInt(n);
+    const out = new Uint8Array(8);
+    for (let i = 7; i >= 0; i--) { out[i] = Number(v & 0xffn); v >>= 8n; }
+    return out;
+  }, []);
+  const pollConfirmedRound = useCallback(async (txId: string): Promise<number | null> => {
+    for (let i = 0; i < 15; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const r = await fetch(`/api/pending?txid=${txId}`);
+        const j = await r.json();
+        const confirmed = j["confirmed-round"];
+        if (confirmed) return Number(confirmed);
+      } catch {}
+    }
+    return null;
+  }, []);
+
+  async function run<T>(label: string, fn: () => Promise<T>) {
+    setOcBusy(label); setOcError(null); setOcLastTxId(null); setOcConfirmedRound(null);
+    try {
+      const res: any = await fn();
+      if (res?.txId) setOcLastTxId(res.txId);
+      if (res?.confirmedRound) setOcConfirmedRound(res.confirmedRound);
+    } catch (e: any) {
+      const msg = e?.response?.text ?? e?.message ?? String(e);
+      setOcError(msg);
+      try { toast.error(msg); } catch {}
+      console.error(e);
+    } finally {
+      setOcBusy(null);
+    }
+  }
+
+  const onGetParams = useCallback(() => run("Get Params", async () => {
+    const sp = await getParams();
+    const round = (sp as any).lastRound ?? (sp as any)["last-round"] ?? (sp as any).firstRound;
+    try { toast.success(`Params OK (round ${String(round)})`); } catch {}
+    return {} as any;
+  }), [toast]);
+
+  const onOptIn = useCallback(() => run("Opt-In", async () => {
+    const sender = connectedAddress || account;
+    if (!sender) throw new Error(`Connect wallet on ${netLower} to opt-in.`);
+    if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
+    const blob = await buildAppOptInTxnBlob({ appId: ocAppId, sender });
+    const { txId } = await signAndSubmit([blob], signer);
+    const cr = await pollConfirmedRound(txId);
+    if (cr) setOcConfirmedRound(cr);
+    try { toast.success("Opt-In submitted"); } catch {}
+    return { txId, confirmedRound: cr } as any;
+  }), [connectedAddress, account, ocAppId, signer, pollConfirmedRound, netLower, toast]);
+
+  const onRegister = useCallback(() => run("Register", async () => {
+    const sender = connectedAddress || account;
+    if (!sender) throw new Error(`Connect wallet on ${netLower} to register.`);
+    if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
+    if (!fakeId) throw new Error("Enter a Fake ID string.");
+    const args = [str("register"), str(fakeId)];
+    const blob = await buildAppNoOpTxnBlob({ appId: ocAppId, sender, appArgs: args });
+    const { txId } = await signAndSubmit([blob], signer);
+    const cr = await pollConfirmedRound(txId);
+    if (cr) setOcConfirmedRound(cr);
+    try { toast.success("Register submitted"); } catch {}
+    return { txId, confirmedRound: cr } as any;
+  }), [connectedAddress, account, ocAppId, fakeId, signer, pollConfirmedRound, str, netLower, toast]);
+
+  const onBid = useCallback(() => run("Place Bid", async () => {
+    const sender = connectedAddress || account;
+    if (!sender) throw new Error(`Connect wallet on ${netLower} to place a bid.`);
+    if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
+    if (!Number.isInteger(microAlgos) || microAlgos < 0) throw new Error("Bid must be a non-negative integer (µAlgos).");
+    const args = [str("bid"), u64(microAlgos)];
+    const blob = await buildAppNoOpTxnBlob({ appId: ocAppId, sender, appArgs: args });
+    const { txId } = await signAndSubmit([blob], signer);
+    const cr = await pollConfirmedRound(txId);
+    if (cr) setOcConfirmedRound(cr);
+    try { toast.success("Bid submitted"); } catch {}
+    return { txId, confirmedRound: cr } as any;
+  }), [connectedAddress, account, ocAppId, microAlgos, signer, pollConfirmedRound, str, u64, netLower, toast]);
 
   async function setPhase(phase: number) {
     try {
@@ -168,5 +282,45 @@ export default function PhaseControl({ appId, account, network }: Props) {
       </div>
     )}
   </div>
+      {/* On-Chain Actions */}
+      <div style={{ marginTop: 12, border: "1px solid #ddd", padding: 12, borderRadius: 8, background: "#fff" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <strong>On-Chain Actions</strong>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 8 }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span>App ID</span>
+            <input type="number" value={ocAppId} onChange={(e)=>setOcAppId(Number(e.target.value||0))} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span>Fake ID</span>
+            <input type="text" value={fakeId} onChange={(e)=>setFakeId(e.target.value)} placeholder="SMOKE_YYYY-MM-DD_KAM" />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span>Bid (µAlgos)</span>
+            <input type="number" min={0} value={microAlgos} onChange={(e)=>setMicroAlgos(Number(e.target.value||0))} />
+          </label>
+        </div>
+        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button disabled={!!ocBusy} onClick={onGetParams}>Get Params</button>
+          <button disabled={!connectedAddress || !!ocBusy || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onOptIn}>Opt-In</button>
+          <button disabled={!connectedAddress || !!ocBusy || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onRegister}>Register</button>
+          <button disabled={!connectedAddress || !!ocBusy || !(Number.isInteger(ocAppId) && ocAppId>0) || !(Number.isInteger(microAlgos) && microAlgos>=0)} onClick={onBid}>Place Bid</button>
+        </div>
+        {(ocLastTxId || ocError) && (
+          <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>
+            {ocLastTxId && (
+              <div>
+                <div>txId: <code>{ocLastTxId}</code></div>
+                {ocConfirmedRound && <div>confirmed-round: {ocConfirmedRound}</div>}
+                <div><a href={txUrl(ocLastTxId)} target="_blank" rel="noreferrer">View in Lora</a></div>
+              </div>
+            )}
+            {ocError && (
+              <div style={{ color: "#b00" }}>error: {ocError}</div>
+            )}
+          </div>
+        )}
+      </div>
   );
 }

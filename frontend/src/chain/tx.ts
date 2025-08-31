@@ -9,14 +9,17 @@
 // - Build unsigned txns with algosdk, sign via wallet, then POST to /api/submit.
 // - Keep env secrets server-side; this module only uses fetch() to /api/*.
 //
+// Prefer the thin wrappers (getParams, optInApp, register, placeBid) in UI code
+// to keep components concise and avoid duplicating flow details here.
+//
 // Usage example (inside a React component):
 //   const { activeAddress, signTransactions } = useWallet();
-//   const blob = await buildAppNoOpTxnBlob({ appId, sender: activeAddress!, appArgs: [str("ping")] });
-//   const { txId } = await signAndSubmit([blob], signTransactions);
+//   const { txId } = await register({ sender: activeAddress!, appId, fakeId: "ID123", sign: signTransactions });
 
 // cspell:ignore txns stxns appArgs NoOp
 import * as algosdk from "algosdk";
 import type { Transaction, SuggestedParams } from "algosdk";
+import { str, u64 } from "./enc";
 
 /** Shape expected by /api/submit in this repo (single signed txn). */
 type SubmitRequest = { signedTxnBase64: string };
@@ -56,6 +59,15 @@ function normalizeSuggestedParams(p: any): SuggestedParams {
     genesisHash: genesisHash as any,
     genesisID: p.genesisID ?? p["genesis-id"],
   } as unknown as SuggestedParams;
+}
+
+// Convenience alias to match UI imports
+/**
+ * Fetch and normalize SuggestedParams via the serverless `/api/params` route.
+ * Prefer this alias in UI code.
+ */
+export function getParams(): Promise<SuggestedParams> {
+  return getSuggestedParams();
 }
 
 /** Build an unsigned Application Opt-In txn and return its encoded blob */
@@ -129,6 +141,59 @@ export async function signAndSubmit(
     throw new Error(`Submit failed: ${text}`);
   }
   return (await res.json()) as SubmitResponse;
+}
+
+// Thin wrappers for common actions
+export type Signer = WalletSigner;
+
+/**
+ * Opt the `sender` into the application `appId`.
+ * Delegates to: getParams → buildAppOptInTxnBlob → signAndSubmit.
+ * Returns the `{ txId }` from `/api/submit`.
+ */
+export async function optInApp(args: {
+  sender: string;
+  appId: number;
+  sign: Signer;
+}): Promise<SubmitResponse> {
+  const blob = await buildAppOptInTxnBlob({ appId: args.appId, sender: args.sender });
+  return await signAndSubmit([blob], args.sign);
+}
+
+/**
+ * Register the `fakeId` on-chain via a NoOp call: ["register", fakeId].
+ * Delegates to: getParams → buildAppNoOpTxnBlob → signAndSubmit.
+ * Returns the `{ txId }` from `/api/submit`.
+ */
+export async function register(args: {
+  sender: string;
+  appId: number;
+  fakeId: string;
+  sign: Signer;
+}): Promise<SubmitResponse> {
+  const appArgs = [str("register"), str(args.fakeId)];
+  const blob = await buildAppNoOpTxnBlob({ appId: args.appId, sender: args.sender, appArgs });
+  return await signAndSubmit([blob], args.sign);
+}
+
+/**
+ * Place a bid in microAlgos via a NoOp call: ["bid", u64(microAlgos)].
+ * Validates `microAlgos` is a non-negative integer.
+ * Delegates to: getParams → buildAppNoOpTxnBlob → signAndSubmit.
+ * Returns the `{ txId }` from `/api/submit`.
+ */
+export async function placeBid(args: {
+  sender: string;
+  appId: number;
+  microAlgos: number;
+  sign: Signer;
+}): Promise<SubmitResponse> {
+  if (!Number.isInteger(args.microAlgos) || args.microAlgos < 0) {
+    throw new Error("placeBid: microAlgos must be a non-negative integer");
+  }
+  const appArgs = [str("bid"), u64(args.microAlgos)];
+  const blob = await buildAppNoOpTxnBlob({ appId: args.appId, sender: args.sender, appArgs });
+  return await signAndSubmit([blob], args.sign);
 }
 
 /** Small, dependency-free base64 encoder for Uint8Array */
