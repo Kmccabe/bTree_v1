@@ -77,9 +77,9 @@ frontend/                       # React + Vite + TypeScript app (Pera on TestNet
     favicon.svg
   src/
     App.tsx                     # Pera connect, deploy, debug panel
+    main.tsx                    # use-wallet v2 provider initialization
     deploy.ts                   # Build unsigned app-create txn (wallet signs)
     components/PhaseControl.tsx # Admin phase switching via app call
-    wallet.ts                   # Shared Pera instance across the app
     polyfills.ts                # Buffer/process/global shims for browser
   index.html
   package.json
@@ -181,7 +181,17 @@ Post‑deploy health checks:
 
 Notes:
 - Transactions are built client‑side and signed in Pera; serverless routes only forward the signed bytes to Algod.
-- A shared `PeraWalletConnect` instance (`src/wallet.ts`) is used across the app to avoid session mismatch.
+- Wallet integration uses `@txnlab/use-wallet` v2; no shared `wallet.ts` singleton. Provider setup lives in `frontend/src/main.tsx`.
+
+---
+
+## Refactor Highlights
+
+- Moved to `@txnlab/use-wallet` v2 (Pera provider) with initialization in `frontend/src/main.tsx`.
+- Removed legacy wallet singleton (`src/wallet.ts`) and legacy identity modules.
+- Enforced serverless-only chain I/O via `frontend/api/*` (no direct Algod from the browser).
+- Clarified env separation: `TESTNET_ALGOD_*` (server) vs `VITE_*` (client).
+- Local dev uses `vercel dev` with Vite proxying `/api` to `:3000`.
 
 ---
 
@@ -208,8 +218,9 @@ Notes:
 
 ## Troubleshooting
 
-- Wallet init error ("PeraWalletConnect was not initialized correctly"):
-  - We call `reconnectSession()` before signing and share a single Pera instance. Reconnect wallet if needed.
+- Wallet connection issues:
+  - Ensure Pera is on the same network as `VITE_NETWORK` (TestNet by default).
+  - Use the Debug Panel actions (Reconnect/Reset) or call `reconnectProviders` via the app to restore sessions.
 - Zero‑fee rejection ("txgroup had 0 in fees"):
   - Params are normalized to enforce a non‑zero fee; refresh and retry.
 - `/api/*` returns HTML/404 locally:
