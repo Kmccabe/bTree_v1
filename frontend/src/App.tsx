@@ -7,7 +7,16 @@ import ExportCSVButton from "./components/ExportCSVButton";
 import PhaseControl from "./components/PhaseControl";
 
 export default function App(): JSX.Element {
-  const { activeAddress, activeAccount, clients, providers, signTransactions, status } = useWallet();
+  const {
+    activeAddress,
+    activeAccount,
+    clients,
+    providers,
+    connectedAccounts,
+    connectedActiveAccounts,
+    signTransactions,
+    status,
+  } = useWallet();
   const account = activeAddress || activeAccount?.address || null;
   const network = (import.meta.env.VITE_NETWORK as string) ?? "TESTNET";
   const [deploying, setDeploying] = useState(false);
@@ -25,14 +34,33 @@ export default function App(): JSX.Element {
   useEffect(() => {}, []);
 
   const handleConnect = useCallback(async () => {
+    const peraClient = clients?.[PROVIDER_ID.PERA];
+    if (!peraClient) return;
     try {
-      const wallet = await clients?.[PROVIDER_ID.PERA]?.connect(() => {});
+      let wallet = await peraClient.connect(() => {});
       const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
       p?.setActiveProvider();
-      const first = wallet?.accounts?.[0]?.address || p?.accounts?.[0]?.address;
-      if (first) p?.setActiveAccount(first);
-    } catch (err) {
-      console.error("Connect failed:", err);
+      const target = wallet?.accounts?.[0]?.address || p?.accounts?.[0]?.address;
+      if (target) p?.setActiveAccount(target);
+    } catch (err: any) {
+      // If a session exists, fall back to reconnect
+      if (String(err?.message || err).toLowerCase().includes("currently connected")) {
+        try {
+          const wallet = await peraClient.reconnect(() => {});
+          const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
+          p?.setActiveProvider();
+          const target = wallet?.accounts?.[0]?.address || p?.accounts?.[0]?.address;
+          if (target) {
+            // prefer wallet-provided address if present in provider accounts
+            const found = p?.accounts?.find(a => a.address === target)?.address || p?.accounts?.[0]?.address;
+            if (found) p?.setActiveAccount(found);
+          }
+        } catch (e) {
+          console.error("Reconnect failed:", e);
+        }
+      } else {
+        console.error("Connect failed:", err);
+      }
     }
   }, [clients, providers]);
 
@@ -40,21 +68,36 @@ export default function App(): JSX.Element {
     try { await clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {}
   }, [clients]);
 
-  // Auto-activate provider/account if a session exists (e.g., after mobile connects)
+  // Auto-restore session and set active account if provider already connected
   useEffect(() => {
-    try {
-      const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
-      if (!p) return;
-      const hasAccounts = Array.isArray(p.accounts) && p.accounts.length > 0;
-      if (hasAccounts) {
-        if (!p.isActive) p.setActiveProvider();
-        const first = p.accounts[0]?.address;
-        if (first && (!activeAccount || activeAccount.address !== first)) {
-          p.setActiveAccount(first);
+    const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
+    const client = clients?.[PROVIDER_ID.PERA];
+    if (!p || !client) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // If no accounts loaded yet, try reconnect
+        if (!Array.isArray(p.accounts) || p.accounts.length === 0) {
+          const wallet = await client.reconnect(() => {});
+          if (cancelled) return;
+          if (wallet && wallet.accounts && wallet.accounts.length) {
+            if (!p.isActive) p.setActiveProvider();
+            const target = wallet.accounts[0]?.address;
+            const found = p.accounts?.find(a => a.address === target)?.address || p.accounts?.[0]?.address;
+            if (found) p.setActiveAccount(found);
+          }
+        } else {
+          // Accounts present: ensure provider/account are active
+          if (!p.isActive) p.setActiveProvider();
+          const first = p.accounts[0]?.address;
+          if (first && (!activeAccount || activeAccount.address !== first)) {
+            p.setActiveAccount(first);
+          }
         }
-      }
-    } catch {}
-  }, [providers, activeAccount]);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [providers, clients, activeAccount]);
 
   const handleDeploy = useCallback(async () => {
     const sender = account;
@@ -280,6 +323,8 @@ export default function App(): JSX.Element {
             <div>Account: {account || "(none)"}</div>
             <div>Valid: {String(isValidAccount)}</div>
             <div>Status: {status}</div>
+            <div>connectedAccounts: {connectedAccounts.length}</div>
+            <div>connectedActiveAccounts: {connectedActiveAccounts.length}</div>
             <div>Location: {typeof window !== 'undefined' ? window.location.origin : ''}</div>
             <div style={{ marginTop: 8 }}>
               <button onClick={handlePingParams}>Ping /api/params</button>
