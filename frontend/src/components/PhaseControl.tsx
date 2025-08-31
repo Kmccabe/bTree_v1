@@ -268,7 +268,6 @@ export default function PhaseControl({ appId, account, network }: Props) {
           Connect wallet and ensure an App ID (deploy once or set <code>VITE_TESTNET_APP_ID</code>).
       </div>
     )}
-  </div>
       {/* On-Chain Actions */}
       <div style={{ marginTop: 12, border: "1px solid #ddd", padding: 12, borderRadius: 8, background: "#fff" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -308,6 +307,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
             )}
           </div>
         )}
+      </div>
       </div>
   );
 }
