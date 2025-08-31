@@ -40,16 +40,6 @@ export default function App(): JSX.Element {
       await peraClient.connect(() => {});
       const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
       if (p && !p.isActive) p.setActiveProvider();
-      // Wait briefly for provider.accounts to populate, then set first account if available
-      if (p) {
-        for (let i = 0; i < 20; i++) {
-          if (Array.isArray(p.accounts) && p.accounts.length > 0) break;
-          await new Promise(r => setTimeout(r, 100));
-        }
-        if (Array.isArray(p.accounts) && p.accounts.length > 0) {
-          p.setActiveAccount(p.accounts[0].address);
-        }
-      }
     } catch (err: any) {
       // If a session exists, fall back to reconnect
       if (String(err?.message || err).toLowerCase().includes("currently connected")) {
@@ -57,15 +47,6 @@ export default function App(): JSX.Element {
           await peraClient.reconnect(() => {});
           const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
           if (p && !p.isActive) p.setActiveProvider();
-          if (p) {
-            for (let i = 0; i < 20; i++) {
-              if (Array.isArray(p.accounts) && p.accounts.length > 0) break;
-              await new Promise(r => setTimeout(r, 100));
-            }
-            if (Array.isArray(p.accounts) && p.accounts.length > 0) {
-              p.setActiveAccount(p.accounts[0].address);
-            }
-          }
         } catch (e) {
           console.error("Reconnect failed:", e);
         }
@@ -79,7 +60,7 @@ export default function App(): JSX.Element {
     try { await clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {}
   }, [clients]);
 
-  // Auto-restore session and set active account if provider already connected
+  // Ensure provider is marked active when accounts are present
   useEffect(() => {
     const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
     const client = clients?.[PROVIDER_ID.PERA];
@@ -93,17 +74,10 @@ export default function App(): JSX.Element {
           if (cancelled) return;
           if (wallet && wallet.accounts && wallet.accounts.length) {
             if (!p.isActive) p.setActiveProvider();
-            const target = wallet.accounts[0]?.address;
-            const found = p.accounts?.find(a => a.address === target)?.address || p.accounts?.[0]?.address;
-            if (found) p.setActiveAccount(found);
           }
         } else {
-          // Accounts present: ensure provider/account are active
+          // Accounts present: ensure provider is active
           if (!p.isActive) p.setActiveProvider();
-          const first = p.accounts[0]?.address;
-          if (first && (!activeAccount || activeAccount.address !== first)) {
-            p.setActiveAccount(first);
-          }
         }
       } catch {}
     })();
@@ -336,6 +310,8 @@ export default function App(): JSX.Element {
             <div>Status: {status}</div>
             <div>connectedAccounts: {connectedAccounts.length}</div>
             <div>connectedActiveAccounts: {connectedActiveAccounts.length}</div>
+            <div>providers: {providers?.length ?? 0}</div>
+            <div>pera.isActive: {String(!!providers?.find(p=>p.metadata.id===PROVIDER_ID.PERA)?.isActive)}</div>
             <div>Location: {typeof window !== 'undefined' ? window.location.origin : ''}</div>
             <div style={{ marginTop: 8 }}>
               <button onClick={handlePingParams}>Ping /api/params</button>

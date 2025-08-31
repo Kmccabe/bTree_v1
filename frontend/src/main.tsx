@@ -29,11 +29,24 @@ function Root() {
           : "https://betanet-api.algonode.cloud",
     },
   });
+  // Optional: simple network switch handler from App buttons
+  React.useEffect(() => {
+    const handler = (e: any) => {
+      const next = (e?.detail || '').toString().toLowerCase();
+      if (!next) return;
+      const url = new URL(window.location.href);
+      url.searchParams.set('net', next);
+      window.location.href = url.toString();
+    };
+    window.addEventListener('wallet:set-network', handler);
+    return () => window.removeEventListener('wallet:set-network', handler);
+  }, []);
   React.useEffect(() => {
     if (providers) {
       reconnectProviders(providers).catch(() => {});
     }
   }, [providers]);
+  if (!providers) return null;
   return (
     <WalletProvider value={providers}>
       <App />
