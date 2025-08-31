@@ -34,19 +34,22 @@ export default function App(): JSX.Element {
   useEffect(() => {}, []);
 
   const handleConnect = useCallback(async () => {
+    const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
     const peraClient = clients?.[PROVIDER_ID.PERA];
-    if (!peraClient) return;
+    if (!p) {
+      console.warn("Pera provider not initialized yet");
+      return;
+    }
     try {
-      await peraClient.connect(() => {});
-      const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
-      if (p && !p.isActive) p.setActiveProvider();
+      // Prefer high-level Provider.connect (manages state and activation)
+      await p.connect();
+      if (!p.isActive) p.setActiveProvider();
     } catch (err: any) {
-      // If a session exists, fall back to reconnect
-      if (String(err?.message || err).toLowerCase().includes("currently connected")) {
+      const msg = String(err?.message || err).toLowerCase();
+      if (msg.includes("currently connected") && peraClient) {
         try {
           await peraClient.reconnect(() => {});
-          const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
-          if (p && !p.isActive) p.setActiveProvider();
+          if (!p.isActive) p.setActiveProvider();
         } catch (e) {
           console.error("Reconnect failed:", e);
         }
@@ -227,15 +230,18 @@ export default function App(): JSX.Element {
         <span style={{ marginLeft: 8, color: '#666', fontSize: 12 }}>(Switch wallet network to match)</span>
       </div>
 
-      {!account ? (
-        <button onClick={handleConnect}>Connect Pera Wallet</button>
-      ) : (
-        <div>
-          <p><strong>Connected:</strong> {account}</p>
-          <button onClick={handleDisconnect}>Disconnect</button>
-          <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {} }} style={{ marginLeft: 8 }}>Reset Wallet Session</button>
-        </div>
-      )}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+        {!account ? (
+          <button onClick={handleConnect}>Connect Pera Wallet</button>
+        ) : (
+          <>
+            <p style={{ margin: 0 }}><strong>Connected:</strong> {account}</p>
+            <button onClick={handleDisconnect}>Disconnect</button>
+          </>
+        )}
+        <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.reconnect(() => {}); } catch {} }}>Force Reconnect</button>
+        <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {} }}>Reset Wallet Session</button>
+      </div>
 
       <hr />
       <h3>Deploy placeholder app (no mnemonic; Pera signs)</h3>
@@ -312,6 +318,14 @@ export default function App(): JSX.Element {
             <div>connectedActiveAccounts: {connectedActiveAccounts.length}</div>
             <div>providers: {providers?.length ?? 0}</div>
             <div>pera.isActive: {String(!!providers?.find(p=>p.metadata.id===PROVIDER_ID.PERA)?.isActive)}</div>
+            <div>
+              pera.accounts:
+              {(() => {
+                const p = providers?.find(p=>p.metadata.id===PROVIDER_ID.PERA);
+                const addrs = (p?.accounts||[]).map(a=>a.address).join(", ");
+                return " [" + addrs + "]";
+              })()}
+            </div>
             <div>Location: {typeof window !== 'undefined' ? window.location.origin : ''}</div>
             <div style={{ marginTop: 8 }}>
               <button onClick={handlePingParams}>Ping /api/params</button>
