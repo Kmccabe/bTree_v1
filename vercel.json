@@ -1,0 +1,12 @@
+{
+  "builds": [
+    { "src": "frontend/package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } },
+    { "src": "frontend/api/**/*.ts", "use": "@vercel/node@3" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "frontend/api/$1.ts" },
+    { "src": "/(.*)", "dest": "frontend/dist/$1" }
+  ],
+  "installCommand": "cd frontend && npm install --legacy-peer-deps",
+  "buildCommand": "cd frontend && npm run build"
+}
