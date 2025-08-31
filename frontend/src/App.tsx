@@ -26,10 +26,10 @@ export default function App(): JSX.Element {
 
   const handleConnect = useCallback(async () => {
     try {
-      await clients?.[PROVIDER_ID.PERA]?.connect(() => {});
+      const wallet = await clients?.[PROVIDER_ID.PERA]?.connect(() => {});
       const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
       p?.setActiveProvider();
-      const first = p?.accounts?.[0]?.address;
+      const first = wallet?.accounts?.[0]?.address || p?.accounts?.[0]?.address;
       if (first) p?.setActiveAccount(first);
     } catch (err) {
       console.error("Connect failed:", err);
@@ -39,6 +39,22 @@ export default function App(): JSX.Element {
   const handleDisconnect = useCallback(async () => {
     try { await clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {}
   }, [clients]);
+
+  // Auto-activate provider/account if a session exists (e.g., after mobile connects)
+  useEffect(() => {
+    try {
+      const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
+      if (!p) return;
+      const hasAccounts = Array.isArray(p.accounts) && p.accounts.length > 0;
+      if (hasAccounts) {
+        if (!p.isActive) p.setActiveProvider();
+        const first = p.accounts[0]?.address;
+        if (first && (!activeAccount || activeAccount.address !== first)) {
+          p.setActiveAccount(first);
+        }
+      }
+    } catch {}
+  }, [providers, activeAccount]);
 
   const handleDeploy = useCallback(async () => {
     const sender = account;
