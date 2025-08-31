@@ -6,6 +6,7 @@ import { WalletProvider, useInitializeProviders, PROVIDER_ID, reconnectProviders
 import * as algosdk from "algosdk";
 import React from "react";
 import { PeraWalletConnect } from "@perawallet/connect";
+import { ToastProvider } from "./components/Toaster";
 
 const root = createRoot(document.getElementById("root")!);
 
@@ -38,7 +39,9 @@ function Root() {
   if (!providers) return null;
   return (
     <WalletProvider value={providers}>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </WalletProvider>
   );
 }

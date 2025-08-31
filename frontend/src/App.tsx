@@ -5,6 +5,8 @@ import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
 import { deployPlaceholderApp } from "./deploy";
 import ExportCSVButton from "./components/ExportCSVButton";
 import PhaseControl from "./components/PhaseControl";
+import AccountSelector from "./components/AccountSelector";
+import { useToast } from "./components/Toaster";
 
 export default function App(): JSX.Element {
   const {
@@ -17,6 +19,7 @@ export default function App(): JSX.Element {
     signTransactions,
     status,
   } = useWallet();
+  const toast = useToast();
   const account = activeAddress || activeAccount?.address || null;
   const network = (import.meta.env.VITE_NETWORK as string) ?? "TESTNET";
   const [deploying, setDeploying] = useState(false);
@@ -90,7 +93,7 @@ export default function App(): JSX.Element {
   const handleDeploy = useCallback(async () => {
     const sender = account;
     if (!sender || !algosdk.isValidAddress(sender)) {
-      alert("No valid Algorand address connected. Please connect wallet.");
+      try { toast.error("Connect a valid Algorand address first"); } catch {}
       return;
     }
     try {
@@ -132,7 +135,7 @@ export default function App(): JSX.Element {
       }
     } catch (e) {
       console.error(e);
-      alert("Deploy failed: " + (e as Error).message);
+      try { toast.error("Deploy failed: " + (e as Error).message); } catch {}
     } finally {
       setDeploying(false);
     }
@@ -191,7 +194,7 @@ export default function App(): JSX.Element {
   const handleCopyManifest = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(manifestText);
-      alert("Manifest copied to clipboard");
+      try { toast.success("Manifest copied to clipboard"); } catch {}
     } catch {
       // Fallback: create a temporary textarea
       const ta = document.createElement("textarea");
@@ -200,7 +203,7 @@ export default function App(): JSX.Element {
       ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
-      alert("Manifest copied to clipboard");
+      try { toast.success("Manifest copied to clipboard"); } catch {}
     }
   }, [manifestText]);
 
@@ -225,7 +228,7 @@ export default function App(): JSX.Element {
       <h1>bTree v1 — Trust Game MVP</h1>
       <p><strong>Network:</strong> {network} (wallet = use-wallet/Pera)</p>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
         {!account ? (
           <button onClick={handleConnect}>Connect Pera Wallet</button>
         ) : (
@@ -234,7 +237,7 @@ export default function App(): JSX.Element {
             <button onClick={handleDisconnect}>Disconnect</button>
           </>
         )}
-        
+        <AccountSelector />
       </div>
 
       <hr />
