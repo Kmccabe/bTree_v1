@@ -224,11 +224,6 @@ export default function App(): JSX.Element {
     <div style={{ fontFamily: "system-ui, Arial", padding: 24 }}>
       <h1>bTree v1 — Trust Game MVP</h1>
       <p><strong>Network:</strong> {network} (wallet = use-wallet/Pera)</p>
-      <div style={{ marginTop: 6 }}>
-        <button onClick={() => window.dispatchEvent(new CustomEvent('wallet:set-network', { detail: 'testnet' }))} style={{ marginRight: 8 }}>Use TestNet</button>
-        <button onClick={() => window.dispatchEvent(new CustomEvent('wallet:set-network', { detail: 'mainnet' }))}>Use MainNet</button>
-        <span style={{ marginLeft: 8, color: '#666', fontSize: 12 }}>(Switch wallet network to match)</span>
-      </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
         {!account ? (
@@ -239,8 +234,7 @@ export default function App(): JSX.Element {
             <button onClick={handleDisconnect}>Disconnect</button>
           </>
         )}
-        <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.reconnect(() => {}); } catch {} }}>Force Reconnect</button>
-        <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {} }}>Reset Wallet Session</button>
+        
       </div>
 
       <hr />
@@ -325,6 +319,10 @@ export default function App(): JSX.Element {
                 const addrs = (p?.accounts||[]).map(a=>a.address).join(", ");
                 return " [" + addrs + "]";
               })()}
+            </div>
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.reconnect(() => {}); } catch {} }}>Force Reconnect</button>
+              <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {} }}>Reset Wallet Session</button>
             </div>
             <div>Location: {typeof window !== 'undefined' ? window.location.origin : ''}</div>
             <div style={{ marginTop: 8 }}>
