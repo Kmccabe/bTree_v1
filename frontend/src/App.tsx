@@ -177,6 +177,11 @@ export default function App(): JSX.Element {
     <div style={{ fontFamily: "system-ui, Arial", padding: 24 }}>
       <h1>bTree v1 — Trust Game MVP</h1>
       <p><strong>Network:</strong> {network} (wallet = use-wallet/Pera)</p>
+      <div style={{ marginTop: 6 }}>
+        <button onClick={() => window.dispatchEvent(new CustomEvent('wallet:set-network', { detail: 'testnet' }))} style={{ marginRight: 8 }}>Use TestNet</button>
+        <button onClick={() => window.dispatchEvent(new CustomEvent('wallet:set-network', { detail: 'mainnet' }))}>Use MainNet</button>
+        <span style={{ marginLeft: 8, color: '#666', fontSize: 12 }}>(Switch wallet network to match)</span>
+      </div>
 
       {!account ? (
         <button onClick={handleConnect}>Connect Pera Wallet</button>
@@ -184,6 +189,7 @@ export default function App(): JSX.Element {
         <div>
           <p><strong>Connected:</strong> {account}</p>
           <button onClick={handleDisconnect}>Disconnect</button>
+          <button onClick={() => { try { clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {} }} style={{ marginLeft: 8 }}>Reset Wallet Session</button>
         </div>
       )}
 

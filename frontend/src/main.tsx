@@ -14,17 +14,9 @@ const envNetwork = (import.meta.env.VITE_NETWORK as string | undefined) || "TEST
 const network = envNetwork.toLowerCase() === "mainnet" ? "mainnet" : "testnet";
 
 function Root() {
-  const isMainnet = network === "mainnet";
   const providers = useInitializeProviders({
     providers: [
-      {
-        id: PROVIDER_ID.PERA,
-        clientStatic: PeraWalletConnect,
-        clientOptions: {
-          // Ensure Pera uses the same chain as the dApp
-          chainId: isMainnet ? 4160 : 416001,
-        },
-      },
+      { id: PROVIDER_ID.PERA, clientStatic: PeraWalletConnect },
     ],
     algosdkStatic: algosdk,
     nodeConfig: {
