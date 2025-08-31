@@ -9,6 +9,21 @@ Minimal, production‑oriented scaffold for running a Trust Game on Algorand Tes
 
 ---
 
+## Update: Wallet Integration (use-wallet v2)
+
+The frontend now uses `@txnlab/use-wallet` v2 with the Pera provider and UI improvements:
+
+- Provider init lives in `frontend/src/main.tsx` using `useInitializeProviders` and `<WalletProvider>`.
+- No forced chainId; make sure Pera’s network matches `VITE_NETWORK`.
+- Optional auto‑restore on load via `VITE_WALLET_AUTO_RECONNECT=true` (default: disabled).
+- Account selector appears when multiple accounts are available (`frontend/src/components/AccountSelector.tsx`).
+- Non‑blocking toasts replace browser alerts (`frontend/src/components/Toaster.tsx`).
+- The Debug Panel includes “Force Reconnect” and “Reset Wallet Session” actions for recovery.
+
+Note: This supersedes earlier mentions of a shared `src/wallet.ts` Pera instance; the app now relies on `@txnlab/use-wallet` hooks and provider.
+
+---
+
 ## Quick Start
 
 Local (with serverless APIs):
