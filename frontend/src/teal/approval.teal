@@ -161,7 +161,7 @@ invest:
   int 2
   ==
   assert
-  global GroupIndex
+  txn GroupIndex
   int 1
   ==
   assert
