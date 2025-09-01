@@ -248,9 +248,11 @@ export async function investFlow(args: {
   // Suggested params
   const sp = await getSuggestedParams();
 
-  const appAddr = (algosdk as any).getApplicationAddress
+  // Resolve app address (algosdk v3 returns Address object; v2 may return string)
+  const appAddrRaw = (algosdk as any).getApplicationAddress
     ? (algosdk as any).getApplicationAddress(appId)
     : (algosdk as any).logic?.getApplicationAddress(appId);
+  const appAddr: string = typeof appAddrRaw === "string" ? appAddrRaw : appAddrRaw?.toString?.();
   if (!appAddr || typeof appAddr !== "string") {
     throw new Error("investFlow: could not resolve application address");
   }
