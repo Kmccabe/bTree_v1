@@ -1,30 +1,58 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
-import { investFlow } from "../chain/tx";
+import algosdk from "algosdk";
+import { investFlow, optInApp } from "../chain/tx";
 
 export default function SubjectActions() {
   const { activeAddress, signTransactions } = useWallet();
+
+  // inputs
   const [appIdIn, setAppIdIn] = useState<string>("");
   const [unit, setUnit] = useState<number>(1000);
   const [E, setE] = useState<number>(100000);
+
+  // invest uses string to avoid leading-zero quirks
+  const [sInput, setSInput] = useState<string>("");
+
+  // ui state
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  // Keep input as string to avoid number input fighting backspacing/empty state
-  const [s, setS] = useState<string>("");
   const [lastTx, setLastTx] = useState<string | null>(null);
 
-  // read globals to get UNIT and E for input stepping
-  async function readGlobals() {
-    const id = Number(appIdIn);
-    if (!Number.isFinite(id) || id <= 0) return setErr("Enter a valid App ID.");
-    setBusy("read"); setErr(null);
+  // helpers
+  const connected = activeAddress || "(not connected)";
+  const appIdNum = Number(appIdIn);
+  const appIdValid = Number.isFinite(appIdNum) && appIdNum > 0;
+  let appAddrPreview = "";
+  try {
+    if (appIdValid) appAddrPreview = (algosdk as any).getApplicationAddress(appIdNum)?.toString?.() || (algosdk as any).getApplicationAddress(appIdNum);
+  } catch { /* ignore */ }
+
+  async function loadGlobals() {
+    setErr(null);
+    if (!appIdValid) return setErr("Enter a numeric App ID (not the App Address).");
+    setBusy("read");
     try {
-      const r = await fetch(`/api/pair?id=${id}`);
+      const r = await fetch(`/api/pair?id=${appIdNum}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
       setUnit(Number(j?.globals?.UNIT ?? 1000));
       setE(Number(j?.globals?.E ?? 100000));
-    } catch (e:any) {
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function doOptIn() {
+    setErr(null);
+    if (!activeAddress) return setErr("Connect wallet as subject.");
+    if (!appIdValid) return setErr("Enter a numeric App ID first.");
+    setBusy("optin");
+    try {
+      await optInApp({ sender: activeAddress, appId: appIdNum, sign: (u) => signTransactions(u) });
+    } catch (e: any) {
       setErr(e?.message || String(e));
     } finally {
       setBusy(null);
@@ -32,32 +60,42 @@ export default function SubjectActions() {
   }
 
   async function doInvest() {
-    const id = Number(appIdIn);
+    setErr(null);
     if (!activeAddress) return setErr("Connect wallet as subject.");
-    if (!Number.isFinite(id) || id <= 0) return setErr("Enter a valid App ID.");
-    const sNum = Number(s);
-    if (!Number.isInteger(sNum) || sNum < 0) return setErr("Enter a non-negative integer s (µAlgos).");
-    if (unit > 0 && sNum % unit !== 0) return setErr(`s must be a multiple of UNIT (${unit}).`);
-    setBusy("invest"); setErr(null);
+    if (!appIdValid) return setErr("Enter a numeric App ID (not the App Address).");
+
+    const s = Number(sInput);
+    if (!Number.isInteger(s) || s < 0) return setErr("Enter a whole number of µAlgos for s.");
+    if (s % unit !== 0) return setErr(`s must be a multiple of UNIT (${unit}).`);
+    if (s > E) return setErr(`s must be ≤ E (${E}).`);
+
+    setBusy("invest");
     try {
       const r = await investFlow({
         sender: activeAddress,
-        appId: id,
-        s: sNum,
+        appId: appIdNum,
+        s,
         sign: (u) => signTransactions(u),
       });
       setLastTx(r.txId);
-    } catch (e:any) {
+    } catch (e: any) {
       setErr(e?.message || String(e));
     } finally {
       setBusy(null);
     }
   }
 
+  const investDisabled =
+    !!busy || !activeAddress || !appIdValid ||
+    !/^\d+$/.test(sInput || "0") ||
+    Number(sInput) % unit !== 0 ||
+    Number(sInput) > E;
+
   return (
     <div className="rounded-2xl border p-4 space-y-3">
       <h3 className="text-lg font-semibold">Subject — Invest</h3>
 
+      {/* App ID + read */}
       <div className="flex items-center gap-2 text-sm">
         <span>App ID:</span>
         <input
@@ -65,35 +103,46 @@ export default function SubjectActions() {
           className="border rounded px-2 py-1 w-44"
           value={appIdIn}
           onChange={(e)=>setAppIdIn(e.target.value)}
-          placeholder="paste App ID"
+          placeholder="e.g., 745000000"
         />
-        <button className="text-xs underline" onClick={readGlobals} disabled={!!busy || !appIdIn}>
+        <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !appIdValid}>
           Load globals
         </button>
-        <span className="text-xs text-neutral-600">UNIT: {unit} · E: {E}</span>
+        <button className="text-xs underline" onClick={doOptIn} disabled={!!busy || !activeAddress || !appIdValid}>
+          {busy === "optin" ? "Opting in…" : "Opt-In"}
+        </button>
       </div>
 
+      {/* Connected + derived app address */}
+      <div className="text-xs text-neutral-600">
+        Connected: <code>{connected}</code>
+        {appAddrPreview && <> · App Address: <code>{appAddrPreview}</code></>}
+        <span className="ml-2">UNIT: {unit} · E: {E}</span>
+      </div>
+
+      {/* s input + invest */}
       <div className="flex items-center gap-2 text-sm">
         <span>Invest s (µAlgos):</span>
         <input
-          type="number"
+          inputMode="numeric"
+          pattern="\d*"
           className="border rounded px-2 py-1 w-44"
-          step={unit}
-          min={0}
-          max={E}
-          value={s}
-          onChange={(e)=>setS(e.target.value)}
+          value={sInput}
+          onChange={(e) => setSInput(e.target.value.replace(/[^\d]/g, ""))}
+          placeholder={`multiple of ${unit}, ≤ ${E}`}
         />
         <button className="text-xs underline" 
           onClick={doInvest}
-          disabled={!!busy || !activeAddress || !appIdIn || s === ""}>
+          disabled={investDisabled}>
           {busy==="invest" ? "Investing…" : "Invest"}
         </button>
       </div>
 
       {lastTx && <div className="text-xs">TxID: <code>{lastTx}</code></div>}
       {err && <div className="text-sm text-red-600">{err}</div>}
-      <p className="text-xs text-neutral-500">Wallet must be opted-in; phase must be 2; s must be a multiple of UNIT.</p>
+      <p className="text-xs text-neutral-500">
+        Requires: phase = 2, subject opted-in, 2-txn group, s multiple of UNIT, 0 ≤ s ≤ E.
+      </p>
     </div>
   );
 }
