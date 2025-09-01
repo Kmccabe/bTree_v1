@@ -232,6 +232,6 @@ export async function deployTrustGame(args: {
     if (app) { appId = Number(app); break; }
   }
   if (!appId) throw new Error("Deploy submitted but appId not found in pending within timeout");
-  const appAddress = algosdk.getApplicationAddress(appId);
+  const appAddress = algosdk.getApplicationAddress(appId).toString();
   return { txId, appId, appAddress };
 }
