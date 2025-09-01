@@ -8,8 +8,8 @@ import { useToast } from "./Toaster";
 import {
   getParams,
   optInApp,
-  register as registerAction,
-  placeBid as placeBidAction,
+  register,
+  placeBid,
   type Signer,
 } from "../chain/tx";
 
@@ -130,7 +130,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     if (!sender) throw new Error(`Connect wallet on ${netLower} to register.`);
     if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
     if (!fakeId) throw new Error("Enter a Fake ID string.");
-    const { txId } = await registerAction({ appId: ocAppId, sender, fakeId, sign: signer });
+    const { txId } = await register({ appId: ocAppId, sender, fakeId, sign: signer });
     const cr = await pollConfirmedRound(txId);
     if (cr) setOcConfirmedRound(cr);
     try { toast.success("Register submitted"); } catch {}
@@ -142,7 +142,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     if (!sender) throw new Error(`Connect wallet on ${netLower} to place a bid.`);
     if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
     if (!Number.isInteger(microAlgos) || microAlgos < 0) throw new Error("Bid must be a non-negative integer (µAlgos).");
-    const { txId } = await placeBidAction({ appId: ocAppId, sender, microAlgos, sign: signer });
+    const { txId } = await placeBid({ appId: ocAppId, sender, microAlgos, sign: signer });
     const cr = await pollConfirmedRound(txId);
     if (cr) setOcConfirmedRound(cr);
     try { toast.success("Bid submitted"); } catch {}
