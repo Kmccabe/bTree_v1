@@ -69,10 +69,13 @@ export default function PhaseControl({ appId, account, network }: Props) {
     "SMOKE_" + new Date().toISOString().slice(0, 10)
   );
   const [microAlgos, setMicroAlgos] = useState<number>(100000);
-  const [ocBusy, setOcBusy] = useState<string | null>(null);
-  const [ocLastTxId, setOcLastTxId] = useState<string | null>(null);
-  const [ocConfirmedRound, setOcConfirmedRound] = useState<number | null>(null);
-  const [ocError, setOcError] = useState<string | null>(null);
+  type ChainState = {
+    busy: string | null;
+    lastTxId: string | null;
+    confirmedRound: number | null;
+    error: string | null;
+  };
+  const [chain, setChain] = useState<ChainState>({ busy: null, lastTxId: null, confirmedRound: null, error: null });
   const netLower = (import.meta.env.VITE_NETWORK as string | undefined || "testnet").toLowerCase();
   const txUrl = useCallback((txId: string) => {
     const chain = netLower === "mainnet" ? "mainnet" : "testnet";
@@ -94,18 +97,21 @@ export default function PhaseControl({ appId, account, network }: Props) {
   }, []);
 
   async function run<T>(label: string, fn: () => Promise<T>) {
-    setOcBusy(label); setOcError(null); setOcLastTxId(null); setOcConfirmedRound(null);
+    setChain(c => ({ ...c, busy: label, error: null, lastTxId: null, confirmedRound: null }));
     try {
       const res: any = await fn();
-      if (res?.txId) setOcLastTxId(res.txId);
-      if (res?.confirmedRound) setOcConfirmedRound(res.confirmedRound);
+      setChain(c => ({
+        ...c,
+        lastTxId: res?.txId ?? null,
+        confirmedRound: typeof res?.confirmedRound === 'number' ? res.confirmedRound : null,
+      }));
     } catch (e: any) {
       const msg = e?.response?.text ?? e?.message ?? String(e);
-      setOcError(msg);
+      setChain(c => ({ ...c, error: msg }));
       try { toast.error(msg); } catch {}
       console.error(e);
     } finally {
-      setOcBusy(null);
+      setChain(c => ({ ...c, busy: null }));
     }
   }
 
@@ -122,7 +128,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
     const { txId } = await optInApp({ appId: ocAppId, sender, sign: signer });
     const cr = await pollConfirmedRound(txId);
-    if (cr) setOcConfirmedRound(cr);
+    if (cr) setChain(c => ({ ...c, confirmedRound: cr }));
     try { toast.success("Opt-In submitted"); } catch {}
     return { txId, confirmedRound: cr } as any;
   }), [connectedAddress, account, ocAppId, signer, pollConfirmedRound, netLower, toast]);
@@ -134,7 +140,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     if (!fakeId) throw new Error("Enter a Fake ID string.");
     const { txId } = await register({ appId: ocAppId, sender, fakeId, sign: signer });
     const cr = await pollConfirmedRound(txId);
-    if (cr) setOcConfirmedRound(cr);
+    if (cr) setChain(c => ({ ...c, confirmedRound: cr }));
     try { toast.success("Register submitted"); } catch {}
     return { txId, confirmedRound: cr } as any;
   }), [connectedAddress, account, ocAppId, fakeId, signer, pollConfirmedRound, netLower, toast]);
@@ -146,7 +152,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     if (!Number.isInteger(microAlgos) || microAlgos < 0) throw new Error("Bid must be a non-negative integer (µAlgos).");
     const { txId } = await placeBid({ appId: ocAppId, sender, microAlgos, sign: signer });
     const cr = await pollConfirmedRound(txId);
-    if (cr) setOcConfirmedRound(cr);
+    if (cr) setChain(c => ({ ...c, confirmedRound: cr }));
     try { toast.success("Bid submitted"); } catch {}
     return { txId, confirmedRound: cr } as any;
   }), [connectedAddress, account, ocAppId, microAlgos, signer, pollConfirmedRound, netLower, toast]);
@@ -305,22 +311,22 @@ export default function PhaseControl({ appId, account, network }: Props) {
           </label>
         </div>
         <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button disabled={!!ocBusy} onClick={onGetParams}>Get Params</button>
-          <button disabled={!connectedAddress || !!ocBusy || !netSanity.match || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onOptIn}>Opt-In</button>
-          <button disabled={!connectedAddress || !!ocBusy || !netSanity.match || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onRegister}>Register</button>
-          <button disabled={!connectedAddress || !!ocBusy || !netSanity.match || !(Number.isInteger(ocAppId) && ocAppId>0) || !(Number.isInteger(microAlgos) && microAlgos>=0)} onClick={onBid}>Place Bid</button>
+          <button disabled={!!chain.busy} onClick={onGetParams}>Get Params</button>
+          <button disabled={!connectedAddress || !!chain.busy || !netSanity.match || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onOptIn}>Opt-In</button>
+          <button disabled={!connectedAddress || !!chain.busy || !netSanity.match || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onRegister}>Register</button>
+          <button disabled={!connectedAddress || !!chain.busy || !netSanity.match || !(Number.isInteger(ocAppId) && ocAppId>0) || !(Number.isInteger(microAlgos) && microAlgos>=0)} onClick={onBid}>Place Bid</button>
         </div>
-        {(ocLastTxId || ocError) && (
+        {(chain.lastTxId || chain.error) && (
           <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>
-            {ocLastTxId && (
+            {chain.lastTxId && (
               <div>
-                <div>txId: <code>{ocLastTxId}</code></div>
-                {ocConfirmedRound && <div>confirmed-round: {ocConfirmedRound}</div>}
-                <div><a href={txUrl(ocLastTxId)} target="_blank" rel="noreferrer">View in Lora</a></div>
+                <div>txId: <code>{chain.lastTxId}</code></div>
+                {chain.confirmedRound && <div>confirmed-round: {chain.confirmedRound}</div>}
+                <div><a href={txUrl(chain.lastTxId)} target="_blank" rel="noreferrer">View in Lora</a></div>
               </div>
             )}
-            {ocError && (
-              <div style={{ color: "#b00" }}>error: {ocError}</div>
+            {chain.error && (
+              <div style={{ color: "#b00" }}>error: {chain.error}</div>
             )}
           </div>
         )}
