@@ -17,6 +17,7 @@ export default function AdminSetup() {
   const [fund, setFund] = useState<{ required: number; balance?: number; ok?: boolean } | null>(null);
   const [showQR, setShowQR] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [globals, setGlobals] = useState<any | null>(null);
 
   const required = (m - 1) * E + 50_000; // conservative buffer
 
@@ -140,6 +141,29 @@ export default function AdminSetup() {
           {showQR && qrDataUrl && (
             <div className="p-2 border inline-block rounded">
               <img src={qrDataUrl} alt="App Address QR" width={200} height={200} />
+            </div>
+          )}
+          <div className="text-sm">
+            <button
+              onClick={async () => {
+                if (!appId) return;
+                try {
+                  const r = await fetch(`/api/pair?id=${appId}`);
+                  const j = await r.json();
+                  setGlobals(j?.globals || null);
+                } catch (e) {
+                  setGlobals(null);
+                }
+              }}
+              disabled={!!busy || !appId}
+              className="text-xs underline ml-0"
+            >
+              Read pair state
+            </button>
+          </div>
+          {globals && (
+            <div className="text-xs text-neutral-700">
+              E: {globals.E ?? "?"} · m: {globals.m ?? "?"} · UNIT: {globals.UNIT ?? "?"} · phase: {globals.phase ?? "?"}
             </div>
           )}
           <div className="text-sm">
