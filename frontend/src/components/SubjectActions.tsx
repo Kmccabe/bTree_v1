@@ -49,6 +49,16 @@ export default function SubjectActions() {
     setErr(null);
     if (!activeAddress) return setErr("Connect wallet as subject.");
     if (!appIdValid) return setErr("Enter a numeric App ID first.");
+    // Validate app existence on backend before submitting Opt-In
+    try {
+      const chk = await fetch(`/api/pair?id=${appIdNum}`);
+      const cj = await chk.json().catch(() => ({} as any));
+      if (!chk.ok) {
+        return setErr(cj?.error || `App ${appIdNum} not found on backend network. Check network & App ID.`);
+      }
+    } catch (e: any) {
+      return setErr(e?.message || `Failed to verify App ${appIdNum} on backend.`);
+    }
     setBusy("optin");
     try {
       await optInApp({ sender: activeAddress, appId: appIdNum, sign: (u) => signTransactions(u) });
