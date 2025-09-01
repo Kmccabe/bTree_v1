@@ -20,11 +20,12 @@ function decodeGlobalState(gs: any[] | undefined) {
     const keyB64 = kv?.key ?? "";
     const key = Buffer.from(String(keyB64), "base64").toString("utf8");
     const val = kv?.value;
-    if (val?.type === 1) {
+    // Algod: type 1 = bytes, type 2 = uint
+    if (val?.type === 2) {
       const uint = Number(val?.uint ?? 0);
       rows.push({ key, type: "uint", uint });
       map[key] = uint;
-    } else if (val?.type === 2) {
+    } else if (val?.type === 1) {
       const { str, bytesB64 } = b64ToUtf8Safe(String(val?.bytes || ""));
       rows.push({ key, type: "bytes", bytesB64, ...(str ? { str } : {}) });
       map[key] = str ?? bytesB64;
@@ -65,4 +66,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: e?.message || "server error" });
   }
 }
-
