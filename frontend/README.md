@@ -21,3 +21,8 @@ npm run dev
 ## Local Dev Tips
 - Run `npx vercel dev` in parallel (exposes `/api` on :3000).
 - Vite dev proxies `/api` to :3000 (see `vite.config.ts`).
+
+## Docs
+
+- Design spec: [docs/trust-game-design.md](docs/trust-game-design.md)
+- Variants & treatments: [docs/trust-game-variants.md](docs/trust-game-variants.md)
