@@ -18,6 +18,7 @@ export default function AdminSetup() {
   const [showQR, setShowQR] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [globals, setGlobals] = useState<any | null>(null);
+  const [globals, setGlobals] = useState<any | null>(null);
 
   const required = (m - 1) * E + 50_000; // conservative buffer
 
@@ -75,6 +76,11 @@ export default function AdminSetup() {
     return () => { cancelled = true; };
   }, [addr, showQR]);
 
+  // Lora link for the application
+  const netLower = ((import.meta as any).env?.VITE_NETWORK || "testnet").toLowerCase();
+  const chain = netLower === "mainnet" ? "mainnet" : "testnet";
+  const loraAppHref = appId ? `https://lora.algokit.io/${chain}/application/${appId}` : null;
+
   return (
     <div className="rounded-2xl border p-4 space-y-3">
       <h3 className="text-lg font-semibold">Admin — Deploy & Fund (per pair)</h3>
@@ -130,17 +136,40 @@ export default function AdminSetup() {
             >
               {showQR ? "Hide QR" : "Show QR"}
             </button>
-            <a
-              href={`https://testnet.algoexplorer.io/address/${addr}`}
-              target="_blank" rel="noreferrer"
+            {loraAppHref && (
+              <a
+                href={loraAppHref}
+                target="_blank" rel="noreferrer"
+                className="text-xs underline"
+              >
+                View in Lora
+              </a>
+            )}
+            <button
+              onClick={async () => {
+                if (!appId) return;
+                try {
+                  const r = await fetch(`/api/pair?id=${appId}`);
+                  const j = await r.json();
+                  setGlobals(j?.globals || null);
+                } catch (e) {
+                  setGlobals(null);
+                }
+              }}
+              disabled={!!busy || !appId}
               className="text-xs underline"
             >
-              View
-            </a>
+              Read pair state
+            </button>
           </div>
           {showQR && qrDataUrl && (
             <div className="p-2 border inline-block rounded">
               <img src={qrDataUrl} alt="App Address QR" width={200} height={200} />
+            </div>
+          )}
+          {globals && (
+            <div className="text-xs text-neutral-700">
+              E: {globals.E ?? "?"} · m: {globals.m ?? "?"} · UNIT: {globals.UNIT ?? "?"} · phase: {globals.phase ?? "?"}
             </div>
           )}
           <div className="text-sm">
