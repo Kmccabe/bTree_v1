@@ -7,6 +7,15 @@ Minimal, production‑oriented scaffold for running a Trust Game on Algorand Tes
 - Hosting: Vercel (Root Directory = `frontend/`)
 - Contracts: Placeholder TEAL for now; upgradeable to full Trust Game logic
 
+## Trust Game (MVP)
+
+- 📄 Design spec: [frontend/docs/trust-game-design.md](frontend/docs/trust-game-design.md)
+- 🧪 Variants & treatments: [frontend/docs/trust-game-variants.md](frontend/docs/trust-game-variants.md)
+
+**Quick note:** The app lives under `frontend/` (React + Vite + Vercel serverless). 
+Admin can deploy & fund a per-pair contract from the in-app “Admin — Deploy & Fund” panel.
+
+
 ---
 
 ## Update: Wallet Integration (use-wallet v2)
