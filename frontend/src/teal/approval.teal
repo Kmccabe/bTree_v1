@@ -58,7 +58,11 @@ noop:
   ==
   bnz set_phase
 
-  // (invest will be added in next step)
+  txn ApplicationArgs 0
+  byte "invest"
+  ==
+  bnz invest
+
   err
 
 // -------------------------
@@ -98,3 +102,129 @@ set_phase:
   int 1
   return
 
+// ---- invest(s): phase==2, group[0]=pay s caller->app, group[1]=this call
+invest:
+  // phase gate
+  byte "phase"
+  app_global_get
+  int 2
+  ==
+  assert
+
+  // args: ["invest", s]
+  txn NumAppArgs
+  int 2
+  ==
+  assert
+  txn ApplicationArgs 1
+  btoi
+  store 0                    // s
+
+  // bounds / unit checks
+  byte "E"
+  app_global_get
+  store 1                    // E
+  byte "UNIT"
+  app_global_get
+  store 2                    // UNIT
+
+  load 0
+  int 0
+  >=
+  assert
+  load 0
+  load 1
+  <=
+  assert
+  load 0
+  load 2
+  %
+  int 0
+  ==
+  assert
+
+  // subject must be opted-in
+  txn Sender
+  global CurrentApplicationID
+  app_opted_in
+  assert
+
+  // not already invested: local "done" == 0
+  byte "done"
+  app_local_get
+  int 0
+  ==
+  assert
+
+  // group shape: size 2, this is index 1
+  global GroupSize
+  int 2
+  ==
+  assert
+  global GroupIndex
+  int 1
+  ==
+  assert
+
+  // gtxn[0] must be payment s from caller -> app, no rekey/close
+  gtxn 0 TypeEnum
+  int pay
+  ==
+  assert
+  gtxn 0 Sender
+  txn Sender
+  ==
+  assert
+  gtxn 0 Receiver
+  global CurrentApplicationAddress
+  ==
+  assert
+  gtxn 0 RekeyTo
+  global ZeroAddress
+  ==
+  assert
+  gtxn 0 CloseRemainderTo
+  global ZeroAddress
+  ==
+  assert
+  gtxn 0 Amount
+  load 0
+  ==
+  assert
+
+  // write local s & done
+  byte "s"
+  load 0
+  app_local_put
+  byte "done"
+  int 1
+  app_local_put
+
+  // delta = E - s
+  load 1
+  load 0
+  -
+  store 5
+
+  // inner refund (E - s) to caller if > 0, Fee=0 (outer covers)
+  load 5
+  int 0
+  >
+  bnz do_refund
+  b invest_end
+
+do_refund:
+  itxn_begin
+  int pay
+  itxn_field TypeEnum
+  txn Sender
+  itxn_field Receiver
+  load 5
+  itxn_field Amount
+  int 0
+  itxn_field Fee
+  itxn_submit
+
+invest_end:
+  int 1
+  return

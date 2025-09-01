@@ -224,3 +224,75 @@ export async function setPhase(args: {
   const blob = await buildAppNoOpTxnBlob({ appId, sender, appArgs });
   return await signAndSubmit([blob], sign);
 }
+
+/**
+ * investFlow: two-txn atomic group
+ *   g0: Payment s from sender -> app address
+ *   g1: AppCall NoOp ["invest", u64(s)] with fee bumped to cover 1 inner-pay
+ * Submits the concatenated signed group via existing `/api/submit` (single body).
+ */
+export async function investFlow(args: {
+  sender: string;
+  appId: number;
+  s: number; // µAlgos, non-negative integer
+  sign: Signer;
+  wait?: boolean;
+}): Promise<{ txId: string; confirmedRound?: number }> {
+  const { sender, appId, s, sign, wait = true } = args;
+  if (!sender) throw new Error("investFlow: sender (wallet address) is required");
+  if (!Number.isInteger(s) || s < 0) throw new Error("investFlow: s must be a non-negative integer (µAlgos)");
+
+  // Suggested params
+  const sp = await getSuggestedParams();
+
+  const appAddr = (algosdk as any).getApplicationAddress
+    ? (algosdk as any).getApplicationAddress(appId)
+    : (algosdk as any).logic.getApplicationAddress(appId);
+
+  const pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
+    from: sender,
+    to: appAddr,
+    amount: s,
+    suggestedParams: sp,
+  });
+
+  const appArgs = [str("invest"), u64(s)];
+  const call = (algosdk as any).makeApplicationNoOpTxnFromObject({
+    from: sender,
+    appIndex: appId,
+    appArgs,
+    suggestedParams: { ...(sp as any), flatFee: true, fee: (sp as any).minFee ? (sp as any).minFee * 2 : (sp as any).fee * 2 },
+  });
+
+  (algosdk as any).assignGroupID([pay, call]);
+  const unsigned = [pay, call].map((t: any) => (algosdk as any).encodeUnsignedTransaction(t));
+
+  const signed = await sign(unsigned);
+  if (!signed?.length || signed.length !== 2) throw new Error("investFlow: wallet returned unexpected signatures");
+
+  // Concatenate signed txns; submit as single blob via existing /api/submit
+  const total = signed[0].length + signed[1].length;
+  const combo = new Uint8Array(total);
+  combo.set(signed[0], 0);
+  combo.set(signed[1], signed[0].length);
+  const signedTxnBase64 = toBase64(combo);
+
+  const resp = await fetch("/api/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ signedTxnBase64 }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data?.error || JSON.stringify(data));
+  const txId = (data?.txId ?? data?.txid ?? data?.txID) as string;
+
+  if (!wait) return { txId };
+  // Poll pending for confirmation
+  try {
+    const pend = await (await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`)).json();
+    const confirmedRound = pend?.["confirmed-round"] ?? pend?.confirmedRound;
+    return { txId, confirmedRound };
+  } catch {
+    return { txId };
+  }
+}
