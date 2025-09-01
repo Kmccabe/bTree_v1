@@ -1,6 +1,6 @@
 // frontend/src/components/PhaseControl.tsx
 // cspell:ignore itob
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import * as algosdk from "algosdk";
 import { useWallet } from "@txnlab/use-wallet";
 import { Buffer } from "buffer"; // ensure Buffer exists in browser builds
@@ -81,6 +81,15 @@ export default function PhaseControl({ appId, account, network }: Props) {
     const chain = netLower === "mainnet" ? "mainnet" : "testnet";
     return `https://lora.algokit.io/${chain}/tx/${txId}`;
   }, [netLower]);
+
+  // Keep ocAppId in sync when a known App ID becomes available
+  useEffect(() => {
+    const envId = Number(((import.meta as any).env?.VITE_TESTNET_APP_ID as string) || 0);
+    const preferred = Number(resolvedAppId || envId || 0);
+    if (preferred > 0 && (!Number.isInteger(ocAppId) || ocAppId <= 0)) {
+      setOcAppId(preferred);
+    }
+  }, [resolvedAppId, ocAppId]);
 
   const signer: Signer = useCallback((txns) => signTransactions(txns), [signTransactions]);
   const pollConfirmedRound = useCallback(async (txId: string): Promise<number | null> => {
