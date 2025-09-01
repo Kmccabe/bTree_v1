@@ -84,12 +84,14 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
       onComplete: algosdk.OnApplicationComplete.NoOpOC,
       approvalProgram: approvalProg,
       clearProgram: clearProg,
+      // Schema must accommodate globals written at create and local used later
       numGlobalByteSlices: 0,
-      numGlobalInts: 0,
+      numGlobalInts: 4, // E, m, UNIT, phase
       numLocalByteSlices: 0,
-      numLocalInts: 0,
+      numLocalInts: 2,  // s, done
       note,
-      appArgs: [],
+      // Placeholder deploy uses default values compatible with TEAL create
+      appArgs: [u64(100000), u64(3), u64(1000)],
       accounts: [],
       foreignApps: [],
       foreignAssets: [],
@@ -181,7 +183,7 @@ export async function deployTrustGame(args: {
     numGlobalByteSlices: 0,
     numGlobalInts: 4, // E, m, UNIT, phase
     numLocalByteSlices: 0,
-    numLocalInts: 0,
+    numLocalInts: 2,  // s, done
     appArgs,
     note,
   } as any);
