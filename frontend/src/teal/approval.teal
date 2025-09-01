@@ -6,11 +6,16 @@ int 0
 ==
 bnz create
 
-// Runtime branch (only NoOp supported so far)
+// Runtime branch (support NoOp + OptIn)
 txn OnCompletion
 int NoOp
 ==
 bnz noop
+
+txn OnCompletion
+int OptIn
+==
+bnz optin
 
 // Reject everything else
 err
@@ -64,6 +69,11 @@ noop:
   bnz invest
 
   err
+
+// Accept opt-in to allocate local state
+optin:
+  int 1
+  return
 
 // -------------------------
 // Admin: set_phase(p) where p in [1..4]
