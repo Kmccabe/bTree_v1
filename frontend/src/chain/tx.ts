@@ -278,17 +278,12 @@ export async function investFlow(args: {
   const signed = await sign(unsigned);
   if (!signed?.length || signed.length !== 2) throw new Error("investFlow: wallet returned unexpected signatures");
 
-  // Concatenate signed txns; submit as single blob via existing /api/submit
-  const total = signed[0].length + signed[1].length;
-  const combo = new Uint8Array(total);
-  combo.set(signed[0], 0);
-  combo.set(signed[1], signed[0].length);
-  const signedTxnBase64 = toBase64(combo);
-
+  // Submit as an array of stxns; server will concatenate and forward
+  const stxnsB64 = signed.map((b) => toBase64(b));
   const resp = await fetch("/api/submit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ signedTxnBase64 }),
+    body: JSON.stringify({ stxns: stxnsB64 }),
   });
   const data = await resp.json();
   if (!resp.ok) throw new Error(data?.error || JSON.stringify(data));
