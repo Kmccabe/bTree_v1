@@ -1,0 +1,36 @@
+#pragma version 8
+txn ApplicationID
+int 0
+==
+bnz create
+err
+
+create:
+  // Expect 3 creation args: E (u64), m (u64), UNIT (u64)
+  txn NumAppArgs
+  int 3
+  ==
+  assert
+
+  byte "E"
+  txn ApplicationArgs 0
+  btoi
+  app_global_put
+
+  byte "m"
+  txn ApplicationArgs 1
+  btoi
+  app_global_put
+
+  byte "UNIT"
+  txn ApplicationArgs 2
+  btoi
+  app_global_put
+
+  byte "phase"
+  int 1
+  app_global_put
+
+  int 1
+  return
+
