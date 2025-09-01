@@ -239,109 +239,105 @@ export async function investFlow(args: {
   wait?: boolean;
 }): Promise<{ txId: string; confirmedRound?: number }> {
   const { sender, appId, s, sign, wait = true } = args;
-  console.debug("[investFlow] args", { sender, appId, s, wait });
+  const TAG = "[investFlow]";
 
-  // Validate inputs early
-  if (!sender) throw new Error("investFlow: sender (wallet address) is required");
-  try { (algosdk as any).decodeAddress(sender); } catch (e) {
-    console.error("[investFlow] invalid sender address", sender, e);
-    throw new Error("investFlow: sender address is invalid");
+  function short(addr?: string | null) {
+    return typeof addr === "string" && addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-6)}` : String(addr);
+  }
+
+  // Resolve sender robustly
+  const w: any = (globalThis as any) || {};
+  const senderResolved =
+    (typeof sender === "string" && sender) ||
+    (sender as any)?.address ||
+    w.activeAddress ||
+    (w.wallet?.accounts?.[0]?.address ?? "");
+
+  console.log(`${TAG} senderResolved=`, senderResolved);
+  console.log(`${TAG} appId=`, appId, "s=", s);
+
+  if (!algosdk.isValidAddress(senderResolved)) {
+    throw new Error(`${TAG} invalid sender: ${JSON.stringify(senderResolved)}`);
   }
   if (!Number.isInteger(appId) || appId <= 0) {
-    throw new Error("investFlow: appId must be a positive integer");
+    throw new Error(`${TAG} invalid appId: ${appId}`);
   }
   if (!Number.isInteger(s) || s < 0) {
-    throw new Error("investFlow: s must be a non-negative integer (µAlgos)");
+    throw new Error(`${TAG} invalid s (µAlgos): ${s}`);
   }
 
-  // Log raw /api/params for visibility, then use normalized params
+  // Derive app address
+  let appAddr = "";
   try {
-    const r = await fetch("/api/params");
-    const raw = await r.json();
-    console.debug("[investFlow] /api/params", raw);
-  } catch (e) {
-    console.warn("[investFlow] failed to read /api/params for logging", e);
+    appAddr = (algosdk as any).getApplicationAddress(appId)?.toString?.() || (algosdk as any).getApplicationAddress(appId);
+  } catch (e: any) {
+    throw new Error(`${TAG} getApplicationAddress failed for id=${appId}: ${e?.message || e}`);
   }
-  const sp = await getSuggestedParams();
-  console.debug("[investFlow] normalized SuggestedParams", sp);
-
-  // Resolve application address
-  const appAddrRaw = (algosdk as any).getApplicationAddress(appId);
-  const appAddr: string = typeof appAddrRaw === "string" ? appAddrRaw : appAddrRaw?.toString?.();
-  console.debug("[investFlow] derived app address", { appAddrRaw, appAddr });
-  if (!appAddr || typeof appAddr !== "string") {
-    throw new Error("investFlow: could not resolve application address");
-  }
-  if (!(algosdk as any).isValidAddress(appAddr)) {
-    throw new Error(`investFlow: derived app address invalid for appId ${appId}`);
+  console.log(`${TAG} appAddr=`, appAddr);
+  if (!algosdk.isValidAddress(appAddr)) {
+    throw new Error(`${TAG} derived app address invalid: ${appAddr}`);
   }
 
-  // Build transactions
-  const toField: any = (appAddrRaw && typeof appAddrRaw !== "string") ? appAddrRaw : appAddr;
+  // Decode sanity
+  try {
+    (algosdk as any).decodeAddress(senderResolved);
+    (algosdk as any).decodeAddress(appAddr);
+  } catch (e: any) {
+    throw new Error(`${TAG} decodeAddress failed (from=${short(senderResolved)} to=${short(appAddr)}): ${e?.message || e}`);
+  }
+
+  // Params (log raw for visibility)
+  const r = await fetch("/api/params");
+  const raw = await r.text();
+  console.log(`${TAG} /api/params status=`, r.status, "raw=", raw);
+  if (!r.ok) throw new Error(`${TAG} params HTTP ${r.status}: ${raw}`);
+  let j: any; try { j = JSON.parse(raw); } catch (e) { throw new Error(`${TAG} params JSON parse error: ${String(e)} raw=${raw}`); }
+  const sp = (j.params ?? j.suggestedParams ?? j) as (any);
+  console.log(`${TAG} minFee=`, sp?.minFee, "lastRound=", (sp as any)["last-round"] ?? (sp as any).lastRound);
+
+  // Build Payment with explicit FROM/TO/AMOUNT in error
   let pay: any;
   try {
     pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
-      from: sender,
-      to: toField,
+      from: senderResolved,
+      to: appAddr,
       amount: s,
       suggestedParams: sp,
     });
   } catch (e: any) {
-    console.error("[investFlow] build payment failed", e);
-    throw new Error(`investFlow: build Payment failed: ${e?.message || String(e)}`);
+    throw new Error(`${TAG} build Payment failed (from=${short(senderResolved)} to=${short(appAddr)} amount=${s}): ${e?.message || e}`);
   }
 
-  const appArgs = [str("invest"), u64(s)];
+  // Build AppCall
   let call: any;
   try {
     call = (algosdk as any).makeApplicationNoOpTxnFromObject({
-      from: sender,
+      from: senderResolved,
       appIndex: appId,
-      appArgs,
-      suggestedParams: { ...(sp as any), flatFee: true, fee: (sp as any).minFee ? (sp as any).minFee * 2 : (sp as any).fee * 2 },
+      appArgs: [str("invest"), u64(s)],
+      suggestedParams: { ...(sp as any), flatFee: true, fee: ((sp?.minFee || (sp?.fee ?? 1000)) * 2) },
     });
   } catch (e: any) {
-    console.error("[investFlow] build app call failed", e);
-    throw new Error(`investFlow: build AppCall failed: ${e?.message || String(e)}`);
+    throw new Error(`${TAG} build AppCall failed (from=${short(senderResolved)} appId=${appId} fee=${(sp?.minFee || (sp?.fee ?? 1000)) * 2}): ${e?.message || e}`);
   }
 
-  try {
-    (algosdk as any).assignGroupID([pay, call]);
-  } catch (e) {
-    console.error("[investFlow] assignGroupID failed", e);
-    throw new Error("investFlow: failed to assign group id");
-  }
-  const unsigned = [pay, call].map((t: any) => (algosdk as any).encodeUnsignedTransaction(t));
-  console.debug("[investFlow] unsigned lengths", unsigned.map((u) => u?.length));
+  (algosdk as any).assignGroupID([pay, call]);
 
-  // Sign
-  const signed = await sign(unsigned);
-  console.debug("[investFlow] signed count", signed?.length);
-  if (!signed?.length || signed.length !== 2) throw new Error("investFlow: wallet returned unexpected signatures");
-
-  // Submit as an array of stxns; server will concatenate and forward
-  const stxnsB64 = signed.map((b) => toBase64(b));
-  console.debug("[investFlow] submit stxns (base64 sizes)", stxnsB64.map((s) => s.length));
-  const resp = await fetch("/api/submit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ stxns: stxnsB64 }),
-  });
-  const text = await resp.text();
-  let data: any; try { data = JSON.parse(text); } catch { data = { raw: text }; }
-  console.debug("[investFlow] submit response", resp.status, data);
-  if (!resp.ok) throw new Error(data?.error || JSON.stringify(data));
-  const txId = (data?.txId ?? data?.txid ?? data?.txID) as string;
+  // Sign & submit
+  const stxns = await sign([
+    (algosdk as any).encodeUnsignedTransaction(pay),
+    (algosdk as any).encodeUnsignedTransaction(call),
+  ]);
+  const payload = { stxns: stxns.map((b: Uint8Array) => toBase64(b)) };
+  const sub = await fetch("/api/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const subText = await sub.text();
+  if (!sub.ok) throw new Error(`${TAG} submit HTTP ${sub.status}: ${subText}`);
+  const sj = (() => { try { return JSON.parse(subText); } catch { return {}; } })();
+  const txId = sj.txId ?? sj.txid ?? sj.txID;
+  if (!txId) throw new Error(`${TAG} missing txId in submit response`);
 
   if (!wait) return { txId };
-  // Poll pending for confirmation
-  try {
-    const pend = await (await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`)).json();
-    const confirmedRound = pend?.["confirmed-round"] ?? pend?.confirmedRound;
-    console.debug("[investFlow] pending", { confirmedRound, pend });
-    return { txId, confirmedRound };
-  } catch (e) {
-    console.warn("[investFlow] pending fetch failed", e);
-    return { txId };
-  }
+  const pend = await (await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`)).json();
+  const confirmedRound = pend?.["confirmed-round"] ?? pend?.confirmedRound;
+  return { txId, confirmedRound };
 }
