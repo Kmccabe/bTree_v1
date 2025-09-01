@@ -240,6 +240,9 @@ export async function investFlow(args: {
 }): Promise<{ txId: string; confirmedRound?: number }> {
   const { sender, appId, s, sign, wait = true } = args;
   if (!sender) throw new Error("investFlow: sender (wallet address) is required");
+  if (!(algosdk as any).isValidAddress || !(algosdk as any).isValidAddress(sender)) {
+    throw new Error("investFlow: sender address is invalid");
+  }
   if (!Number.isInteger(s) || s < 0) throw new Error("investFlow: s must be a non-negative integer (µAlgos)");
 
   // Suggested params
@@ -247,7 +250,10 @@ export async function investFlow(args: {
 
   const appAddr = (algosdk as any).getApplicationAddress
     ? (algosdk as any).getApplicationAddress(appId)
-    : (algosdk as any).logic.getApplicationAddress(appId);
+    : (algosdk as any).logic?.getApplicationAddress(appId);
+  if (!appAddr || typeof appAddr !== "string") {
+    throw new Error("investFlow: could not resolve application address");
+  }
 
   const pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
     from: sender,

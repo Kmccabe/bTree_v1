@@ -9,7 +9,8 @@ export default function SubjectActions() {
   const [E, setE] = useState<number>(100000);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [s, setS] = useState<number>(0);
+  // Keep input as string to avoid number input fighting backspacing/empty state
+  const [s, setS] = useState<string>("");
   const [lastTx, setLastTx] = useState<string | null>(null);
 
   // read globals to get UNIT and E for input stepping
@@ -34,12 +35,15 @@ export default function SubjectActions() {
     const id = Number(appIdIn);
     if (!activeAddress) return setErr("Connect wallet as subject.");
     if (!Number.isFinite(id) || id <= 0) return setErr("Enter a valid App ID.");
+    const sNum = Number(s);
+    if (!Number.isInteger(sNum) || sNum < 0) return setErr("Enter a non-negative integer s (µAlgos).");
+    if (unit > 0 && sNum % unit !== 0) return setErr(`s must be a multiple of UNIT (${unit}).`);
     setBusy("invest"); setErr(null);
     try {
       const r = await investFlow({
         sender: activeAddress,
         appId: id,
-        s,
+        s: sNum,
         sign: (u) => signTransactions(u),
       });
       setLastTx(r.txId);
@@ -78,11 +82,11 @@ export default function SubjectActions() {
           min={0}
           max={E}
           value={s}
-          onChange={(e)=>setS(Number(e.target.value))}
+          onChange={(e)=>setS(e.target.value)}
         />
-        <button className="text-xs underline"
+        <button className="text-xs underline" 
           onClick={doInvest}
-          disabled={!!busy || !activeAddress || !appIdIn}>
+          disabled={!!busy || !activeAddress || !appIdIn || s === ""}>
           {busy==="invest" ? "Investing…" : "Invest"}
         </button>
       </div>
@@ -93,4 +97,3 @@ export default function SubjectActions() {
     </div>
   );
 }
-
