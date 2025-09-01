@@ -12,6 +12,7 @@ import {
 import { deployPlaceholderApp } from "./deploy";
 import ExportCSVButton from "./components/ExportCSVButton";
 import AdminSetup from "./components/AdminSetup";
+import SubjectActions from "./components/SubjectActions";
 import PhaseControl from "./components/PhaseControl";
 import AccountSelector from "./components/AccountSelector";
 import { useToast } from "./components/Toaster";
@@ -344,6 +345,9 @@ export default function App(): JSX.Element {
     <div style={{ fontFamily: "system-ui, Arial", padding: 24 }}>
       <div style={{ marginBottom: 16 }}>
         <AdminSetup />
+        <div style={{ marginTop: 16 }}>
+          <SubjectActions />
+        </div>
       </div>
       <h1>bTree v1 — Trust Game MVP</h1>
       <p><strong>Network:</strong> {network} (wallet = use-wallet/Pera)</p>
