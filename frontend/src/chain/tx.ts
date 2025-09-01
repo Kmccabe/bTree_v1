@@ -259,9 +259,10 @@ export async function investFlow(args: {
     throw new Error(`investFlow: derived app address invalid for appId ${appId}`);
   }
 
+  const toField: any = (appAddrRaw && typeof appAddrRaw !== "string") ? appAddrRaw : appAddr;
   const pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
     from: sender,
-    to: appAddr,
+    to: toField,
     amount: s,
     suggestedParams: sp,
   });
