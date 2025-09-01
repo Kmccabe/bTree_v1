@@ -1,37 +1,10 @@
 // frontend/src/deploy.ts
 import * as algosdk from "algosdk";
 import { u64 } from "./chain/enc";
+import approvalSrc from "./teal/approval.teal?raw";
+import clearSrc from "./teal/clear.teal?raw";
 
-/** Minimal placeholder contract (approves all except Update/Delete unless creator) */
-export const APPROVAL_TEAL = `#pragma version 8
-txn OnCompletion
-int DeleteApplication
-==
-bnz delete_check
-txn OnCompletion
-int UpdateApplication
-==
-bnz update_check
-int 1
-return
-
-delete_check:
-global CreatorAddress
-txn Sender
-==
-return
-
-update_check:
-global CreatorAddress
-txn Sender
-==
-return
-`;
-
-export const CLEAR_TEAL = `#pragma version 8
-int 1
-return
-`;
+// TEAL sources are imported from src/teal/*.teal via Vite ?raw imports
 
 /** Simple helper for our serverless API calls */
 async function api<T = any>(path: string, init?: RequestInit): Promise<T> {
@@ -63,16 +36,18 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
   const params = await api<any>("/api/params");
 
   // 2) Compile TEAL via serverless (Algod /v2/teal/compile)
-  const approval = await api<{ result: string }>("/api/compile", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source: APPROVAL_TEAL }),
-  });
-  const clear = await api<{ result: string }>("/api/compile", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source: CLEAR_TEAL }),
-  });
+  const [approval, clear] = await Promise.all([
+    api<{ result: string }>("/api/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: approvalSrc }),
+    }),
+    api<{ result: string }>("/api/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: clearSrc }),
+    }),
+  ]);
 
   const approvalProg = new Uint8Array(Buffer.from(approval.result, "base64"));
   const clearProg = new Uint8Array(Buffer.from(clear.result, "base64"));
@@ -162,18 +137,20 @@ export async function deployTrustGame(args: {
   if (!Number.isInteger(m) || m < 1) throw new Error("m must be an integer >= 1");
   if (!Number.isInteger(UNIT) || UNIT < 1) throw new Error("UNIT must be an integer >= 1");
 
-  // Params and compile TEAL (using current in-file sources)
+  // Params and compile TEAL from src/teal/*.teal
   const params = await api<any>("/api/params");
-  const approval = await api<{ result: string }>("/api/compile", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source: APPROVAL_TEAL }),
-  });
-  const clear = await api<{ result: string }>("/api/compile", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source: CLEAR_TEAL }),
-  });
+  const [approval, clear] = await Promise.all([
+    api<{ result: string }>("/api/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: approvalSrc }),
+    }),
+    api<{ result: string }>("/api/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: clearSrc }),
+    }),
+  ]);
 
   const approvalProg = new Uint8Array(Buffer.from(approval.result, "base64"));
   const clearProg = new Uint8Array(Buffer.from(clear.result, "base64"));
