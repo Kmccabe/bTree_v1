@@ -255,10 +255,13 @@ export async function investFlow(args: {
   if (!appAddr || typeof appAddr !== "string") {
     throw new Error("investFlow: could not resolve application address");
   }
+  if (!(algosdk as any).isValidAddress(appAddr)) {
+    throw new Error(`investFlow: derived app address invalid for appId ${appId}`);
+  }
 
   const pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
     from: sender,
-    to: appAddr.toString(),
+    to: appAddr,
     amount: s,
     suggestedParams: sp,
   });
