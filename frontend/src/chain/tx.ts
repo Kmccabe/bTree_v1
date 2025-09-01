@@ -239,19 +239,36 @@ export async function investFlow(args: {
   wait?: boolean;
 }): Promise<{ txId: string; confirmedRound?: number }> {
   const { sender, appId, s, sign, wait = true } = args;
+  console.debug("[investFlow] args", { sender, appId, s, wait });
+
+  // Validate inputs early
   if (!sender) throw new Error("investFlow: sender (wallet address) is required");
-  try { (algosdk as any).decodeAddress(sender); } catch {
+  try { (algosdk as any).decodeAddress(sender); } catch (e) {
+    console.error("[investFlow] invalid sender address", sender, e);
     throw new Error("investFlow: sender address is invalid");
   }
-  if (!Number.isInteger(s) || s < 0) throw new Error("investFlow: s must be a non-negative integer (µAlgos)");
+  if (!Number.isInteger(appId) || appId <= 0) {
+    throw new Error("investFlow: appId must be a positive integer");
+  }
+  if (!Number.isInteger(s) || s < 0) {
+    throw new Error("investFlow: s must be a non-negative integer (µAlgos)");
+  }
 
-  // Suggested params
+  // Log raw /api/params for visibility, then use normalized params
+  try {
+    const r = await fetch("/api/params");
+    const raw = await r.json();
+    console.debug("[investFlow] /api/params", raw);
+  } catch (e) {
+    console.warn("[investFlow] failed to read /api/params for logging", e);
+  }
   const sp = await getSuggestedParams();
+  console.debug("[investFlow] normalized SuggestedParams", sp);
 
-  // Resolve app address (algosdk v3 returns Address object; v2 may return string)
-  // Resolve using SDK helper
+  // Resolve application address
   const appAddrRaw = (algosdk as any).getApplicationAddress(appId);
   const appAddr: string = typeof appAddrRaw === "string" ? appAddrRaw : appAddrRaw?.toString?.();
+  console.debug("[investFlow] derived app address", { appAddrRaw, appAddr });
   if (!appAddr || typeof appAddr !== "string") {
     throw new Error("investFlow: could not resolve application address");
   }
@@ -259,36 +276,60 @@ export async function investFlow(args: {
     throw new Error(`investFlow: derived app address invalid for appId ${appId}`);
   }
 
+  // Build transactions
   const toField: any = (appAddrRaw && typeof appAddrRaw !== "string") ? appAddrRaw : appAddr;
-  const pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
-    from: sender,
-    to: toField,
-    amount: s,
-    suggestedParams: sp,
-  });
+  let pay: any;
+  try {
+    pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
+      from: sender,
+      to: toField,
+      amount: s,
+      suggestedParams: sp,
+    });
+  } catch (e: any) {
+    console.error("[investFlow] build payment failed", e);
+    throw new Error(`investFlow: build Payment failed: ${e?.message || String(e)}`);
+  }
 
   const appArgs = [str("invest"), u64(s)];
-  const call = (algosdk as any).makeApplicationNoOpTxnFromObject({
-    from: sender,
-    appIndex: appId,
-    appArgs,
-    suggestedParams: { ...(sp as any), flatFee: true, fee: (sp as any).minFee ? (sp as any).minFee * 2 : (sp as any).fee * 2 },
-  });
+  let call: any;
+  try {
+    call = (algosdk as any).makeApplicationNoOpTxnFromObject({
+      from: sender,
+      appIndex: appId,
+      appArgs,
+      suggestedParams: { ...(sp as any), flatFee: true, fee: (sp as any).minFee ? (sp as any).minFee * 2 : (sp as any).fee * 2 },
+    });
+  } catch (e: any) {
+    console.error("[investFlow] build app call failed", e);
+    throw new Error(`investFlow: build AppCall failed: ${e?.message || String(e)}`);
+  }
 
-  (algosdk as any).assignGroupID([pay, call]);
+  try {
+    (algosdk as any).assignGroupID([pay, call]);
+  } catch (e) {
+    console.error("[investFlow] assignGroupID failed", e);
+    throw new Error("investFlow: failed to assign group id");
+  }
   const unsigned = [pay, call].map((t: any) => (algosdk as any).encodeUnsignedTransaction(t));
+  console.debug("[investFlow] unsigned lengths", unsigned.map((u) => u?.length));
 
+  // Sign
   const signed = await sign(unsigned);
+  console.debug("[investFlow] signed count", signed?.length);
   if (!signed?.length || signed.length !== 2) throw new Error("investFlow: wallet returned unexpected signatures");
 
   // Submit as an array of stxns; server will concatenate and forward
   const stxnsB64 = signed.map((b) => toBase64(b));
+  console.debug("[investFlow] submit stxns (base64 sizes)", stxnsB64.map((s) => s.length));
   const resp = await fetch("/api/submit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ stxns: stxnsB64 }),
   });
-  const data = await resp.json();
+  const text = await resp.text();
+  let data: any; try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  console.debug("[investFlow] submit response", resp.status, data);
   if (!resp.ok) throw new Error(data?.error || JSON.stringify(data));
   const txId = (data?.txId ?? data?.txid ?? data?.txID) as string;
 
@@ -297,8 +338,10 @@ export async function investFlow(args: {
   try {
     const pend = await (await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`)).json();
     const confirmedRound = pend?.["confirmed-round"] ?? pend?.confirmedRound;
+    console.debug("[investFlow] pending", { confirmedRound, pend });
     return { txId, confirmedRound };
-  } catch {
+  } catch (e) {
+    console.warn("[investFlow] pending fetch failed", e);
     return { txId };
   }
 }

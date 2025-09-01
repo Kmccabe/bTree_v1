@@ -25,7 +25,10 @@ export default function SubjectActions() {
   const appIdValid = Number.isFinite(appIdNum) && appIdNum > 0;
   let appAddrPreview = "";
   try {
-    if (appIdValid) appAddrPreview = (algosdk as any).getApplicationAddress(appIdNum)?.toString?.() || (algosdk as any).getApplicationAddress(appIdNum);
+    if (appIdValid) {
+      const raw = (algosdk as any).getApplicationAddress(appIdNum);
+      appAddrPreview = typeof raw === "string" ? raw : raw?.toString?.();
+    }
   } catch { /* ignore */ }
 
   async function loadGlobals() {
@@ -33,12 +36,15 @@ export default function SubjectActions() {
     if (!appIdValid) return setErr("Enter a numeric App ID (not the App Address).");
     setBusy("read");
     try {
+      console.debug("[SubjectActions] loadGlobals", { appId: appIdNum });
       const r = await fetch(`/api/pair?id=${appIdNum}`);
       const j = await r.json();
+      console.debug("[SubjectActions] /api/pair", r.status, j);
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
       setUnit(Number(j?.globals?.UNIT ?? 1000));
       setE(Number(j?.globals?.E ?? 100000));
     } catch (e: any) {
+      console.error("[SubjectActions] loadGlobals failed", e);
       setErr(e?.message || String(e));
     } finally {
       setBusy(null);
@@ -51,8 +57,10 @@ export default function SubjectActions() {
     if (!appIdValid) return setErr("Enter a numeric App ID first.");
     // Validate app existence on backend before submitting Opt-In
     try {
+      console.debug("[SubjectActions] preflight opt-in /api/pair", { appId: appIdNum });
       const chk = await fetch(`/api/pair?id=${appIdNum}`);
       const cj = await chk.json().catch(() => ({} as any));
+      console.debug("[SubjectActions] /api/pair preflight", chk.status, cj);
       if (!chk.ok) {
         return setErr(cj?.error || `App ${appIdNum} not found on backend network. Check network & App ID.`);
       }
@@ -61,8 +69,10 @@ export default function SubjectActions() {
     }
     setBusy("optin");
     try {
+      console.debug("[SubjectActions] optIn submit", { sender: activeAddress, appId: appIdNum });
       await optInApp({ sender: activeAddress, appId: appIdNum, sign: (u) => signTransactions(u) });
     } catch (e: any) {
+      console.error("[SubjectActions] optIn failed", e);
       setErr(e?.message || String(e));
     } finally {
       setBusy(null);
@@ -81,14 +91,17 @@ export default function SubjectActions() {
 
     setBusy("invest");
     try {
+      console.debug("[SubjectActions] invest submit", { sender: activeAddress, appId: appIdNum, s });
       const r = await investFlow({
         sender: activeAddress,
         appId: appIdNum,
         s,
         sign: (u) => signTransactions(u),
       });
+      console.debug("[SubjectActions] invest result", r);
       setLastTx(r.txId);
     } catch (e: any) {
+      console.error("[SubjectActions] invest failed", e);
       setErr(e?.message || String(e));
     } finally {
       setBusy(null);
