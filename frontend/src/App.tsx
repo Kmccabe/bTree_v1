@@ -14,6 +14,7 @@ import ExportCSVButton from "./components/ExportCSVButton";
 import PhaseControl from "./components/PhaseControl";
 import AccountSelector from "./components/AccountSelector";
 import { useToast } from "./components/Toaster";
+import { useNetworkSanity } from "./hooks/useNetworkSanity";
 
 export default function App(): JSX.Element {
   const {
@@ -39,6 +40,7 @@ export default function App(): JSX.Element {
   const [paramsErr, setParamsErr] = useState<string | null>(null);
   const [spInfo, setSpInfo] = useState<null | any>(null);
   const [progLens, setProgLens] = useState<null | { approvalLen: number; clearLen: number }>(null);
+  const netSanity = useNetworkSanity();
 
   // --- On-Chain Smoke Test state ---
   const [smAppId, setSmAppId] = useState<number>(Number((import.meta as any).env?.VITE_APP_ID || 0));
@@ -146,6 +148,7 @@ export default function App(): JSX.Element {
 
   const smokeOptIn = useCallback(async () => {
     if (!requireWallet()) return;
+    if (!netSanity.match) { try { toast.error(`Network mismatch: backend ${netSanity.backendNet}, expected ${netSanity.expectedNet}`); } catch {}; return; }
     if (!Number.isInteger(smAppId) || smAppId <= 0) { toast.error("Enter a valid App ID (> 0)"); return; }
     setSmBusy("Opt-In"); setSmError(null); setSmLastTxId(null); setSmConfirmedRound(null);
     try {
@@ -160,10 +163,11 @@ export default function App(): JSX.Element {
       setSmError(msg);
       toast.error(`Opt-In failed: ${msg}`);
     } finally { setSmBusy(null); }
-  }, [requireWallet, smAppId, account, signer, pollConfirmedRound, toast]);
+  }, [requireWallet, netSanity.match, netSanity.backendNet, netSanity.expectedNet, smAppId, account, signer, pollConfirmedRound, toast]);
 
   const smokeRegister = useCallback(async () => {
     if (!requireWallet()) return;
+    if (!netSanity.match) { try { toast.error(`Network mismatch: backend ${netSanity.backendNet}, expected ${netSanity.expectedNet}`); } catch {}; return; }
     if (!Number.isInteger(smAppId) || smAppId <= 0) { toast.error("Enter a valid App ID (> 0)"); return; }
     setSmBusy("Register"); setSmError(null); setSmLastTxId(null); setSmConfirmedRound(null);
     try {
@@ -179,10 +183,11 @@ export default function App(): JSX.Element {
       setSmError(msg);
       toast.error(`Register failed: ${msg}`);
     } finally { setSmBusy(null); }
-  }, [requireWallet, smAppId, smFakeId, account, signer, pollConfirmedRound, str, toast]);
+  }, [requireWallet, netSanity.match, netSanity.backendNet, netSanity.expectedNet, smAppId, smFakeId, account, signer, pollConfirmedRound, str, toast]);
 
   const smokeBid = useCallback(async () => {
     if (!requireWallet()) return;
+    if (!netSanity.match) { try { toast.error(`Network mismatch: backend ${netSanity.backendNet}, expected ${netSanity.expectedNet}`); } catch {}; return; }
     if (!Number.isInteger(smAppId) || smAppId <= 0) { toast.error("Enter a valid App ID (> 0)"); return; }
     if (!Number.isInteger(smMicroAlgos) || smMicroAlgos < 0) { toast.error("Enter a non-negative integer bid"); return; }
     setSmBusy("Place Bid"); setSmError(null); setSmLastTxId(null); setSmConfirmedRound(null);
@@ -199,7 +204,7 @@ export default function App(): JSX.Element {
       setSmError(msg);
       toast.error(`Bid failed: ${msg}`);
     } finally { setSmBusy(null); }
-  }, [requireWallet, smAppId, smMicroAlgos, account, signer, pollConfirmedRound, str, u64, toast]);
+  }, [requireWallet, netSanity.match, netSanity.backendNet, netSanity.expectedNet, smAppId, smMicroAlgos, account, signer, pollConfirmedRound, str, u64, toast]);
 
   const handleDeploy = useCallback(async () => {
     const sender = account;
@@ -416,6 +421,21 @@ export default function App(): JSX.Element {
           <strong>Debug Panel</strong>
           <button onClick={() => setDebugOpen(v => !v)}>{debugOpen ? "Hide" : "Show"}</button>
         </div>
+        {(!netSanity.loading && (!netSanity.match || netSanity.error)) && (
+          <div style={{ marginTop: 12, border: "1px solid #f0b429", padding: 10, borderRadius: 6, background: "#fff7ed", color: "#92400e", fontSize: 13 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Network mismatch</div>
+            {netSanity.error ? (
+              <div>Couldn't verify backend network: {netSanity.error}</div>
+            ) : (
+              <div>
+                Backend reports <strong>{netSanity.backendNet}</strong> but client expects <strong>{netSanity.expectedNet}</strong>. Please switch your wallet (Pera) to <strong>{netSanity.expectedNet}</strong> or fix envs.
+              </div>
+            )}
+            <div style={{ marginTop: 6 }}>
+              <button onClick={netSanity.refresh}>Recheck</button>
+            </div>
+          </div>
+        )}
         {debugOpen && (
           <div style={{ marginTop: 8, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13 }}>
             <div>Network: {network}</div>
@@ -495,9 +515,9 @@ export default function App(): JSX.Element {
               </div>
               <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button disabled={!!smBusy} onClick={smokeGetParams}>Get Params</button>
-                <button disabled={!account || smAppId<=0 || !!smBusy} onClick={smokeOptIn}>Opt-In</button>
-                <button disabled={!account || smAppId<=0 || !!smBusy} onClick={smokeRegister}>Register</button>
-                <button disabled={!account || smAppId<=0 || !!smBusy} onClick={smokeBid}>Place Bid</button>
+                <button disabled={!account || smAppId<=0 || !!smBusy || !netSanity.match} onClick={smokeOptIn}>Opt-In</button>
+                <button disabled={!account || smAppId<=0 || !!smBusy || !netSanity.match} onClick={smokeRegister}>Register</button>
+                <button disabled={!account || smAppId<=0 || !!smBusy || !netSanity.match} onClick={smokeBid}>Place Bid</button>
               </div>
               {(smLastTxId || smError) && (
                 <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>

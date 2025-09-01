@@ -5,6 +5,7 @@ import * as algosdk from "algosdk";
 import { useWallet } from "@txnlab/use-wallet";
 import { Buffer } from "buffer"; // ensure Buffer exists in browser builds
 import { useToast } from "./Toaster";
+import { useNetworkSanity } from "../hooks/useNetworkSanity";
 import {
   getParams,
   optInApp,
@@ -38,6 +39,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
   const { activeAddress, activeAccount, signTransactions } = useWallet();
   const connectedAddress = activeAddress || activeAccount?.address || null;
   const toast = useToast();
+  const netSanity = useNetworkSanity();
   const [busy, setBusy] = useState<number | null>(null);
   const [lastTxId, setLastTxId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -222,6 +224,21 @@ export default function PhaseControl({ appId, account, network }: Props) {
         <strong>Phase Control</strong>
         <span style={{ fontSize: 12, color: "#666" }}>App ID: {resolvedAppId ?? "—"}</span>
       </div>
+      {!netSanity.loading && (!netSanity.match || netSanity.error) && (
+        <div style={{ marginTop: 8, border: "1px solid #f0b429", padding: 8, borderRadius: 6, background: "#fff7ed", color: "#92400e", fontSize: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>Network mismatch</div>
+          {netSanity.error ? (
+            <div>Couldn't verify backend network: {netSanity.error}</div>
+          ) : (
+            <div>
+              Backend reports <strong>{netSanity.backendNet}</strong> but client expects <strong>{netSanity.expectedNet}</strong>.
+            </div>
+          )}
+          <div style={{ marginTop: 6 }}>
+            <button onClick={netSanity.refresh}>Recheck</button>
+          </div>
+        </div>
+      )}
       <div style={{ marginTop: 6, color: "#444", fontSize: 13 }}>
         Switch experiment phases on-chain (1=registration, 2=commit, 3=reveal).
       </div>
@@ -289,9 +306,9 @@ export default function PhaseControl({ appId, account, network }: Props) {
         </div>
         <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button disabled={!!ocBusy} onClick={onGetParams}>Get Params</button>
-          <button disabled={!connectedAddress || !!ocBusy || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onOptIn}>Opt-In</button>
-          <button disabled={!connectedAddress || !!ocBusy || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onRegister}>Register</button>
-          <button disabled={!connectedAddress || !!ocBusy || !(Number.isInteger(ocAppId) && ocAppId>0) || !(Number.isInteger(microAlgos) && microAlgos>=0)} onClick={onBid}>Place Bid</button>
+          <button disabled={!connectedAddress || !!ocBusy || !netSanity.match || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onOptIn}>Opt-In</button>
+          <button disabled={!connectedAddress || !!ocBusy || !netSanity.match || !(Number.isInteger(ocAppId) && ocAppId>0)} onClick={onRegister}>Register</button>
+          <button disabled={!connectedAddress || !!ocBusy || !netSanity.match || !(Number.isInteger(ocAppId) && ocAppId>0) || !(Number.isInteger(microAlgos) && microAlgos>=0)} onClick={onBid}>Place Bid</button>
         </div>
         {(ocLastTxId || ocError) && (
           <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>
