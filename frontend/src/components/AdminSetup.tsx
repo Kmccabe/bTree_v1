@@ -18,7 +18,6 @@ export default function AdminSetup() {
   const [showQR, setShowQR] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [globals, setGlobals] = useState<any | null>(null);
-  const [globals, setGlobals] = useState<any | null>(null);
 
   const required = (m - 1) * E + 50_000; // conservative buffer
 
