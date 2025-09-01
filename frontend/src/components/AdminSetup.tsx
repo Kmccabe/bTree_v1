@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
 import { setPhase } from "../chain/tx";
+import QRCode from "qrcode";
 
 const nf = (n: number) => Intl.NumberFormat().format(n);
 
@@ -31,6 +32,26 @@ export default function AdminSetup() {
   // Phase control
   const [phaseIn, setPhaseIn] = useState<number>(2);
   const [globals, setGlobals] = useState<any | null>(null);
+
+  // QR code for App Address
+  const [showQR, setShowQR] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (addr && showQR) {
+        try {
+          const url = await QRCode.toDataURL(addr, { width: 200, margin: 1 });
+          if (!cancelled) setQrDataUrl(url);
+        } catch {
+          if (!cancelled) setQrDataUrl(null);
+        }
+      } else {
+        setQrDataUrl(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [addr, showQR]);
 
   // convenience signer
   const signer = (u: Uint8Array[]) => signTransactions(u);
@@ -165,6 +186,13 @@ export default function AdminSetup() {
             >
               Copy
             </button>
+            <button
+              onClick={() => setShowQR(v => !v)}
+              className="text-xs underline"
+              title="Show QR for mobile scan"
+            >
+              {showQR ? "Hide QR" : "Show QR"}
+            </button>
             <a
               href={`https://testnet.algoexplorer.io/address/${addr}`}
               target="_blank" rel="noreferrer"
@@ -173,6 +201,11 @@ export default function AdminSetup() {
               View
             </a>
           </div>
+          {showQR && qrDataUrl && (
+            <div className="p-2 border inline-block rounded">
+              <img src={qrDataUrl} width={200} height={200} alt="App Address QR" />
+            </div>
+          )}
           <div className="text-sm">
             Required pool (est.): <b>{nf(required)}</b> µAlgos ·
             <button onClick={checkFunding} disabled={!!busy} className="underline ml-2">Check funding</button>
