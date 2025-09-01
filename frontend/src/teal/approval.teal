@@ -1,12 +1,22 @@
 #pragma version 8
+
+// Creation branch
 txn ApplicationID
 int 0
 ==
 bnz create
+
+// Runtime branch (only NoOp supported so far)
+txn OnCompletion
+int NoOp
+==
+bnz noop
+
+// Reject everything else
 err
 
 create:
-  // Expect 3 creation args: E (u64), m (u64), UNIT (u64)
+  // Expect 3 creation args: E, m, UNIT
   txn NumAppArgs
   int 3
   ==
@@ -29,6 +39,60 @@ create:
 
   byte "phase"
   int 1
+  app_global_put
+
+  int 1
+  return
+
+// -------------------------
+noop:
+  // At least a method name
+  txn NumAppArgs
+  int 1
+  >=
+  assert
+
+  // method dispatch
+  txn ApplicationArgs 0
+  byte "set_phase"
+  ==
+  bnz set_phase
+
+  // (invest will be added in next step)
+  err
+
+// -------------------------
+// Admin: set_phase(p) where p in [1..4]
+// Only the app creator may call
+set_phase:
+  // creator gate
+  txn Sender
+  global CreatorAddress
+  ==
+  assert
+
+  // ["set_phase", p]
+  txn NumAppArgs
+  int 2
+  ==
+  assert
+
+  txn ApplicationArgs 1
+  btoi
+  store 10        // p
+
+  // bounds 1..4
+  load 10
+  int 1
+  >=
+  assert
+  load 10
+  int 4
+  <=
+  assert
+
+  byte "phase"
+  load 10
   app_global_put
 
   int 1

@@ -204,3 +204,23 @@ function toBase64(u8: Uint8Array): string {
   // btoa expects binary string
   return btoa(s);
 }
+
+/**
+ * Admin: set the global phase (1..4) via a NoOp call: ["set_phase", u64(phase)].
+ * Only the app creator will pass the on-chain gate.
+ * Returns the `{ txId }` from `/api/submit`.
+ */
+export async function setPhase(args: {
+  sender: string;
+  appId: number;
+  phase: number; // 1..4
+  sign: Signer;
+}): Promise<SubmitResponse> {
+  const { sender, appId, phase, sign } = args;
+  if (!Number.isInteger(phase) || phase < 1 || phase > 4) {
+    throw new Error("setPhase: phase must be an integer in 1..4");
+  }
+  const appArgs = [str("set_phase"), u64(phase)];
+  const blob = await buildAppNoOpTxnBlob({ appId, sender, appArgs });
+  return await signAndSubmit([blob], sign);
+}
