@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
+import QRCode from "qrcode";
 
 const nf = (n: number) => Intl.NumberFormat().format(n);
 
@@ -14,6 +15,8 @@ export default function AdminSetup() {
   const [appId, setAppId] = useState<number | null>(null);
   const [addr, setAddr] = useState<string | null>(null);
   const [fund, setFund] = useState<{ required: number; balance?: number; ok?: boolean } | null>(null);
+  const [showQR, setShowQR] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   const required = (m - 1) * E + 50_000; // conservative buffer
 
@@ -51,6 +54,25 @@ export default function AdminSetup() {
       setBusy(null);
     }
   }
+
+  // whenever addr or showQR changes, (re)generate QR
+  useEffect(() => {
+    let cancelled = false;
+    async function gen() {
+      if (addr && showQR) {
+        try {
+          const url = await QRCode.toDataURL(addr, { width: 200, margin: 1 });
+          if (!cancelled) setQrDataUrl(url);
+        } catch {
+          if (!cancelled) setQrDataUrl(null);
+        }
+      } else {
+        setQrDataUrl(null);
+      }
+    }
+    gen();
+    return () => { cancelled = true; };
+  }, [addr, showQR]);
 
   return (
     <div className="rounded-2xl border p-4 space-y-3">
@@ -90,7 +112,36 @@ export default function AdminSetup() {
 
       {addr && (
         <div className="space-y-2">
-          <div className="text-sm">App Address: <code>{addr}</code></div>
+          <div className="text-sm flex items-center gap-2">
+            <span>App Address:</span>
+            <code className="break-all">{addr}</code>
+            <button
+              onClick={() => navigator.clipboard.writeText(addr)}
+              className="text-xs underline"
+              title="Copy to clipboard"
+            >
+              Copy
+            </button>
+            <button
+              onClick={() => setShowQR(v => !v)}
+              className="text-xs underline"
+              title="Show QR for mobile scan"
+            >
+              {showQR ? "Hide QR" : "Show QR"}
+            </button>
+            <a
+              href={`https://testnet.algoexplorer.io/address/${addr}`}
+              target="_blank" rel="noreferrer"
+              className="text-xs underline"
+            >
+              View
+            </a>
+          </div>
+          {showQR && qrDataUrl && (
+            <div className="p-2 border inline-block rounded">
+              <img src={qrDataUrl} alt="App Address QR" width={200} height={200} />
+            </div>
+          )}
           <div className="text-sm">
             Required pool (est.): <b>{nf(required)}</b> µAlgos ·
             <button onClick={checkFunding} disabled={!!busy} className="underline ml-2">Check funding</button>
@@ -111,4 +162,3 @@ export default function AdminSetup() {
     </div>
   );
 }
-
