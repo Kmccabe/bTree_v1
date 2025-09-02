@@ -184,7 +184,7 @@ export async function optInApp(args: {
   let opt: any;
   try {
     opt = (algosdk as any).makeApplicationOptInTxnFromObject({
-      from: sender,
+      sender: sender,
       appIndex: appId,
       suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
     });
@@ -313,7 +313,7 @@ export async function setPhase(args: {
     const mf = (sp as any).minFee ?? sp.fee ?? 1000;
     console.info(TAG, "build AppCall", { from: shortAddr(sender), appId, fee: mf });
     call = (algosdk as any).makeApplicationNoOpTxnFromObject({
-      from: sender,
+      sender: sender,
       appIndex: appId,
       appArgs,
       suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
@@ -446,7 +446,7 @@ export async function investFlow(args: {
   try {
     const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
     call = (algosdk as any).makeApplicationNoOpTxnFromObject({
-      from: senderResolved,
+      sender: senderResolved,
       appIndex: appId,
       appArgs: [str("invest"), u64(s)],
       suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 2 },
