@@ -1,5 +1,5 @@
 // frontend/src/chain/params.ts
-import type algosdk from "algosdk";
+import algosdk from "algosdk";
 
 /**
  * Fetch /api/params and normalize to the exact shape used in deploy.ts.
@@ -17,16 +17,10 @@ export async function getParamsNormalized(): Promise<algosdk.SuggestedParams & {
   const minFee = Number(p["min-fee"]) || 1000;
   const firstRound = Number(p["last-round"]) || 0;
   const genesisHashRaw = (p["genesis-hash"] || p["genesishashb64"] || p["genesisHash"]) as string | Uint8Array | undefined;
-
-  // Force base64 STRING for genesisHash (defensive coercion if bytes were provided)
-  let genesisHash: string = "";
-  if (typeof genesisHashRaw === "string") {
-    genesisHash = genesisHashRaw;
-  } else if (genesisHashRaw instanceof Uint8Array) {
-    genesisHash = typeof Buffer !== "undefined"
-      ? Buffer.from(genesisHashRaw).toString("base64")
-      : btoa(String.fromCharCode(...genesisHashRaw));
-  }
+  // Use Uint8Array for genesisHash (matches deploy.ts behavior and algosdk v3 expectations)
+  const genesisHash: Uint8Array | undefined = typeof genesisHashRaw === "string"
+    ? algosdk.base64ToBytes(genesisHashRaw)
+    : (genesisHashRaw as Uint8Array | undefined);
 
   const suggestedParams: any = {
     fee: minFee,
@@ -36,7 +30,7 @@ export async function getParamsNormalized(): Promise<algosdk.SuggestedParams & {
     lastValid: firstRound + 1000,
     firstRound,
     lastRound: firstRound + 1000,
-    genesisHash, // base64 string only
+    genesisHash, // Uint8Array
     genesisID: p["genesis-id"],
   } as unknown as algosdk.SuggestedParams & { minFee?: number };
 
@@ -45,8 +39,8 @@ export async function getParamsNormalized(): Promise<algosdk.SuggestedParams & {
     fee: suggestedParams.fee,
     firstRound: (suggestedParams as any).firstRound,
     lastRound: (suggestedParams as any).lastRound,
-    genesisHash_type: typeof (suggestedParams as any).genesisHash,
-    genesisHash_len: String((suggestedParams as any).genesisHash || "").length,
+    genesisHash_type: (suggestedParams as any).genesisHash instanceof Uint8Array ? "Uint8Array" : typeof (suggestedParams as any).genesisHash,
+    genesisHash_len: (suggestedParams as any).genesisHash instanceof Uint8Array ? (suggestedParams as any).genesisHash.length : 0,
     genesisID: (suggestedParams as any).genesisID,
     flatFee: (suggestedParams as any).flatFee,
     minFee: (suggestedParams as any).minFee,
