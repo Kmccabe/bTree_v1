@@ -422,17 +422,34 @@ export async function investFlow(args: {
   // Build Payment with explicit FROM/TO/AMOUNT in error
   let pay: any;
   try {
-    const fromAddr = String(senderResolved).trim();
-    const toAddr = String(appAddr).trim();
+    const fromAddr = String(senderResolved ?? "").trim();
+    const toAddr = String(appAddr ?? "").trim();
+    console.info("[investFlow] build payment", {
+      from: short(fromAddr),
+      to: short(toAddr),
+      from_type: typeof fromAddr,
+      to_type: typeof toAddr,
+      from_len: fromAddr?.length ?? -1,
+      to_len: toAddr?.length ?? -1,
+    });
+    if (!fromAddr) throw new Error("from address empty string");
+    if (!toAddr) throw new Error("to address empty string");
     if (!algosdk.isValidAddress(fromAddr)) throw new Error(`invalid from address ${fromAddr}`);
     if (!algosdk.isValidAddress(toAddr)) throw new Error(`invalid to address ${toAddr}`);
-    console.info("[investFlow] build payment", { from_type: typeof fromAddr, to_type: typeof toAddr });
-    const makePayFn = (algosdk as any).makePaymentTxnWithSuggestedParams ?? (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject;
-    if ((algosdk as any).makePaymentTxnWithSuggestedParams) {
-      // Legacy/compatible signature
+
+    // Prefer object-style builder (less ambiguity across SDK versions)
+    if ((algosdk as any).makePaymentTxnWithSuggestedParamsFromObject) {
+      pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
+        from: fromAddr,
+        to: toAddr,
+        amount: s,
+        suggestedParams: sp,
+      } as any);
+    } else if ((algosdk as any).makePaymentTxnWithSuggestedParams) {
+      // Fallback to positional signature
       pay = (algosdk as any).makePaymentTxnWithSuggestedParams(fromAddr, toAddr, s, undefined, undefined, sp);
     } else {
-      pay = makePayFn({ from: fromAddr, to: toAddr, amount: s, suggestedParams: sp } as any);
+      throw new Error("algosdk payment builders not found");
     }
   } catch (e: any) {
     throw new Error(`${TAG} build Payment failed (from=${short(senderResolved)} to=${short(appAddr)} amount=${s}): ${e?.message || e}`);
