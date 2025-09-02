@@ -19,6 +19,7 @@
 // cspell:ignore txns stxns appArgs NoOp
 import * as algosdk from "algosdk";
 import type { Transaction, SuggestedParams } from "algosdk";
+import { getParamsNormalized } from "./params";
 import { str, u64 } from "./enc";
 
 /** Shape expected by /api/submit in this repo (single signed txn). */
@@ -29,40 +30,15 @@ type SubmitResponse = { txId: string };
 export type WalletSigner = (txns: Uint8Array[]) => Promise<Uint8Array[]>;
 
 /** GET /api/params → SuggestedParams (normalized) */
+// Back-compat alias used by other helpers in this file
 export async function getSuggestedParams(): Promise<SuggestedParams> {
-  const res = await fetch("/api/params", { method: "GET" });
-  const raw = await res.text();
-  if (!res.ok) {
-    throw new Error(`[params] HTTP ${res.status}: ${raw}`);
-  }
-  let j: any;
-  try { j = JSON.parse(raw); } catch (e) { throw new Error(`[params] JSON parse error: ${String(e)} raw=${raw}`); }
-  const sp = normalizeSuggestedParams(j);
-  try { console.info("[params] normalized", sp); } catch {}
-  return sp as SuggestedParams;
+  return (await getParamsNormalized()) as SuggestedParams;
 }
 
 /** Normalizes server response into algosdk.SuggestedParams */
+// normalizeSuggestedParams is now provided by getParamsNormalized(); keep alias for internal use
 function normalizeSuggestedParams(raw: any): SuggestedParams & { minFee?: number } {
-  const p = raw?.params ?? raw ?? {};
-  const lr = Number(p["last-round"]);
-  const mf = Number(p["min-fee"]);
-  const gh = String(p["genesis-hash"] || "");
-  const gid = String(p["genesis-id"] || "");
-  if (!Number.isFinite(lr)) throw new Error(`[params] invalid last-round: ${p["last-round"]}`);
-  if (!Number.isFinite(mf)) throw new Error(`[params] invalid min-fee: ${p["min-fee"]}`);
-  if (!gh) throw new Error(`[params] missing genesis-hash`);
-  if (!gid) throw new Error(`[params] missing genesis-id`);
-  const sp: any = {
-    fee: mf,
-    firstRound: lr,
-    lastRound: lr + 1000,
-    genesisHash: gh,
-    genesisID: gid,
-    flatFee: false,
-    minFee: mf,
-  };
-  return sp as SuggestedParams & { minFee?: number };
+  return getParamsNormalized() as unknown as SuggestedParams & { minFee?: number };
 }
 
 // Convenience alias to match UI imports
@@ -181,8 +157,15 @@ export async function optInApp(args: {
   }
 
   // normalized params
-  const sp: any = await getSuggestedParams();
-  const mf = (sp as any).minFee ?? sp.fee ?? 1000;
+  const sp: any = await getParamsNormalized();
+  const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
+  console.info("[tx] using params", {
+    fee: sp.fee, firstRound: (sp as any).firstRound, lastRound: (sp as any).lastRound,
+    genesisHash_type: (sp as any).genesisHash instanceof Uint8Array ? "Uint8Array" : typeof (sp as any).genesisHash,
+    genesisHash_len: (sp as any).genesisHash instanceof Uint8Array ? (sp as any).genesisHash.length : String((sp as any).genesisHash || "").length,
+    genesisHashBytes_len: (sp as any).genesisHashBytes?.length,
+    genesisID: (sp as any).genesisID, flatFee: (sp as any).flatFee, minFee: (sp as any).minFee,
+  });
 
   // log everything we will pass to the SDK
   console.info(TAG, "build opt-in with", {
@@ -311,7 +294,14 @@ export async function setPhase(args: {
   if (!Number.isInteger(appId) || appId <= 0) throw new Error(`${TAG} invalid appId`);
   if (!Number.isInteger(phase) || phase < 1 || phase > 4) throw new Error(`${TAG} invalid phase ${phase}`);
 
-  const sp: any = await getSuggestedParams();
+  const sp: any = await getParamsNormalized();
+  console.info("[tx] using params", {
+    fee: sp.fee, firstRound: (sp as any).firstRound, lastRound: (sp as any).lastRound,
+    genesisHash_type: (sp as any).genesisHash instanceof Uint8Array ? "Uint8Array" : typeof (sp as any).genesisHash,
+    genesisHash_len: (sp as any).genesisHash instanceof Uint8Array ? (sp as any).genesisHash.length : String((sp as any).genesisHash || "").length,
+    genesisHashBytes_len: (sp as any).genesisHashBytes?.length,
+    genesisID: (sp as any).genesisID, flatFee: (sp as any).flatFee, minFee: (sp as any).minFee,
+  });
   const appArgs = [str("set_phase"), u64(phase)];
 
   let call: any;
@@ -423,8 +413,14 @@ export async function investFlow(args: {
   }
 
   // -------- PARAMS FETCH (normalized) --------
-  const sp: any = await getSuggestedParams();
-  console.info("[investFlow] normalized SuggestedParams", sp);
+  const sp: any = await getParamsNormalized();
+  console.info("[tx] using params", {
+    fee: sp.fee, firstRound: (sp as any).firstRound, lastRound: (sp as any).lastRound,
+    genesisHash_type: (sp as any).genesisHash instanceof Uint8Array ? "Uint8Array" : typeof (sp as any).genesisHash,
+    genesisHash_len: (sp as any).genesisHash instanceof Uint8Array ? (sp as any).genesisHash.length : String((sp as any).genesisHash || "").length,
+    genesisHashBytes_len: (sp as any).genesisHashBytes?.length,
+    genesisID: (sp as any).genesisID, flatFee: (sp as any).flatFee, minFee: (sp as any).minFee,
+  });
 
   // Build Payment with explicit FROM/TO/AMOUNT in error
   let pay: any;
@@ -442,14 +438,15 @@ export async function investFlow(args: {
   // Build AppCall
   let call: any;
   try {
+    const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
     call = (algosdk as any).makeApplicationNoOpTxnFromObject({
       from: senderResolved,
       appIndex: appId,
       appArgs: [str("invest"), u64(s)],
-      suggestedParams: { ...(sp as any), flatFee: true, fee: ((sp?.minFee || (sp?.fee ?? 1000)) * 2) },
+      suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 2 },
     });
   } catch (e: any) {
-    throw new Error(`${TAG} build AppCall failed (from=${short(senderResolved)} appId=${appId} fee=${(sp?.minFee || (sp?.fee ?? 1000)) * 2}): ${e?.message || e}`);
+    throw new Error(`${TAG} build AppCall failed (from=${short(senderResolved)} appId=${appId}): ${e?.message || e}`);
   }
 
   (algosdk as any).assignGroupID([pay, call]);
