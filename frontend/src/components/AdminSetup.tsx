@@ -89,10 +89,12 @@ export default function AdminSetup() {
   }
 
   async function onApplyPhase() {
-    if (!activeAddress) return setErr("Connect the experimenter wallet.");
+    setErr(null);
     const id = appId ?? Number(manualAppId);
-    if (!Number.isFinite(id) || id <= 0) return setErr("Enter a valid App ID.");
-    setBusy("phase"); setErr(null);
+    console.info("[AdminSetup] onApplyPhase", { activeAddress, id, phaseIn });
+    if (!activeAddress) return setErr("Connect the creator wallet.");
+    if (!Number.isFinite(id) || id <= 0) return setErr("Enter a numeric App ID.");
+    setBusy("phase");
     try {
       await setPhase({ sender: activeAddress, appId: id, phase: phaseIn, sign: signer });
     } catch (e: any) {

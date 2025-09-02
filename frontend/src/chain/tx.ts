@@ -155,13 +155,90 @@ export type Signer = WalletSigner;
  * Delegates to: getParams → buildAppOptInTxnBlob → signAndSubmit.
  * Returns the `{ txId }` from `/api/submit`.
  */
+// Small display helper
+function short(addr?: string | null) {
+  return typeof addr === "string" && addr.length > 12
+    ? `${addr.slice(0, 6)}…${addr.slice(-6)}`
+    : String(addr);
+}
+
 export async function optInApp(args: {
   sender: string;
   appId: number;
   sign: Signer;
-}): Promise<SubmitResponse> {
-  const blob = await buildAppOptInTxnBlob({ appId: args.appId, sender: args.sender });
-  return await signAndSubmit([blob], args.sign);
+  wait?: boolean;
+}): Promise<{ txId: string; confirmedRound?: number }> {
+  const TAG = "[optInApp]";
+  const { sender, appId, sign, wait = true } = args;
+
+  console.info(TAG, "args", { sender, appId });
+
+  if (!sender || !algosdk.isValidAddress(sender)) {
+    throw new Error(`${TAG} invalid sender: ${sender}`);
+  }
+  if (!Number.isInteger(appId) || appId <= 0) {
+    throw new Error(`${TAG} invalid appId: ${appId}`);
+  }
+
+  // normalized params
+  const sp: any = await getSuggestedParams();
+  const mf = (sp as any).minFee ?? sp.fee ?? 1000;
+
+  // log everything we will pass to the SDK
+  console.info(TAG, "build opt-in with", {
+    from: short(sender),
+    appId,
+    fee: mf,
+    firstRound: (sp as any).firstRound,
+    lastRound: (sp as any).lastRound,
+    genesisHash: (sp as any).genesisHash,
+    genesisID: (sp as any).genesisID,
+    flatFee: true,
+  });
+
+  let opt: any;
+  try {
+    opt = (algosdk as any).makeApplicationOptInTxnFromObject({
+      from: sender,
+      appIndex: appId,
+      suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
+    });
+  } catch (e: any) {
+    // include the exact values so we know what was undefined
+    throw new Error(
+      `${TAG} build failed (from=${short(sender)} appId=${appId} fee=${mf} fr=${(sp as any).firstRound} lr=${(sp as any).lastRound} gh=${(sp as any).genesisHash} gid=${(sp as any).genesisID}): ${e?.message || e}`
+    );
+  }
+
+  let stxns: Uint8Array[];
+  try {
+    stxns = await sign([(algosdk as any).encodeUnsignedTransaction(opt)]);
+    console.info(TAG, "signed 1 txn");
+  } catch (e: any) {
+    throw new Error(`${TAG} sign failed: ${e?.message || e}`);
+  }
+
+  const payload = { stxns: stxns.map((b) => toBase64(b)) };
+  const sub = await fetch("/api/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const subText = await sub.text();
+  console.info(TAG, "/api/submit", sub.status, subText);
+  if (!sub.ok) throw new Error(`${TAG} submit ${sub.status}: ${subText}`);
+
+  const sj = (() => { try { return JSON.parse(subText); } catch { return {}; } })();
+  const txId = sj.txId ?? sj.txid ?? sj.txID;
+  if (!txId) throw new Error(`${TAG} missing txId`);
+
+  if (!wait) return { txId };
+  const pendR = await fetch(`/api/pending?txId=${encodeURIComponent(txId)}`);
+  const pendText = await pendR.text();
+  console.info(TAG, "/api/pending", pendR.status, pendText);
+  let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
+  const confirmedRound = pend?.["confirmed-round"] ?? pend?.confirmedRound;
+  return { txId, confirmedRound };
 }
 
 /**
@@ -214,19 +291,74 @@ function toBase64(u8: Uint8Array): string {
  * Only the app creator will pass the on-chain gate.
  * Returns the `{ txId }` from `/api/submit`.
  */
+function shortAddr(addr?: string | null) {
+  return typeof addr === "string" && addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-6)}` : String(addr);
+}
+
 export async function setPhase(args: {
-  sender: string;
-  appId: number;
-  phase: number; // 1..4
+  sender: string;            // creator address
+  appId: number;             // numeric
+  phase: number;             // 1..4
   sign: Signer;
-}): Promise<SubmitResponse> {
-  const { sender, appId, phase, sign } = args;
-  if (!Number.isInteger(phase) || phase < 1 || phase > 4) {
-    throw new Error("setPhase: phase must be an integer in 1..4");
-  }
+  wait?: boolean;
+}): Promise<{ txId: string; confirmedRound?: number }> {
+  const TAG = "[setPhase]";
+  const { sender, appId, phase, sign, wait = true } = args;
+
+  console.info(TAG, "args", { sender, appId, phase });
+
+  if (!sender || !algosdk.isValidAddress(sender)) throw new Error(`${TAG} invalid sender`);
+  if (!Number.isInteger(appId) || appId <= 0) throw new Error(`${TAG} invalid appId`);
+  if (!Number.isInteger(phase) || phase < 1 || phase > 4) throw new Error(`${TAG} invalid phase ${phase}`);
+
+  const sp: any = await getSuggestedParams();
   const appArgs = [str("set_phase"), u64(phase)];
-  const blob = await buildAppNoOpTxnBlob({ appId, sender, appArgs });
-  return await signAndSubmit([blob], sign);
+
+  let call: any;
+  try {
+    const mf = (sp as any).minFee ?? sp.fee ?? 1000;
+    console.info(TAG, "build AppCall", { from: shortAddr(sender), appId, fee: mf });
+    call = (algosdk as any).makeApplicationNoOpTxnFromObject({
+      from: sender,
+      appIndex: appId,
+      appArgs,
+      suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
+    });
+  } catch (e: any) {
+    console.error(TAG, "build AppCall error", e);
+    throw new Error(`${TAG} build AppCall failed (from=${shortAddr(sender)} appId=${appId} phase=${phase}): ${e?.message || e}`);
+  }
+
+  let stxns: Uint8Array[];
+  try {
+    stxns = await sign([(algosdk as any).encodeUnsignedTransaction(call)]);
+    console.info(TAG, "signed 1 txn");
+  } catch (e: any) {
+    console.error(TAG, "sign error", e);
+    throw new Error(`${TAG} sign failed: ${e?.message || e}`);
+  }
+
+  const payload = { stxns: stxns.map((b) => toBase64(b)) };
+  const sub = await fetch("/api/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const subText = await sub.text();
+  console.info(TAG, "/api/submit", sub.status, subText);
+  if (!sub.ok) throw new Error(`${TAG} submit ${sub.status}: ${subText}`);
+
+  const sj = (() => { try { return JSON.parse(subText); } catch { return {}; } })();
+  const txId = sj.txId ?? sj.txid ?? sj.txID;
+  if (!txId) throw new Error(`${TAG} missing txId`);
+
+  if (!wait) return { txId };
+  const pendR = await fetch(`/api/pending?txId=${encodeURIComponent(txId)}`);
+  const pendText = await pendR.text();
+  console.info(TAG, "/api/pending", pendR.status, pendText);
+  let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
+  const confirmedRound = pend?.["confirmed-round"] ?? pend?.confirmedRound;
+  return { txId, confirmedRound };
 }
 
 /**
