@@ -437,19 +437,49 @@ export async function investFlow(args: {
     if (!algosdk.isValidAddress(fromAddr)) throw new Error(`invalid from address ${fromAddr}`);
     if (!algosdk.isValidAddress(toAddr)) throw new Error(`invalid to address ${toAddr}`);
 
-    // Prefer object-style builder (less ambiguity across SDK versions)
-    if ((algosdk as any).makePaymentTxnWithSuggestedParamsFromObject) {
-      pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
-        from: fromAddr,
-        to: toAddr,
-        amount: s,
-        suggestedParams: sp,
-      } as any);
-    } else if ((algosdk as any).makePaymentTxnWithSuggestedParams) {
-      // Fallback to positional signature
-      pay = (algosdk as any).makePaymentTxnWithSuggestedParams(fromAddr, toAddr, s, undefined, undefined, sp);
-    } else {
-      throw new Error("algosdk payment builders not found");
+    // Try multiple builder signatures to handle SDK v2/v3 differences
+    const errors: string[] = [];
+    const sdkAny = algosdk as any;
+
+    // 1) Positional (legacy, widely compatible)
+    if (sdkAny.makePaymentTxnWithSuggestedParams) {
+      try {
+        pay = sdkAny.makePaymentTxnWithSuggestedParams(fromAddr, toAddr, s, undefined, undefined, sp);
+      } catch (e: any) {
+        errors.push(`positional: ${e?.message || e}`);
+      }
+    }
+
+    // 2) Object style with { from, to }
+    if (!pay && sdkAny.makePaymentTxnWithSuggestedParamsFromObject) {
+      try {
+        pay = sdkAny.makePaymentTxnWithSuggestedParamsFromObject({
+          from: fromAddr,
+          to: toAddr,
+          amount: s,
+          suggestedParams: sp,
+        } as any);
+      } catch (e: any) {
+        errors.push(`object{from,to}: ${e?.message || e}`);
+      }
+    }
+
+    // 3) Object style with { sender, to } (some SDK variants)
+    if (!pay && sdkAny.makePaymentTxnWithSuggestedParamsFromObject) {
+      try {
+        pay = sdkAny.makePaymentTxnWithSuggestedParamsFromObject({
+          sender: fromAddr,
+          to: toAddr,
+          amount: s,
+          suggestedParams: sp,
+        } as any);
+      } catch (e: any) {
+        errors.push(`object{sender,to}: ${e?.message || e}`);
+      }
+    }
+
+    if (!pay) {
+      throw new Error(`algosdk payment builder mismatch: ${errors.join(" | ")}`);
     }
   } catch (e: any) {
     throw new Error(`${TAG} build Payment failed (from=${short(senderResolved)} to=${short(appAddr)} amount=${s}): ${e?.message || e}`);
