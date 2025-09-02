@@ -440,11 +440,13 @@ export async function investFlow(args: {
     // Try multiple builder signatures to handle SDK v2/v3 differences
     const errors: string[] = [];
     const sdkAny = algosdk as any;
+    const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
+    const spFlat = { ...(sp as any), flatFee: true, fee: mf };
 
     // 1) Positional (legacy, widely compatible)
     if (sdkAny.makePaymentTxnWithSuggestedParams) {
       try {
-        pay = sdkAny.makePaymentTxnWithSuggestedParams(fromAddr, toAddr, s, undefined, undefined, sp);
+        pay = sdkAny.makePaymentTxnWithSuggestedParams(fromAddr, toAddr, s, undefined, undefined, spFlat);
       } catch (e: any) {
         errors.push(`positional: ${e?.message || e}`);
       }
@@ -457,24 +459,52 @@ export async function investFlow(args: {
           from: fromAddr,
           to: toAddr,
           amount: s,
-          suggestedParams: sp,
+          suggestedParams: spFlat,
         } as any);
       } catch (e: any) {
         errors.push(`object{from,to}: ${e?.message || e}`);
       }
     }
 
-    // 3) Object style with { sender, to } (some SDK variants)
+    // 3) Object style with { from, receiver }
+    if (!pay && sdkAny.makePaymentTxnWithSuggestedParamsFromObject) {
+      try {
+        pay = sdkAny.makePaymentTxnWithSuggestedParamsFromObject({
+          from: fromAddr,
+          receiver: toAddr,
+          amount: s,
+          suggestedParams: spFlat,
+        } as any);
+      } catch (e: any) {
+        errors.push(`object{from,receiver}: ${e?.message || e}`);
+      }
+    }
+
+    // 4) Object style with { sender, to } (some SDK variants)
     if (!pay && sdkAny.makePaymentTxnWithSuggestedParamsFromObject) {
       try {
         pay = sdkAny.makePaymentTxnWithSuggestedParamsFromObject({
           sender: fromAddr,
           to: toAddr,
           amount: s,
-          suggestedParams: sp,
+          suggestedParams: spFlat,
         } as any);
       } catch (e: any) {
         errors.push(`object{sender,to}: ${e?.message || e}`);
+      }
+    }
+
+    // 5) Object style with { sender, receiver }
+    if (!pay && sdkAny.makePaymentTxnWithSuggestedParamsFromObject) {
+      try {
+        pay = sdkAny.makePaymentTxnWithSuggestedParamsFromObject({
+          sender: fromAddr,
+          receiver: toAddr,
+          amount: s,
+          suggestedParams: spFlat,
+        } as any);
+      } catch (e: any) {
+        errors.push(`object{sender,receiver}: ${e?.message || e}`);
       }
     }
 
