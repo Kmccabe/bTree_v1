@@ -58,10 +58,15 @@ export async function _devParamsSelfTest(sender: string) {
   try {
     // dynamic import to avoid hard dependency in isolated use
     const { default: algosdk } = await import("algosdk");
-    algosdk.makePaymentTxnWithSuggestedParamsFromObject({ from: sender, to: sender, amount: 0, suggestedParams: sp });
+    // Cast to any to accommodate SDK v2/v3 typing differences (from/sender)
+    (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
+      from: sender,
+      to: sender,
+      amount: 0,
+      suggestedParams: sp,
+    } as any);
     console.info("[_devParamsSelfTest] payment build OK");
   } catch (e) {
     console.error("[_devParamsSelfTest] payment build FAILED", e, sp);
   }
 }
-
