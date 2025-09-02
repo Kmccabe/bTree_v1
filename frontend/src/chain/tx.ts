@@ -215,7 +215,7 @@ export async function optInApp(args: {
   if (!txId) throw new Error(`${TAG} missing txId`);
 
   if (!wait) return { txId };
-  const pendR = await fetch(`/api/pending?txId=${encodeURIComponent(txId)}`);
+  const pendR = await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`);
   const pendText = await pendR.text();
   console.info(TAG, "/api/pending", pendR.status, pendText);
   let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
@@ -341,7 +341,7 @@ export async function setPhase(args: {
   if (!txId) throw new Error(`${TAG} missing txId`);
 
   if (!wait) return { txId };
-  const pendR = await fetch(`/api/pending?txId=${encodeURIComponent(txId)}`);
+  const pendR = await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`);
   const pendText = await pendR.text();
   console.info(TAG, "/api/pending", pendR.status, pendText);
   let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
@@ -422,12 +422,14 @@ export async function investFlow(args: {
   // Build Payment with explicit FROM/TO/AMOUNT in error
   let pay: any;
   try {
+    const appAddrRaw = (algosdk as any).getApplicationAddress(appId);
+    const toField: any = (appAddrRaw && typeof appAddrRaw !== "string") ? appAddrRaw : appAddr;
     pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
       from: senderResolved,
-      to: appAddr,
+      to: toField,
       amount: s,
       suggestedParams: sp,
-    });
+    } as any);
   } catch (e: any) {
     throw new Error(`${TAG} build Payment failed (from=${short(senderResolved)} to=${short(appAddr)} amount=${s}): ${e?.message || e}`);
   }
