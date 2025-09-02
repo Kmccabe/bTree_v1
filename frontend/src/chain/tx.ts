@@ -31,34 +31,38 @@ export type WalletSigner = (txns: Uint8Array[]) => Promise<Uint8Array[]>;
 /** GET /api/params → SuggestedParams (normalized) */
 export async function getSuggestedParams(): Promise<SuggestedParams> {
   const res = await fetch("/api/params", { method: "GET" });
+  const raw = await res.text();
   if (!res.ok) {
-    const text = await res.text().catch(() => String(res.status));
-    throw new Error(`Failed to fetch params: ${text}`);
+    throw new Error(`[params] HTTP ${res.status}: ${raw}`);
   }
-  const p = await res.json();
-  return normalizeSuggestedParams(p);
+  let j: any;
+  try { j = JSON.parse(raw); } catch (e) { throw new Error(`[params] JSON parse error: ${String(e)} raw=${raw}`); }
+  const sp = normalizeSuggestedParams(j);
+  try { console.info("[params] normalized", sp); } catch {}
+  return sp as SuggestedParams;
 }
 
 /** Normalizes server response into algosdk.SuggestedParams */
-function normalizeSuggestedParams(p: any): SuggestedParams {
-  // Mirror the working normalization used in deploy.ts
-  const minFee = Number(p["min-fee"]) || Number(p.fee) || Number(p["fee"]) || 1000;
-  const baseRound = Number(p["last-round"]) || Number(p.lastRound) || Number(p.firstRound) || 0;
-  const gh = p.genesisHash ?? p["genesis-hash"] ?? p["genesishashb64"]; // may be b64 string
-  const genesisHash = typeof gh === "string" ? algosdk.base64ToBytes(gh) : gh;
-  const firstRound = baseRound;
-  const lastRound = baseRound + 1000;
-  return {
-    fee: minFee,
-    minFee: minFee as any,
-    flatFee: true,
-    firstValid: firstRound as any,
-    lastValid: lastRound as any,
-    firstRound: firstRound as any,
-    lastRound: lastRound as any,
-    genesisHash: genesisHash as any,
-    genesisID: p.genesisID ?? p["genesis-id"],
-  } as unknown as SuggestedParams;
+function normalizeSuggestedParams(raw: any): SuggestedParams & { minFee?: number } {
+  const p = raw?.params ?? raw ?? {};
+  const lr = Number(p["last-round"]);
+  const mf = Number(p["min-fee"]);
+  const gh = String(p["genesis-hash"] || "");
+  const gid = String(p["genesis-id"] || "");
+  if (!Number.isFinite(lr)) throw new Error(`[params] invalid last-round: ${p["last-round"]}`);
+  if (!Number.isFinite(mf)) throw new Error(`[params] invalid min-fee: ${p["min-fee"]}`);
+  if (!gh) throw new Error(`[params] missing genesis-hash`);
+  if (!gid) throw new Error(`[params] missing genesis-id`);
+  const sp: any = {
+    fee: mf,
+    firstRound: lr,
+    lastRound: lr + 1000,
+    genesisHash: gh,
+    genesisID: gid,
+    flatFee: false,
+    minFee: mf,
+  };
+  return sp as SuggestedParams & { minFee?: number };
 }
 
 // Convenience alias to match UI imports
@@ -286,14 +290,9 @@ export async function investFlow(args: {
     throw new Error(`${TAG} decodeAddress failed (from=${short(senderResolved)} to=${short(appAddr)}): ${e?.message || e}`);
   }
 
-  // Params (log raw for visibility)
-  const r = await fetch("/api/params");
-  const raw = await r.text();
-  console.log(`${TAG} /api/params status=`, r.status, "raw=", raw);
-  if (!r.ok) throw new Error(`${TAG} params HTTP ${r.status}: ${raw}`);
-  let j: any; try { j = JSON.parse(raw); } catch (e) { throw new Error(`${TAG} params JSON parse error: ${String(e)} raw=${raw}`); }
-  const sp = (j.params ?? j.suggestedParams ?? j) as (any);
-  console.log(`${TAG} minFee=`, sp?.minFee, "lastRound=", (sp as any)["last-round"] ?? (sp as any).lastRound);
+  // -------- PARAMS FETCH (normalized) --------
+  const sp: any = await getSuggestedParams();
+  console.info("[investFlow] normalized SuggestedParams", sp);
 
   // Build Payment with explicit FROM/TO/AMOUNT in error
   let pay: any;
