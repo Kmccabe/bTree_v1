@@ -422,11 +422,14 @@ export async function investFlow(args: {
   // Build Payment with explicit FROM/TO/AMOUNT in error
   let pay: any;
   try {
-    const appAddrRaw = (algosdk as any).getApplicationAddress(appId);
-    const toField: any = (appAddrRaw && typeof appAddrRaw !== "string") ? appAddrRaw : appAddr;
+    const fromAddr = String(senderResolved).trim();
+    const toAddr = String(appAddr).trim();
+    if (!algosdk.isValidAddress(fromAddr)) throw new Error(`invalid from address ${fromAddr}`);
+    if (!algosdk.isValidAddress(toAddr)) throw new Error(`invalid to address ${toAddr}`);
+    console.info("[investFlow] build payment", { from_type: typeof fromAddr, to_type: typeof toAddr });
     pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
-      from: senderResolved,
-      to: toField,
+      from: fromAddr,
+      to: toAddr,
       amount: s,
       suggestedParams: sp,
     } as any);
