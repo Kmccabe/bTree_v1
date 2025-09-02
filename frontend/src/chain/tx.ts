@@ -523,6 +523,8 @@ export async function investFlow(args: {
       sender: senderResolved,
       appIndex: appId,
       appArgs: [str("invest"), u64(s)],
+      // Provide sender in foreign Accounts in case the TEAL reads it via txna Accounts
+      accounts: [senderResolved],
       suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 2 },
     });
   } catch (e: any) {
