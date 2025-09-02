@@ -159,7 +159,8 @@ invest:
   app_opted_in
   assert
 
-  // not already invested: local "done" == 0
+  // not already invested: local "done" == 0 (read sender-local)
+  txn Sender
   byte "done"
   app_local_get
   int 0
@@ -202,10 +203,12 @@ invest:
   ==
   assert
 
-  // write local s & done
+  // write local s & done to sender-local state
+  txn Sender
   byte "s"
   load 0
   app_local_put
+  txn Sender
   byte "done"
   int 1
   app_local_put
