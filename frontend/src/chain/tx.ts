@@ -158,12 +158,14 @@ export async function optInApp(args: {
 
   // normalized params
   const sp: any = await getParamsNormalized();
+  if (typeof (sp as any).genesisHash !== "string") {
+    throw new Error("[tx] normalized params must have string genesisHash");
+  }
   const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
   console.info("[tx] using params", {
     fee: sp.fee, firstRound: (sp as any).firstRound, lastRound: (sp as any).lastRound,
-    genesisHash_type: (sp as any).genesisHash instanceof Uint8Array ? "Uint8Array" : typeof (sp as any).genesisHash,
-    genesisHash_len: (sp as any).genesisHash instanceof Uint8Array ? (sp as any).genesisHash.length : String((sp as any).genesisHash || "").length,
-    genesisHashBytes_len: (sp as any).genesisHashBytes?.length,
+    genesisHash_type: typeof (sp as any).genesisHash,
+    genesisHash_len: String((sp as any).genesisHash || "").length,
     genesisID: (sp as any).genesisID, flatFee: (sp as any).flatFee, minFee: (sp as any).minFee,
   });
 
@@ -295,11 +297,13 @@ export async function setPhase(args: {
   if (!Number.isInteger(phase) || phase < 1 || phase > 4) throw new Error(`${TAG} invalid phase ${phase}`);
 
   const sp: any = await getParamsNormalized();
+  if (typeof (sp as any).genesisHash !== "string") {
+    throw new Error("[tx] normalized params must have string genesisHash");
+  }
   console.info("[tx] using params", {
     fee: sp.fee, firstRound: (sp as any).firstRound, lastRound: (sp as any).lastRound,
-    genesisHash_type: (sp as any).genesisHash instanceof Uint8Array ? "Uint8Array" : typeof (sp as any).genesisHash,
-    genesisHash_len: (sp as any).genesisHash instanceof Uint8Array ? (sp as any).genesisHash.length : String((sp as any).genesisHash || "").length,
-    genesisHashBytes_len: (sp as any).genesisHashBytes?.length,
+    genesisHash_type: typeof (sp as any).genesisHash,
+    genesisHash_len: String((sp as any).genesisHash || "").length,
     genesisID: (sp as any).genesisID, flatFee: (sp as any).flatFee, minFee: (sp as any).minFee,
   });
   const appArgs = [str("set_phase"), u64(phase)];
@@ -414,11 +418,13 @@ export async function investFlow(args: {
 
   // -------- PARAMS FETCH (normalized) --------
   const sp: any = await getParamsNormalized();
+  if (typeof (sp as any).genesisHash !== "string") {
+    throw new Error("[tx] normalized params must have string genesisHash");
+  }
   console.info("[tx] using params", {
     fee: sp.fee, firstRound: (sp as any).firstRound, lastRound: (sp as any).lastRound,
-    genesisHash_type: (sp as any).genesisHash instanceof Uint8Array ? "Uint8Array" : typeof (sp as any).genesisHash,
-    genesisHash_len: (sp as any).genesisHash instanceof Uint8Array ? (sp as any).genesisHash.length : String((sp as any).genesisHash || "").length,
-    genesisHashBytes_len: (sp as any).genesisHashBytes?.length,
+    genesisHash_type: typeof (sp as any).genesisHash,
+    genesisHash_len: String((sp as any).genesisHash || "").length,
     genesisID: (sp as any).genesisID, flatFee: (sp as any).flatFee, minFee: (sp as any).minFee,
   });
 
