@@ -427,12 +427,13 @@ export async function investFlow(args: {
     if (!algosdk.isValidAddress(fromAddr)) throw new Error(`invalid from address ${fromAddr}`);
     if (!algosdk.isValidAddress(toAddr)) throw new Error(`invalid to address ${toAddr}`);
     console.info("[investFlow] build payment", { from_type: typeof fromAddr, to_type: typeof toAddr });
-    pay = (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject({
-      from: fromAddr,
-      to: toAddr,
-      amount: s,
-      suggestedParams: sp,
-    } as any);
+    const makePayFn = (algosdk as any).makePaymentTxnWithSuggestedParams ?? (algosdk as any).makePaymentTxnWithSuggestedParamsFromObject;
+    if ((algosdk as any).makePaymentTxnWithSuggestedParams) {
+      // Legacy/compatible signature
+      pay = (algosdk as any).makePaymentTxnWithSuggestedParams(fromAddr, toAddr, s, undefined, undefined, sp);
+    } else {
+      pay = makePayFn({ from: fromAddr, to: toAddr, amount: s, suggestedParams: sp } as any);
+    }
   } catch (e: any) {
     throw new Error(`${TAG} build Payment failed (from=${short(senderResolved)} to=${short(appAddr)} amount=${s}): ${e?.message || e}`);
   }
