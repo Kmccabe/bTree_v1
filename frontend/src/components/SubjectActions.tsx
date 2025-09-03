@@ -729,10 +729,17 @@ function SubjectActionsInner() {
             (()=>{
               const ok = funds.balance >= APP_FUND_THRESHOLD;
               const algo = (funds.balance / 1_000_000).toFixed(6);
+              const tVal = (() => { const g:any = pair.globals as any; return (g && typeof g.t === 'number') ? Number(g.t) : 0; })();
+              const needsFunding = tVal > 0 && (funds.balance ?? 0) < tVal;
               return (
                 <div>
                   App balance: {ok ? <span className="text-green-600">OK (≥ 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs ≥ 0.20 ALGO)</span>} · {algo} ALGO
-                  {!ok && appAddrPreview && (
+                  {needsFunding && (
+                    <div className="mt-1 text-amber-700">
+                      App underfunded. Needs ≥ {tVal.toLocaleString()} µAlgos before Subject 2 can return. Use the QR below to fund.
+                    </div>
+                  )}
+                  {((!ok) || needsFunding) && appAddrPreview && (
                     <div className="mt-1">
                       <div className="flex items-center gap-2">
                         <code className="break-all">{appAddrPreview}</code>
@@ -783,6 +790,17 @@ function SubjectActionsInner() {
               Local (subject): s = {pair.local.s ?? 0}, done = {pair.local.done ?? 0}
             </div>
           )}
+          <div className="mt-1">
+            {(() => {
+              const g:any = pair.globals as any;
+              const tVal = g && typeof g.t === 'number' ? Number(g.t) : 0;
+              return (
+                <>
+                  Available for Subject 2: {tVal > 0 ? tVal.toLocaleString() : '—'} µAlgos (3 × s)
+                </>
+              );
+            })()}
+          </div>
         </div>
       )}
 
