@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useContext, useCallback } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { Buffer } from "buffer";
@@ -7,8 +7,122 @@ import { resolveAppId, setSelectedAppId, getSelectedAppId, clearSelectedAppId } 
 import { getAccountBalanceMicroAlgos } from "../chain/balance";
 import { QRCodeCanvas } from "qrcode.react";
 
+// ---------------------- Tiny local toast system (no deps) ----------------------
+type ToastKind = "info" | "success" | "error";
+type ToastAction = { label: string; href: string };
+type ToastItem = {
+  id: string;
+  kind: ToastKind;
+  title: string;
+  description?: string;
+  actions?: ToastAction[];
+  createdAt: number;
+};
+
+type ToastShowArgs = { title: string; description?: string; kind?: ToastKind; actions?: ToastAction[] };
+
+const ToastContext = React.createContext<{
+  show: (args: ToastShowArgs) => { id: string };
+  remove: (id: string) => void;
+  toasts: ToastItem[];
+} | null>(null);
+
+function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const remove = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+    const handle = timeouts.current[id];
+    if (handle) {
+      clearTimeout(handle);
+      delete timeouts.current[id];
+    }
+  }, []);
+
+  const show = useCallback((args: ToastShowArgs) => {
+    const id = Math.random().toString(36).slice(2);
+    const kind: ToastKind = (args.kind as ToastKind) || "info";
+    const item: ToastItem = {
+      id,
+      kind,
+      title: args.title,
+      description: args.description,
+      actions: args.actions,
+      createdAt: Date.now(),
+    };
+    setToasts((prev) => [...prev, item]);
+    const ms = kind === "error" ? 8000 : 5000;
+    const h = setTimeout(() => remove(id), ms);
+    timeouts.current[id] = h;
+    return { id };
+  }, [remove]);
+
+  return (
+    <ToastContext.Provider value={{ show, remove, toasts }}>
+      {children}
+    </ToastContext.Provider>
+  );
+}
+
+function useToast() {
+  const ctx = useContext(ToastContext);
+  if (!ctx) {
+    return {
+      show: (_args: ToastShowArgs) => ({ id: "noop" }),
+      remove: (_id: string) => {},
+    } as const;
+  }
+  return { show: ctx.show, remove: ctx.remove } as const;
+}
+
+function ToastHost() {
+  const ctx = useContext(ToastContext);
+  if (!ctx) return null;
+  const { toasts, remove } = ctx;
+  return (
+    <div style={{ position: "absolute", bottom: 8, right: 8, zIndex: 10000, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+      {toasts.map((t) => (
+        <div key={t.id} style={{ pointerEvents: "auto", minWidth: 240, maxWidth: 360 }} className={`rounded-md border shadow-sm px-3 py-2 text-sm bg-white ${t.kind === 'error' ? 'border-red-300' : t.kind === 'success' ? 'border-green-300' : 'border-neutral-200'}`}>
+          <div className="flex items-start gap-2">
+            <div className={`mt-1 h-2 w-2 rounded-full ${t.kind === 'error' ? 'bg-red-500' : t.kind === 'success' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+            <div className="flex-1">
+              <div className="font-semibold text-neutral-800">{t.title}</div>
+              {t.description && <div className="text-neutral-700 text-xs mt-0.5">{t.description}</div>}
+              {Array.isArray(t.actions) && t.actions.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {t.actions.map((a, i) => (
+                    <a key={i} href={a.href} target="_blank" rel="noreferrer" className="text-xs underline text-blue-700">
+                      {a.label}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button onClick={() => remove(t.id)} className="ml-2 text-neutral-500 hover:text-neutral-800" aria-label="Dismiss" title="Dismiss">
+              ×
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function loraTxUrl(txId: string) { return `https://lora.algorand.foundation/tx/${txId}?network=testnet`; }
+
+// ---------------------- Component ----------------------
 export default function SubjectActions() {
+  return (
+    <ToastProvider>
+      <SubjectActionsInner />
+    </ToastProvider>
+  );
+}
+
+function SubjectActionsInner() {
   const { activeAddress, signTransactions } = useWallet();
+  const toast = useToast();
 
   // inputs
   // Leave blank by default; rely on resolveAppId() for behavior (selected or env fallback)
@@ -301,6 +415,28 @@ export default function SubjectActions() {
     }
   }
 
+  function parseLogicError(msgIn: string): { reason: string; pc?: number } {
+    let raw = msgIn || "";
+    // Try to extract JSON { message, pc }
+    try {
+      const first = raw.indexOf("{");
+      const last = raw.lastIndexOf("}");
+      if (first !== -1 && last !== -1 && last > first) {
+        const obj = JSON.parse(raw.slice(first, last + 1));
+        if (typeof obj?.message === "string") raw = obj.message;
+      }
+    } catch {}
+    let pc: number | undefined;
+    try {
+      const m = raw.match(/pc\s*=\s*(\d+)/i);
+      if (m && m[1]) pc = Number(m[1]);
+    } catch {}
+    const lower = raw.toLowerCase();
+    const friendlyRepeat = pc === 209 || (lower.includes("assert") && raw.includes("=="));
+    const reason = friendlyRepeat ? "Already invested (done == 1)" : (raw.replace(/^.*?:\s*/, "").trim() || "Transaction rejected");
+    return { reason, pc };
+  }
+
   async function doInvest() {
     setErr(null);
     if (!activeAddress) return setErr("Connect wallet as subject.");
@@ -316,17 +452,54 @@ export default function SubjectActions() {
       const id = resolveAppId();
       console.info("[appId] resolved =", id);
       console.debug("[SubjectActions] invest submit", { sender: activeAddress, appId: id, s });
-      const r = await investFlow({
+      // Toast: submitted (pending)
+      toast.show({ kind: 'info', title: 'Invest submitted', description: 'Pending confirmation…' });
+
+      const r: any = await investFlow({
         sender: activeAddress,
         appId: id,
         s,
         sign: (u) => signTransactions(u),
+        wait: false,
       });
-      console.debug("[SubjectActions] invest result", r);
-      setLastTx(r.txId);
+      console.debug("[SubjectActions] invest result (/api/submit)", r);
+      const singleTxId: string = r?.txId;
+      setLastTx(singleTxId || null);
+
+      // Capture both txids if the API returns them; otherwise fall back to single.
+      const paymentTxId: string | undefined = r?.paymentTxId || r?.payTxId || r?.paymentTxID;
+      const appCallTxId: string | undefined = r?.appCallTxId || r?.appTxId || r?.appCallTxID;
+      const actions = (() => {
+        const arr: { label: string; href: string }[] = [];
+        if (appCallTxId) arr.push({ label: 'View AppCall', href: loraTxUrl(appCallTxId) });
+        if (paymentTxId) arr.push({ label: 'View Payment', href: loraTxUrl(paymentTxId) });
+        if (arr.length === 0 && singleTxId) arr.push({ label: 'View on LoRA', href: loraTxUrl(singleTxId) });
+        return arr;
+      })();
+      // Toast: submitted with links
+      toast.show({ kind: 'info', title: 'Invest submitted', description: 'Awaiting on-chain confirmation…', actions });
+
+      // Now wait for confirmation ourselves so we can toast success.
+      const pendR = await fetch(`/api/pending?txid=${encodeURIComponent(singleTxId)}`);
+      const pendText = await pendR.text();
+      console.info('[SubjectActions] /api/pending', pendR.status, pendText);
+      if (!pendR.ok) {
+        const { reason } = parseLogicError(pendText);
+        toast.show({ kind: 'error', title: 'Invest rejected', description: reason });
+        return;
+      }
+      let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
+      const confirmedRound: number | undefined = pend?.["confirmed-round"] ?? pend?.confirmedRound;
+      if (confirmedRound && Number.isFinite(confirmedRound)) {
+        const successActions = actions.length ? actions : (singleTxId ? [{ label: 'View on LoRA', href: loraTxUrl(singleTxId) }] : []);
+        toast.show({ kind: 'success', title: 'Invest confirmed', description: `Round ${confirmedRound}`, actions: successActions });
+      }
     } catch (e: any) {
       console.error("[SubjectActions] invest failed", e);
-      setErr(e?.message || String(e));
+      const msg = e?.message || String(e);
+      const { reason } = parseLogicError(msg);
+      toast.show({ kind: 'error', title: 'Invest rejected', description: reason });
+      setErr(msg);
     } finally {
       setBusy(null);
     }
@@ -342,7 +515,7 @@ export default function SubjectActions() {
     Number(sInput) > E;
 
   return (
-    <div className="rounded-2xl border p-4 space-y-3">
+    <div className="rounded-2xl border p-4 space-y-3" style={{ position: "relative" }}>
       <h3 className="text-lg font-semibold">Subject — Invest</h3>
 
       {/* App ID + read */}
@@ -489,6 +662,7 @@ export default function SubjectActions() {
       <p className="text-xs text-neutral-500">
         Requires: phase = 2, subject opted-in, 2-txn group, s multiple of UNIT, 0 ≤ s ≤ E.
       </p>
+      <ToastHost />
     </div>
   );
 }
