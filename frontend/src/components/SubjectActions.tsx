@@ -209,7 +209,6 @@ function SubjectActionsInner() {
   const [inlineStatus, setInlineStatus] = useState<{ phase: 'submitted' | 'confirmed' | 'rejected'; text: string; round?: number; txId?: string; appCallTxId?: string; paymentTxId?: string } | null>(null);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   // Subject — Return form/state
-  const [returnS1, setReturnS1] = useState<string>("");
   const [returnRInput, setReturnRInput] = useState<string>("");
   const [returnStatus, setReturnStatus] = useState<{ phase: 'submitted' | 'confirmed' | 'rejected'; text: string; round?: number; txId?: string } | null>(null);
 
@@ -620,7 +619,7 @@ function SubjectActionsInner() {
   const rValid = Number.isInteger(rNum) && rNum >= 0 && rNum <= globalsTVal;
   const hasFundsInfo = typeof funds.balance === 'number';
   const underfundedForReturn = globalsTVal > 0 && hasFundsInfo && (funds.balance as number) < globalsTVal;
-  const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || globalsTVal <= 0 || globalsRet === 1 || !rValid || underfundedForReturn || !returnS1 || returnS1.length < 58;
+  const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || globalsTVal <= 0 || globalsRet === 1 || !rValid || underfundedForReturn;
 
   async function doReturn() {
     setErr(null);
@@ -630,8 +629,6 @@ function SubjectActionsInner() {
     if (!(t > 0)) return setErr("Nothing available to return (t == 0).");
     const r = Number(returnRInput || "0");
     if (!Number.isInteger(r) || r < 0 || r > t) return setErr(`Enter r in range 0..${t}.`);
-    const s1 = returnS1.trim();
-    if (s1.length < 58) return setErr("Enter S1 address.");
     if (hasFundsInfo && underfundedForReturn) return setErr("App underfunded; check funds.");
 
     setBusy('return');
@@ -641,7 +638,7 @@ function SubjectActionsInner() {
       // Toast + status
       setReturnStatus({ phase: 'submitted', text: 'Return submitted… (waiting for confirmation)' });
       const activityId = Math.random().toString(36).slice(2);
-      setActivity(prev => [{ id: activityId, ts: Date.now(), status: 'submitted' as const, op: 'return', rAmount: r, tAmount: t, s1 } as ActivityEntry, ...prev].slice(0, 5));
+      setActivity(prev => [{ id: activityId, ts: Date.now(), status: 'submitted' as const, op: 'return', rAmount: r, tAmount: t } as ActivityEntry, ...prev].slice(0, 5));
       toast.show({ kind: 'info', title: 'Return submitted', description: 'Pending confirmation…' });
 
       const sp: any = await getParamsNormalized();
@@ -650,7 +647,6 @@ function SubjectActionsInner() {
         sender: senderResolved,
         appIndex: id,
         appArgs: [str('return'), u64(r)],
-        accounts: [s1],
         suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
       });
       const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
@@ -908,10 +904,16 @@ function SubjectActionsInner() {
             {(() => {
               const g:any = pair.globals as any;
               const tVal = g && typeof g.t === 'number' ? Number(g.t) : 0;
+              const s1 = g && typeof g.s1 === 'string' ? g.s1 : '';
               return (
-                <>
-                  Available for Subject 2: {tVal > 0 ? tVal.toLocaleString() : '—'} µAlgos (3 × s)
-                </>
+                <div className="space-y-1">
+                  <div>Available for Subject 2: {tVal > 0 ? tVal.toLocaleString() : '—'} µAlgos (3 × s)</div>
+                  {s1 && (
+                    <div>
+                      S1 (investor): <code className="break-all">{s1}</code>
+                    </div>
+                  )}
+                </div>
               );
             })()}
           </div>
@@ -945,15 +947,7 @@ function SubjectActionsInner() {
       <div className="mt-4 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Subject — Return</h4>
         <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '—'} µAlgos (3 × s)</div>
-        <div className="flex items-center gap-2 text-sm">
-          <span>S1 address:</span>
-          <input
-            className="border rounded px-2 py-1 w-96"
-            placeholder="Investor S1 address"
-            value={returnS1}
-            onChange={(e)=> setReturnS1(e.target.value)}
-          />
-        </div>
+        {/* No S1 input needed; contract tracks S1 globally */}
         <div className="flex items-center gap-2 text-sm">
           <span>r (µAlgos):</span>
           <input

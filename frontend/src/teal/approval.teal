@@ -232,6 +232,12 @@ invest:
   load 6
   app_global_put
 
+  // persist S1 address globally for Return path
+  txn Sender
+  byte "s1"
+  swap
+  app_global_put
+
   txn Sender
   byte "done"
   int 1
@@ -309,21 +315,10 @@ retpath:
   <=
   assert
 
-  // S1 = Accounts[0], validate it's the investor: local.t(S1) == global.t and done == 1
-  txna Accounts 0       // push S1
-  dup                   // keep a copy for later
-  byte "t"
-  app_local_get         // read S1.local.t
-  load 10
-  ==
-  assert
-  dup                   // duplicate S1 again for done check
-  byte "done"
-  app_local_get
-  int 1
-  ==
-  assert
-  store 12              // save S1 address for payouts
+  // Load S1 from global and use as receiver for r
+  byte "s1"
+  app_global_get
+  store 12              // S1 address
 
   // Solvency: app_liquid >= t
   global CurrentApplicationAddress

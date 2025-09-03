@@ -85,7 +85,7 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
       approvalProgram: approvalProg,
       clearProgram: clearProg,
       // Schema must accommodate globals written at create and local used later
-      numGlobalByteSlices: 0,
+      numGlobalByteSlices: 1, // s1
       numGlobalInts: 6, // E, m, UNIT, phase, t, ret
       numLocalByteSlices: 0,
       numLocalInts: 3,  // s, done, t
@@ -180,7 +180,7 @@ export async function deployTrustGame(args: {
     onComplete: algosdk.OnApplicationComplete.NoOpOC,
     approvalProgram: approvalProg,
     clearProgram: clearProg,
-    numGlobalByteSlices: 0,
+    numGlobalByteSlices: 1, // s1
     numGlobalInts: 6, // E, m, UNIT, phase, t, ret
     numLocalByteSlices: 0,
     numLocalInts: 3,  // s, done, t
