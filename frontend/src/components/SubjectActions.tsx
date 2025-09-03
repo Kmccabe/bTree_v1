@@ -10,20 +10,13 @@ export default function SubjectActions() {
   const { activeAddress, signTransactions } = useWallet();
 
   // inputs
-  const [appIdIn, setAppIdIn] = useState<string>("");
-  // Initialize App ID input from selected/global value if available
-  useEffect(() => {
-    if (!appIdIn) {
-      const sel = getSelectedAppId();
-      if (sel && Number.isInteger(sel) && sel > 0) {
-        setAppIdIn(String(sel));
-      } else {
-        const raw = (import.meta as any)?.env?.VITE_TESTNET_APP_ID as string | undefined;
-        const parsed = raw != null ? Number(raw) : NaN;
-        if (Number.isInteger(parsed) && parsed > 0) setAppIdIn(String(parsed));
-      }
-    }
-  }, [appIdIn]);
+  const [appIdIn, setAppIdIn] = useState<string>(() => {
+    const sel = getSelectedAppId();
+    if (sel && Number.isInteger(sel) && sel > 0) return String(sel);
+    const raw = (import.meta as any)?.env?.VITE_TESTNET_APP_ID as string | undefined;
+    const parsed = raw != null ? Number(raw) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? String(parsed) : "";
+  });
   const [unit, setUnit] = useState<number>(1000);
   const [E, setE] = useState<number>(100000);
 
