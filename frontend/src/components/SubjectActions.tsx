@@ -154,22 +154,48 @@ export default function SubjectActions() {
       ? (((import.meta as any).env?.VITE_MAINNET_ALGOD_TOKEN as string) || "")
       : (((import.meta as any).env?.VITE_TESTNET_ALGOD_TOKEN as string) || "");
     const client = new (algosdk as any).Algodv2(token, server, "");
-    const ai = await client.accountApplicationInformation(subjectAddr, appId).do();
-    const kv: any[] = ai?.["app-local-state"]?.["key-value"] || ai?.["key-value"] || [];
-    let localS = 0;
-    let localDone = 0;
     const b64ToStr = (b64: string): string => {
       try { return Buffer.from(b64, 'base64').toString('utf8'); } catch { /* noop */ }
       try { return decodeURIComponent(escape(atob(b64))); } catch { return ""; }
     };
-    for (const entry of kv) {
-      const keyB64 = String(entry?.key ?? "");
-      const k = b64ToStr(keyB64);
-      const v = entry?.value;
-      if (k === 's' && v?.type === 2) localS = Number(v?.uint ?? 0);
-      if (k === 'done' && v?.type === 2) localDone = Number(v?.uint ?? 0);
+    const parseKv = (kvIn: any[]): { s: number; done: number } => {
+      let localS = 0;
+      let localDone = 0;
+      for (const entry of kvIn || []) {
+        const keyB64 = String(entry?.key ?? "");
+        const k = b64ToStr(keyB64);
+        const v = entry?.value;
+        if (k === 's' && v?.type === 2) localS = Number(v?.uint ?? 0);
+        if (k === 'done' && v?.type === 2) localDone = Number(v?.uint ?? 0);
+      }
+      return { s: localS, done: localDone };
+    };
+
+    // Primary: algod
+    try {
+      const ai = await client.accountApplicationInformation(subjectAddr, appId).do();
+      const kvAlgod: any[] = ai?.["app-local-state"]?.["key-value"] || ai?.["key-value"] || [];
+      const parsed = parseKv(kvAlgod);
+      if (parsed.s !== 0 || parsed.done !== 0 || (Array.isArray(kvAlgod) && kvAlgod.length > 0)) {
+        return parsed;
+      }
+    } catch (e) {
+      // swallow and try indexer
     }
-    return { s: localS, done: localDone };
+
+    // Fallback: indexer
+    try {
+      const idxBase = ((import.meta as any).env?.VITE_TESTNET_INDEXER_URL as string) || "https://testnet-idx.algonode.cloud";
+      const url = `${idxBase.replace(/\/$/, "")}/v2/accounts/${subjectAddr}/applications/${appId}`;
+      const r = await fetch(url);
+      const j = await r.json();
+      const kvIdx: any[] = j?.["app-local-state"]?.["key-value"] || [];
+      return parseKv(kvIdx);
+    } catch {
+      // final fallback: zeros
+    }
+
+    return { s: 0, done: 0 };
   }
 
   // Eagerly seed local state whenever appId/address changes
