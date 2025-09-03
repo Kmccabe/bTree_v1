@@ -3,6 +3,8 @@ import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { investFlow, optInApp } from "../chain/tx";
 import { resolveAppId, setSelectedAppId, getSelectedAppId } from "../state/appId";
+import { getAccountBalanceMicroAlgos } from "../chain/balance";
+import { QRCodeCanvas } from "qrcode.react";
 
 export default function SubjectActions() {
   const { activeAddress, signTransactions } = useWallet();
@@ -32,6 +34,9 @@ export default function SubjectActions() {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [lastTx, setLastTx] = useState<string | null>(null);
+  const [funds, setFunds] = useState<{ balance?: number; checking: boolean; error?: string }>({ checking: false });
+
+  const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
 
   // helpers
   const connected = activeAddress || "(not connected)";
@@ -66,6 +71,22 @@ export default function SubjectActions() {
       setErr(e?.message || String(e));
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function checkFunds() {
+    setFunds({ checking: true });
+    setErr(null);
+    try {
+      const id = resolveAppId();
+      console.info("[appId] resolved =", id);
+      const addr = (algosdk as any).getApplicationAddress(id)?.toString?.() || (algosdk as any).getApplicationAddress(id);
+      if (!addr || !algosdk.isValidAddress(addr)) throw new Error("Derived app address invalid");
+      const balance = await getAccountBalanceMicroAlgos(addr);
+      setFunds({ checking: false, balance });
+    } catch (e: any) {
+      console.error("[SubjectActions] checkFunds failed", e);
+      setFunds({ checking: false, error: e?.message || String(e) });
     }
   }
 
@@ -134,6 +155,7 @@ export default function SubjectActions() {
 
   const investDisabled =
     !!busy || !activeAddress || !hasResolvedAppId ||
+    (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) ||
     !/^\d+$/.test(sInput || "0") ||
     Number(sInput) % unit !== 0 ||
     Number(sInput) > E;
@@ -162,6 +184,9 @@ export default function SubjectActions() {
         <button className="text-xs underline" onClick={doOptIn} disabled={!!busy || !activeAddress || !hasResolvedAppId}>
           {busy === "optin" ? "Opting in…" : "Opt-In"}
         </button>
+        <button className="text-xs underline" onClick={checkFunds} disabled={!!busy || !hasResolvedAppId || funds.checking}>
+          {funds.checking ? "Checking…" : "Check funds"}
+        </button>
       </div>
 
       {/* Connected + derived app address */}
@@ -170,6 +195,36 @@ export default function SubjectActions() {
         {appAddrPreview && <> · App Address: <code>{appAddrPreview}</code></>}
         <span className="ml-2">UNIT: {unit} · E: {E}</span>
       </div>
+
+      {/* Funds status */}
+      {(typeof funds.balance === 'number' || funds.error) && (
+        <div className="text-xs text-neutral-700">
+          {typeof funds.balance === 'number' ? (
+            (()=>{
+              const ok = funds.balance >= APP_FUND_THRESHOLD;
+              const algo = (funds.balance / 1_000_000).toFixed(6);
+              return (
+                <div>
+                  App balance: {ok ? <span className="text-green-600">OK (≥ 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs ≥ 0.20 ALGO)</span>} · {algo} ALGO
+                  {!ok && appAddrPreview && (
+                    <div className="mt-1">
+                      <div className="flex items-center gap-2">
+                        <code className="break-all">{appAddrPreview}</code>
+                        <button className="text-xs underline" onClick={() => navigator.clipboard.writeText(appAddrPreview)}>Copy</button>
+                      </div>
+                      <div className="mt-2">
+                        <QRCodeCanvas value={appAddrPreview} size={128} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : (
+            <span className="text-red-600">{funds.error}</span>
+          )}
+        </div>
+      )}
 
       {/* s input + invest */}
       <div className="flex items-center gap-2 text-sm">
@@ -187,6 +242,9 @@ export default function SubjectActions() {
           disabled={investDisabled}>
           {busy==="invest" ? "Investing…" : "Invest"}
         </button>
+        {(typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
+          <span className="text-xs text-amber-600">App balance low; needs ≥ 0.20 ALGO</span>
+        )}
       </div>
 
       {lastTx && <div className="text-xs">TxID: <code>{lastTx}</code></div>}

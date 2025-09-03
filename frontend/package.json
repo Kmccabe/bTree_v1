@@ -13,6 +13,7 @@
     "@perawallet/connect": "^1.4.2",
     "algosdk": "^3.4.0",
     "qrcode": "^1.5.3",
+    "qrcode.react": "^3.1.0",
     "buffer": "^6.0.3",
     "process": "^0.11.10",
     "react": "^18.2.0",
