@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
+import { Buffer } from "buffer";
 import { investFlow, optInApp } from "../chain/tx";
 import { resolveAppId, setSelectedAppId, getSelectedAppId, clearSelectedAppId } from "../state/appId";
 import { getAccountBalanceMicroAlgos } from "../chain/balance";
@@ -121,6 +122,7 @@ export default function SubjectActions() {
 
       const { senderResolved } = resolveSender();
       const { s, done } = await fetchSubjectLocal(id, senderResolved);
+      console.info('[pair/local]', senderResolved, { s, done });
       const local = { s, done };
 
       setPair({ loading: false, error: null, globals, local });
@@ -154,15 +156,20 @@ export default function SubjectActions() {
     const client = new (algosdk as any).Algodv2(token, server, "");
     const ai = await client.accountApplicationInformation(subjectAddr, appId).do();
     const kv: any[] = ai?.["app-local-state"]?.["key-value"] || ai?.["key-value"] || [];
-    const localMap: Record<string, any> = {};
+    let localS = 0;
+    let localDone = 0;
+    const b64ToStr = (b64: string): string => {
+      try { return Buffer.from(b64, 'base64').toString('utf8'); } catch { /* noop */ }
+      try { return decodeURIComponent(escape(atob(b64))); } catch { return ""; }
+    };
     for (const entry of kv) {
       const keyB64 = String(entry?.key ?? "");
-      let key = "";
-      try { key = atob(keyB64); } catch { try { key = (typeof Buffer !== 'undefined' ? Buffer.from(keyB64, 'base64').toString('utf8') : ""); } catch { key = ""; } }
+      const k = b64ToStr(keyB64);
       const v = entry?.value;
-      if (v?.type === 2) localMap[key] = Number(v?.uint ?? 0);
+      if (k === 's' && v?.type === 2) localS = Number(v?.uint ?? 0);
+      if (k === 'done' && v?.type === 2) localDone = Number(v?.uint ?? 0);
     }
-    return { s: Number(localMap.s ?? 0), done: Number(localMap.done ?? 0) };
+    return { s: localS, done: localDone };
   }
 
   // Eagerly seed local state whenever appId/address changes
