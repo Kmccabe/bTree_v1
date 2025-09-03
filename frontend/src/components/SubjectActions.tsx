@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { investFlow, optInApp } from "../chain/tx";
@@ -51,6 +51,18 @@ export default function SubjectActions() {
       appAddrPreview = typeof raw === "string" ? raw : raw?.toString?.();
     }
   } catch { /* ignore */ }
+
+  // Always-computed app account details (independent of funds state)
+  const resolvedIdForAccount = useMemo(() => {
+    try { return resolveAppId(); } catch { return undefined; }
+  }, [appIdIn]);
+  const appAccountAddr = useMemo(() => {
+    if (!resolvedIdForAccount || !Number.isInteger(resolvedIdForAccount) || resolvedIdForAccount <= 0) return "";
+    try {
+      const raw = (algosdk as any).getApplicationAddress(resolvedIdForAccount);
+      return typeof raw === "string" ? raw : raw?.toString?.();
+    } catch { return ""; }
+  }, [resolvedIdForAccount]);
 
   async function loadGlobals() {
     setErr(null);
@@ -188,6 +200,21 @@ export default function SubjectActions() {
           {funds.checking ? "Checking…" : "Check funds"}
         </button>
       </div>
+
+      {/* App account (always visible when resolvable) */}
+      {appAccountAddr && (
+        <div className="text-xs text-neutral-700">
+          <div className="font-semibold mb-1">App account</div>
+          <div className="flex items-center gap-2">
+            <code className="break-all">{appAccountAddr}</code>
+            <button className="text-xs underline" onClick={() => navigator.clipboard.writeText(appAccountAddr)}>Copy</button>
+            <a className="text-xs underline" href={`https://testnet.algoexplorer.io/address/${appAccountAddr}`} target="_blank" rel="noreferrer">Open in AlgoExplorer (TestNet)</a>
+          </div>
+          <div className="mt-2">
+            <QRCodeCanvas value={appAccountAddr} size={128} />
+          </div>
+        </div>
+      )}
 
       {/* Connected + derived app address */}
       <div className="text-xs text-neutral-600">
