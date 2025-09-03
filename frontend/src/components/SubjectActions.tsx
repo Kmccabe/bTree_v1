@@ -261,7 +261,7 @@ export default function SubjectActions() {
           <div className="flex items-center gap-2">
             <code className="break-all">{appAccountAddr}</code>
             <button className="text-xs underline" onClick={() => navigator.clipboard.writeText(appAccountAddr)}>Copy</button>
-            <a className="text-xs underline" href={`https://lora.algorand.foundation/address/${appAccountAddr}?network=testnet`} target="_blank" rel="noreferrer">Open in LoRA (TestNet)</a>
+            <a className="text-xs underline" href={`https://lora.algokit.io/testnet/address/${appAccountAddr}`} target="_blank" rel="noreferrer">Open in LoRA (TestNet)</a>
           </div>
           <div className="mt-2">
             <QRCodeCanvas value={appAccountAddr} size={128} />
