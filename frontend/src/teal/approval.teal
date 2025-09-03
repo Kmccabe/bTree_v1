@@ -208,6 +208,23 @@ invest:
   byte "s"
   load 0
   app_local_put
+
+  // compute t = 3 * s and persist to local (mirror) and global
+  // assume s in scratch slot 0
+  load 0
+  int 3
+  mul                 // 3*s
+  dup                 // duplicate for local+global stores
+  // local mirror: sender.t = 3*s
+  txn Sender
+  byte "t"
+  swap                // bring value under key
+  app_local_put
+  // global: t = 3*s
+  byte "t"
+  swap
+  app_global_put
+
   txn Sender
   byte "done"
   int 1
