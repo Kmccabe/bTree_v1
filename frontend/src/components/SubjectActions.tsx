@@ -24,6 +24,8 @@ export default function SubjectActions() {
   const [lastTx, setLastTx] = useState<string | null>(null);
   const [funds, setFunds] = useState<{ balance?: number; checking: boolean; error?: string }>({ checking: false });
   const [pair, setPair] = useState<{ loading: boolean; error?: string | null; globals?: Record<string, any> | null; local?: { s?: number; done?: number } | null }>({ loading: false, error: null, globals: null, local: null });
+  const [localDone, setLocalDone] = useState<number | undefined>(undefined);
+  const [localS, setLocalS] = useState<number | undefined>(undefined);
 
   const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
 
@@ -67,6 +69,14 @@ export default function SubjectActions() {
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
       setUnit(Number(j?.globals?.UNIT ?? 1000));
       setE(Number(j?.globals?.E ?? 100000));
+
+      // also refresh subject local to keep Invest gating accurate
+      try {
+        const { senderResolved } = resolveSender();
+        const { s, done } = await fetchSubjectLocal(id, senderResolved);
+        setLocalS(s);
+        setLocalDone(done);
+      } catch {}
     } catch (e: any) {
       console.error("[SubjectActions] loadGlobals failed", e);
       setErr(e?.message || String(e));
@@ -109,43 +119,65 @@ export default function SubjectActions() {
         if (typeof globals.E === 'number') setE(Number(globals.E));
       }
 
-      // Resolve subject address (investFlow style)
-      const w: any = (globalThis as any) || {};
-      const senderResolved =
-        (typeof activeAddress === "string" && activeAddress) ||
-        (activeAddress as any)?.address ||
-        w.activeAddress ||
-        (w.wallet?.accounts?.[0]?.address ?? "");
-      if (!senderResolved) throw new Error("No connected subject address");
-
-      // Fetch local state from algod
-      const net = ((import.meta as any).env?.VITE_NETWORK as string | undefined)?.toUpperCase?.() || "TESTNET";
-      const server = net === 'MAINNET'
-        ? (((import.meta as any).env?.VITE_MAINNET_ALGOD_URL as string) || "https://mainnet-api.algonode.cloud")
-        : (((import.meta as any).env?.VITE_TESTNET_ALGOD_URL as string) || "https://testnet-api.algonode.cloud");
-      const token = net === 'MAINNET'
-        ? (((import.meta as any).env?.VITE_MAINNET_ALGOD_TOKEN as string) || "")
-        : (((import.meta as any).env?.VITE_TESTNET_ALGOD_TOKEN as string) || "");
-
-      const client = new (algosdk as any).Algodv2(token, server, "");
-      const ai = await client.accountApplicationInformation(senderResolved, id).do();
-      const kv: any[] = ai?.["app-local-state"]?.["key-value"] || ai?.["key-value"] || [];
-      const localMap: Record<string, any> = {};
-      for (const entry of kv) {
-        const keyB64 = String(entry?.key ?? "");
-        let key = "";
-        try { key = atob(keyB64); } catch { try { key = (typeof Buffer !== 'undefined' ? Buffer.from(keyB64, 'base64').toString('utf8') : ""); } catch { key = ""; } }
-        const v = entry?.value;
-        if (v?.type === 2) localMap[key] = Number(v?.uint ?? 0);
-      }
-      const local = { s: Number(localMap.s ?? 0), done: Number(localMap.done ?? 0) };
+      const { senderResolved } = resolveSender();
+      const { s, done } = await fetchSubjectLocal(id, senderResolved);
+      const local = { s, done };
 
       setPair({ loading: false, error: null, globals, local });
+      setLocalS(local.s);
+      setLocalDone(local.done);
     } catch (e: any) {
       console.error("[SubjectActions] readPairStates failed", e);
       setPair({ loading: false, error: e?.message || String(e), globals: null, local: null });
     }
   }
+
+  // helper to resolve sender like investFlow
+  function resolveSender(): { senderResolved: string } {
+    const w: any = (globalThis as any) || {};
+    const senderResolved =
+      (typeof activeAddress === "string" && activeAddress) ||
+      (activeAddress as any)?.address ||
+      w.activeAddress ||
+      (w.wallet?.accounts?.[0]?.address ?? "");
+    return { senderResolved };
+  }
+
+  async function fetchSubjectLocal(appId: number, subjectAddr: string): Promise<{ s: number; done: number }> {
+    const net = ((import.meta as any).env?.VITE_NETWORK as string | undefined)?.toUpperCase?.() || "TESTNET";
+    const server = net === 'MAINNET'
+      ? (((import.meta as any).env?.VITE_MAINNET_ALGOD_URL as string) || "https://mainnet-api.algonode.cloud")
+      : (((import.meta as any).env?.VITE_TESTNET_ALGOD_URL as string) || "https://testnet-api.algonode.cloud");
+    const token = net === 'MAINNET'
+      ? (((import.meta as any).env?.VITE_MAINNET_ALGOD_TOKEN as string) || "")
+      : (((import.meta as any).env?.VITE_TESTNET_ALGOD_TOKEN as string) || "");
+    const client = new (algosdk as any).Algodv2(token, server, "");
+    const ai = await client.accountApplicationInformation(subjectAddr, appId).do();
+    const kv: any[] = ai?.["app-local-state"]?.["key-value"] || ai?.["key-value"] || [];
+    const localMap: Record<string, any> = {};
+    for (const entry of kv) {
+      const keyB64 = String(entry?.key ?? "");
+      let key = "";
+      try { key = atob(keyB64); } catch { try { key = (typeof Buffer !== 'undefined' ? Buffer.from(keyB64, 'base64').toString('utf8') : ""); } catch { key = ""; } }
+      const v = entry?.value;
+      if (v?.type === 2) localMap[key] = Number(v?.uint ?? 0);
+    }
+    return { s: Number(localMap.s ?? 0), done: Number(localMap.done ?? 0) };
+  }
+
+  // Eagerly seed local state whenever appId/address changes
+  useEffect(() => {
+    (async () => {
+      try {
+        const id = resolveAppId();
+        const { senderResolved } = resolveSender();
+        if (!senderResolved) return;
+        const { s, done } = await fetchSubjectLocal(id, senderResolved);
+        setLocalS(s);
+        setLocalDone(done);
+      } catch {}
+    })();
+  }, [activeAddress, appIdIn]);
 
   async function doOptIn() {
     setErr(null);
@@ -210,8 +242,10 @@ export default function SubjectActions() {
     }
   }
 
+  const alreadyInvested = localDone === 1;
   const investDisabled =
     !!busy || !activeAddress || !hasResolvedAppId ||
+    alreadyInvested ||
     (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) ||
     !/^\d+$/.test(sInput || "0") ||
     Number(sInput) % unit !== 0 ||
@@ -348,7 +382,9 @@ export default function SubjectActions() {
           disabled={investDisabled}>
           {busy==="invest" ? "Investing…" : "Invest"}
         </button>
-        {(typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
+        {alreadyInvested ? (
+          <span className="text-xs text-amber-600">Already invested (done == 1).</span>
+        ) : (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
           <span className="text-xs text-amber-600">App balance low; needs ≥ 0.20 ALGO</span>
         )}
       </div>
