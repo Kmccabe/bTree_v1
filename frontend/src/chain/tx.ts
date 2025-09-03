@@ -20,6 +20,7 @@
 import * as algosdk from "algosdk";
 import type { Transaction, SuggestedParams } from "algosdk";
 import { getParamsNormalized } from "./params";
+import { resolveAppId } from "../state/appId";
 import { str, u64 } from "./enc";
 
 /** Shape expected by /api/submit in this repo (single signed txn). */
@@ -147,6 +148,7 @@ export async function optInApp(args: {
   const TAG = "[optInApp]";
   const { sender, appId, sign, wait = true } = args;
 
+  try { console.info("[appId] resolved =", resolveAppId()); } catch {}
   console.info(TAG, "args", { sender, appId });
 
   if (!sender || !algosdk.isValidAddress(sender)) {
@@ -234,6 +236,7 @@ export async function register(args: {
   fakeId: string;
   sign: Signer;
 }): Promise<SubmitResponse> {
+  try { console.info("[appId] resolved =", resolveAppId()); } catch {}
   const appArgs = [str("register"), str(args.fakeId)];
   const blob = await buildAppNoOpTxnBlob({ appId: args.appId, sender: args.sender, appArgs });
   return await signAndSubmit([blob], args.sign);
@@ -251,6 +254,7 @@ export async function placeBid(args: {
   microAlgos: number;
   sign: Signer;
 }): Promise<SubmitResponse> {
+  try { console.info("[appId] resolved =", resolveAppId()); } catch {}
   if (!Number.isInteger(args.microAlgos) || args.microAlgos < 0) {
     throw new Error("placeBid: microAlgos must be a non-negative integer");
   }
@@ -287,6 +291,7 @@ export async function setPhase(args: {
   const TAG = "[setPhase]";
   const { sender, appId, phase, sign, wait = true } = args;
 
+  try { console.info("[appId] resolved =", resolveAppId()); } catch {}
   console.info(TAG, "args", { sender, appId, phase });
 
   if (!sender || !algosdk.isValidAddress(sender)) throw new Error(`${TAG} invalid sender`);
@@ -364,6 +369,7 @@ export async function investFlow(args: {
 }): Promise<{ txId: string; confirmedRound?: number }> {
   const { sender, appId, s, sign, wait = true } = args;
   const TAG = "[investFlow]";
+  try { console.info("[appId] resolved =", resolveAppId()); } catch {}
 
   function short(addr?: string | null) {
     return typeof addr === "string" && addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-6)}` : String(addr);

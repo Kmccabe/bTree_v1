@@ -1,16 +1,12 @@
 import React, { useMemo, useState } from "react";
+import { resolveAppId } from "../state/appId";
 
 type Props = { appId?: string | number };
 
 export default function ExportCSVButton({ appId }: Props) {
-  // Resolve app id from prop → ?appId= → VITE_TESTNET_APP_ID
+  // Resolve app id from central resolver
   const resolvedAppId = useMemo(() => {
-    if (appId) return String(appId);
-    const url = new URL(window.location.href);
-    const q = url.searchParams.get("appId");
-    if (q) return q;
-    const env = import.meta.env.VITE_TESTNET_APP_ID as string | undefined;
-    return env ?? "";
+    try { return String(appId ?? resolveAppId()); } catch { return ""; }
   }, [appId]);
 
   const [minRound, setMinRound] = useState<string>("");

@@ -6,6 +6,7 @@ import { useWallet } from "@txnlab/use-wallet";
 import { Buffer } from "buffer"; // ensure Buffer exists in browser builds
 import { useToast } from "./Toaster";
 import { useNetworkSanity } from "../hooks/useNetworkSanity";
+import { resolveAppId, setSelectedAppId } from "../state/appId";
 import {
   getParams,
   optInApp,
@@ -45,12 +46,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
   const [err, setErr] = useState<string | null>(null);
 
   const resolvedAppId = useMemo(() => {
-    if (appId) return Number(appId);
-    const url = new URL(window.location.href);
-    const q = url.searchParams.get("appId");
-    if (q) return Number(q);
-    const env = import.meta.env.VITE_TESTNET_APP_ID as string | undefined;
-    return env ? Number(env) : undefined;
+    try { return resolveAppId(); } catch { return undefined; }
   }, [appId]);
 
   const loraTxUrl = useMemo(() => {
@@ -61,8 +57,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
 
   // --- On-Chain Actions state ---
   const defaultId = useMemo(() => {
-    const env = (import.meta.env.VITE_TESTNET_APP_ID as string) || "";
-    return Number(env || resolvedAppId || 0) || 0;
+    try { return resolveAppId(); } catch { return 0; }
   }, [resolvedAppId]);
   const [ocAppId, setOcAppId] = useState<number>(defaultId);
   const [fakeId, setFakeId] = useState<string>(
@@ -84,12 +79,18 @@ export default function PhaseControl({ appId, account, network }: Props) {
 
   // Keep ocAppId in sync when a known App ID becomes available
   useEffect(() => {
-    const envId = Number(((import.meta as any).env?.VITE_TESTNET_APP_ID as string) || 0);
-    const preferred = Number(resolvedAppId || envId || 0);
-    if (preferred > 0 && (!Number.isInteger(ocAppId) || ocAppId <= 0)) {
-      setOcAppId(preferred);
-    }
+    try {
+      const id = resolveAppId();
+      if (id > 0 && (!Number.isInteger(ocAppId) || ocAppId <= 0)) {
+        setOcAppId(id);
+      }
+    } catch {}
   }, [resolvedAppId, ocAppId]);
+
+  // Keep global selected App ID in sync when changed via input
+  useEffect(() => {
+    if (Number.isInteger(ocAppId) && ocAppId > 0) setSelectedAppId(ocAppId);
+  }, [ocAppId]);
 
   const signer: Signer = useCallback((txns) => signTransactions(txns), [signTransactions]);
   const pollConfirmedRound = useCallback(async (txId: string): Promise<number | null> => {
@@ -134,8 +135,10 @@ export default function PhaseControl({ appId, account, network }: Props) {
   const onOptIn = useCallback(() => run("Opt-In", async () => {
     const sender = connectedAddress || account;
     if (!sender) throw new Error(`Connect wallet on ${netLower} to opt-in.`);
-    if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
-    const { txId } = await optInApp({ appId: ocAppId, sender, sign: signer });
+    const id = resolveAppId();
+    console.info("[appId] resolved =", id);
+    if (!Number.isInteger(id) || id <= 0) throw new Error("Enter a valid App ID.");
+    const { txId } = await optInApp({ appId: id, sender, sign: signer });
     const cr = await pollConfirmedRound(txId);
     if (cr) setChain(c => ({ ...c, confirmedRound: cr }));
     try { toast.success("Opt-In submitted"); } catch {}
@@ -145,9 +148,11 @@ export default function PhaseControl({ appId, account, network }: Props) {
   const onRegister = useCallback(() => run("Register", async () => {
     const sender = connectedAddress || account;
     if (!sender) throw new Error(`Connect wallet on ${netLower} to register.`);
-    if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
+    const id = resolveAppId();
+    console.info("[appId] resolved =", id);
+    if (!Number.isInteger(id) || id <= 0) throw new Error("Enter a valid App ID.");
     if (!fakeId) throw new Error("Enter a Fake ID string.");
-    const { txId } = await register({ appId: ocAppId, sender, fakeId, sign: signer });
+    const { txId } = await register({ appId: id, sender, fakeId, sign: signer });
     const cr = await pollConfirmedRound(txId);
     if (cr) setChain(c => ({ ...c, confirmedRound: cr }));
     try { toast.success("Register submitted"); } catch {}
@@ -157,9 +162,11 @@ export default function PhaseControl({ appId, account, network }: Props) {
   const onBid = useCallback(() => run("Place Bid", async () => {
     const sender = connectedAddress || account;
     if (!sender) throw new Error(`Connect wallet on ${netLower} to place a bid.`);
-    if (!Number.isInteger(ocAppId) || ocAppId <= 0) throw new Error("Enter a valid App ID.");
+    const id = resolveAppId();
+    console.info("[appId] resolved =", id);
+    if (!Number.isInteger(id) || id <= 0) throw new Error("Enter a valid App ID.");
     if (!Number.isInteger(microAlgos) || microAlgos < 0) throw new Error("Bid must be a non-negative integer (µAlgos).");
-    const { txId } = await placeBid({ appId: ocAppId, sender, microAlgos, sign: signer });
+    const { txId } = await placeBid({ appId: id, sender, microAlgos, sign: signer });
     const cr = await pollConfirmedRound(txId);
     if (cr) setChain(c => ({ ...c, confirmedRound: cr }));
     try { toast.success("Bid submitted"); } catch {}
@@ -169,7 +176,9 @@ export default function PhaseControl({ appId, account, network }: Props) {
   async function setPhase(phase: number) {
     try {
       setErr(null);
-      if (!resolvedAppId) throw new Error("No App ID");
+      const id = resolveAppId();
+      console.info("[appId] resolved =", id);
+      if (!id) throw new Error("No App ID");
       const sender = (account ?? connectedAddress) || null;
       if (!sender) throw new Error("Wallet not connected");
       if (!algosdk.isValidAddress(sender)) throw new Error("Invalid wallet address");
@@ -205,7 +214,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
       
       const txn = algosdk.makeApplicationCallTxnFromObject({
         sender: fromAddr,
-        appIndex: resolvedAppId as number,
+        appIndex: id as number,
         onComplete: algosdk.OnApplicationComplete.NoOpOC,
         appArgs,
         suggestedParams: sp,

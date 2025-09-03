@@ -1,13 +1,27 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { investFlow, optInApp } from "../chain/tx";
+import { resolveAppId, setSelectedAppId, getSelectedAppId } from "../state/appId";
 
 export default function SubjectActions() {
   const { activeAddress, signTransactions } = useWallet();
 
   // inputs
   const [appIdIn, setAppIdIn] = useState<string>("");
+  // Initialize App ID input from selected/global value if available
+  useEffect(() => {
+    if (!appIdIn) {
+      const sel = getSelectedAppId();
+      if (sel && Number.isInteger(sel) && sel > 0) {
+        setAppIdIn(String(sel));
+      } else {
+        const raw = (import.meta as any)?.env?.VITE_TESTNET_APP_ID as string | undefined;
+        const parsed = raw != null ? Number(raw) : NaN;
+        if (Number.isInteger(parsed) && parsed > 0) setAppIdIn(String(parsed));
+      }
+    }
+  }, [appIdIn]);
   const [unit, setUnit] = useState<number>(1000);
   const [E, setE] = useState<number>(100000);
 
@@ -23,21 +37,25 @@ export default function SubjectActions() {
   const connected = activeAddress || "(not connected)";
   const appIdNum = Number(appIdIn);
   const appIdValid = Number.isFinite(appIdNum) && appIdNum > 0;
+  const hasResolvedAppId = (() => { try { return Number.isInteger(resolveAppId()); } catch { return false; } })();
   let appAddrPreview = "";
   try {
-    if (appIdValid) {
-      const raw = (algosdk as any).getApplicationAddress(appIdNum);
+    const idForAddr = appIdValid ? appIdNum : (() => { try { return resolveAppId(); } catch { return 0; } })();
+    if (idForAddr > 0) {
+      const raw = (algosdk as any).getApplicationAddress(idForAddr);
       appAddrPreview = typeof raw === "string" ? raw : raw?.toString?.();
     }
   } catch { /* ignore */ }
 
   async function loadGlobals() {
     setErr(null);
-    if (!appIdValid) return setErr("Enter a numeric App ID (not the App Address).");
+    if (!hasResolvedAppId) return setErr("Enter/select a numeric App ID (not the App Address).");
     setBusy("read");
     try {
-      console.debug("[SubjectActions] loadGlobals", { appId: appIdNum });
-      const r = await fetch(`/api/pair?id=${appIdNum}`);
+      const id = resolveAppId();
+      console.info("[appId] resolved =", id);
+      console.debug("[SubjectActions] loadGlobals", { appId: id });
+      const r = await fetch(`/api/pair?id=${id}`);
       const j = await r.json();
       console.debug("[SubjectActions] /api/pair", r.status, j);
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
@@ -54,11 +72,13 @@ export default function SubjectActions() {
   async function doOptIn() {
     setErr(null);
     if (!activeAddress) return setErr("Connect wallet as subject.");
-    if (!appIdValid) return setErr("Enter a numeric App ID first.");
+    if (!hasResolvedAppId) return setErr("Enter/select a numeric App ID first.");
     // Validate app existence on backend before submitting Opt-In
     try {
-      console.debug("[SubjectActions] preflight opt-in /api/pair", { appId: appIdNum });
-      const chk = await fetch(`/api/pair?id=${appIdNum}`);
+      const id = resolveAppId();
+      console.info("[appId] resolved =", id);
+      console.debug("[SubjectActions] preflight opt-in /api/pair", { appId: id });
+      const chk = await fetch(`/api/pair?id=${id}`);
       const cj = await chk.json().catch(() => ({} as any));
       console.debug("[SubjectActions] /api/pair preflight", chk.status, cj);
       if (!chk.ok) {
@@ -69,8 +89,10 @@ export default function SubjectActions() {
     }
     setBusy("optin");
     try {
-      console.debug("[SubjectActions] optIn submit", { sender: activeAddress, appId: appIdNum });
-      await optInApp({ sender: activeAddress, appId: appIdNum, sign: (u) => signTransactions(u) });
+      const id = resolveAppId();
+      console.info("[appId] resolved =", id);
+      console.debug("[SubjectActions] optIn submit", { sender: activeAddress, appId: id });
+      await optInApp({ sender: activeAddress, appId: id, sign: (u) => signTransactions(u) });
     } catch (e: any) {
       console.error("[SubjectActions] optIn failed", e);
       setErr(e?.message || String(e));
@@ -82,7 +104,7 @@ export default function SubjectActions() {
   async function doInvest() {
     setErr(null);
     if (!activeAddress) return setErr("Connect wallet as subject.");
-    if (!appIdValid) return setErr("Enter a numeric App ID (not the App Address).");
+    if (!hasResolvedAppId) return setErr("Enter/select a numeric App ID (not the App Address).");
 
     const s = Number(sInput);
     if (!Number.isInteger(s) || s < 0) return setErr("Enter a whole number of µAlgos for s.");
@@ -91,10 +113,12 @@ export default function SubjectActions() {
 
     setBusy("invest");
     try {
-      console.debug("[SubjectActions] invest submit", { sender: activeAddress, appId: appIdNum, s });
+      const id = resolveAppId();
+      console.info("[appId] resolved =", id);
+      console.debug("[SubjectActions] invest submit", { sender: activeAddress, appId: id, s });
       const r = await investFlow({
         sender: activeAddress,
-        appId: appIdNum,
+        appId: id,
         s,
         sign: (u) => signTransactions(u),
       });
@@ -109,7 +133,7 @@ export default function SubjectActions() {
   }
 
   const investDisabled =
-    !!busy || !activeAddress || !appIdValid ||
+    !!busy || !activeAddress || !hasResolvedAppId ||
     !/^\d+$/.test(sInput || "0") ||
     Number(sInput) % unit !== 0 ||
     Number(sInput) > E;
@@ -125,13 +149,17 @@ export default function SubjectActions() {
           type="number"
           className="border rounded px-2 py-1 w-44"
           value={appIdIn}
-          onChange={(e)=>setAppIdIn(e.target.value)}
+          onChange={(e)=>{
+            setAppIdIn(e.target.value);
+            const n = Number(e.target.value);
+            if (Number.isFinite(n) && n > 0) setSelectedAppId(n);
+          }}
           placeholder="e.g., 745000000"
         />
-        <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !appIdValid}>
+        <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>
           Load globals
         </button>
-        <button className="text-xs underline" onClick={doOptIn} disabled={!!busy || !activeAddress || !appIdValid}>
+        <button className="text-xs underline" onClick={doOptIn} disabled={!!busy || !activeAddress || !hasResolvedAppId}>
           {busy === "optin" ? "Opting in…" : "Opt-In"}
         </button>
       </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
 import { setPhase } from "../chain/tx";
+import { resolveAppId, setSelectedAppId } from "../state/appId";
 import QRCode from "qrcode";
 
 const nf = (n: number) => Intl.NumberFormat().format(n);
@@ -63,6 +64,8 @@ export default function AdminSetup() {
       const r = await deployTrustGame({ sender: activeAddress, E, m, UNIT, sign: signer });
       setAppId(r.appId);
       setAddr(r.appAddress);
+      // Persist the newly deployed App ID for the session
+      setSelectedAppId(r.appId);
       setFund(null);
       setGlobals(null);
     } catch (e: any) {
@@ -90,7 +93,20 @@ export default function AdminSetup() {
 
   async function onApplyPhase() {
     setErr(null);
-    const id = appId ?? Number(manualAppId);
+    if (manualAppId) {
+      const idNum = Number(manualAppId);
+      if (Number.isFinite(idNum) && idNum > 0) setSelectedAppId(idNum);
+    } else if (appId) {
+      setSelectedAppId(appId);
+    }
+    // Use the centralized resolver for the active App ID
+    let id: number;
+    try {
+      id = resolveAppId();
+    } catch (e: any) {
+      return setErr(e?.message || String(e));
+    }
+    console.info("[appId] resolved =", id);
     console.info("[AdminSetup] onApplyPhase", { activeAddress, id, phaseIn });
     if (!activeAddress) return setErr("Connect the creator wallet.");
     if (!Number.isFinite(id) || id <= 0) return setErr("Enter a numeric App ID.");
@@ -105,7 +121,19 @@ export default function AdminSetup() {
   }
 
   async function onReadPairState() {
-    const id = appId ?? Number(manualAppId);
+    let id: number;
+    if (manualAppId) {
+      const idNum = Number(manualAppId);
+      if (Number.isFinite(idNum) && idNum > 0) setSelectedAppId(idNum);
+    } else if (appId) {
+      setSelectedAppId(appId);
+    }
+    try {
+      id = resolveAppId();
+    } catch (e: any) {
+      return setErr(e?.message || String(e));
+    }
+    console.info("[appId] resolved =", id);
     if (!Number.isFinite(id) || id <= 0) return setErr("Enter a valid App ID.");
     setBusy("pair"); setErr(null);
     try {
@@ -161,7 +189,11 @@ export default function AdminSetup() {
           <input
             type="number" min={1} inputMode="numeric"
             value={manualAppId}
-            onChange={(e)=>setManualAppId(e.target.value)}
+            onChange={(e)=>{
+              setManualAppId(e.target.value);
+              const n = Number(e.target.value);
+              if (Number.isFinite(n) && n > 0) setSelectedAppId(n);
+            }}
             className="border rounded px-2 py-1 w-40"
             placeholder="e.g., 745000000"
           />
