@@ -27,6 +27,7 @@ export default function SubjectActions() {
   const [pair, setPair] = useState<{ loading: boolean; error?: string | null; globals?: Record<string, any> | null; local?: { s?: number; done?: number } | null }>({ loading: false, error: null, globals: null, local: null });
   const [localDone, setLocalDone] = useState<number | undefined>(undefined);
   const [localS, setLocalS] = useState<number | undefined>(undefined);
+  const [localLoading, setLocalLoading] = useState<boolean>(false);
 
   const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
 
@@ -134,6 +135,25 @@ export default function SubjectActions() {
     }
   }
 
+  // Refresh only the subject's local state (skip globals)
+  async function refreshLocal() {
+    setLocalLoading(true);
+    try {
+      const id = resolveAppId();
+      const { senderResolved } = resolveSender();
+      if (!senderResolved) return;
+      const { s, done } = await fetchSubjectLocal(id, senderResolved);
+      console.info('[pair/local]', senderResolved, { s, done });
+      setPair(prev => ({ ...prev, local: { s, done } }));
+      setLocalS(s);
+      setLocalDone(done);
+    } catch (e) {
+      // swallow; leave previous local state
+    } finally {
+      setLocalLoading(false);
+    }
+  }
+
   // helper to resolve sender like investFlow
   function resolveSender(): { senderResolved: string } {
     const w: any = (globalThis as any) || {};
@@ -153,6 +173,9 @@ export default function SubjectActions() {
     const token = net === 'MAINNET'
       ? (((import.meta as any).env?.VITE_MAINNET_ALGOD_TOKEN as string) || "")
       : (((import.meta as any).env?.VITE_TESTNET_ALGOD_TOKEN as string) || "");
+    const indexerBase = net === 'MAINNET'
+      ? ((((import.meta as any).env?.VITE_MAINNET_INDEXER_URL as string) || "https://mainnet-idx.algonode.cloud"))
+      : ((((import.meta as any).env?.VITE_TESTNET_INDEXER_URL as string) || "https://testnet-idx.algonode.cloud"));
     const client = new (algosdk as any).Algodv2(token, server, "");
     const b64ToStr = (b64: string): string => {
       try { return Buffer.from(b64, 'base64').toString('utf8'); } catch { /* noop */ }
@@ -171,7 +194,7 @@ export default function SubjectActions() {
       return { s: localS, done: localDone };
     };
 
-    // Primary: algod
+    // Primary: algod accountApplicationInformation
     try {
       const ai = await client.accountApplicationInformation(subjectAddr, appId).do();
       const kvAlgod: any[] = ai?.["app-local-state"]?.["key-value"] || ai?.["key-value"] || [];
@@ -180,19 +203,53 @@ export default function SubjectActions() {
         return parsed;
       }
     } catch (e) {
-      // swallow and try indexer
+      console.debug('[pair/local] algod accountApplicationInformation error', e);
     }
 
-    // Fallback: indexer
+    // Secondary: algod accountInformation?include-all=true and scan apps-local-state
     try {
-      const idxBase = ((import.meta as any).env?.VITE_TESTNET_INDEXER_URL as string) || "https://testnet-idx.algonode.cloud";
-      const url = `${idxBase.replace(/\/$/, "")}/v2/accounts/${subjectAddr}/applications/${appId}`;
+      const url = `${server.replace(/\/$/, "")}/v2/accounts/${subjectAddr}?include-all=true`;
+      const headers: any = token ? { 'X-Algo-API-Token': token } : {};
+      const r = await fetch(url, { headers });
+      const j = await r.json();
+      const apps: any[] = j?.["apps-local-state"] || j?.["applications-local-state"] || [];
+      const hit = (apps || []).find((x: any) => Number(x?.id) === Number(appId));
+      const kvAlgodAcct: any[] = hit?.["key-value"] || [];
+      const parsedAcct = parseKv(kvAlgodAcct);
+      if (parsedAcct.s !== 0 || parsedAcct.done !== 0 || (Array.isArray(kvAlgodAcct) && kvAlgodAcct.length > 0)) {
+        return parsedAcct;
+      }
+    } catch (e) {
+      console.debug('[pair/local] algod accountInformation include-all error', e);
+    }
+
+    // Fallback: indexer specific app endpoint
+    try {
+      const url = `${indexerBase.replace(/\/$/, "")}/v2/accounts/${subjectAddr}/applications/${appId}`;
       const r = await fetch(url);
       const j = await r.json();
-      const kvIdx: any[] = j?.["app-local-state"]?.["key-value"] || [];
-      return parseKv(kvIdx);
-    } catch {
+      const kvIdx: any[] = j?.["app-local-state"]?.["key-value"] || j?.["application-local-state"]?.["key-value"] || [];
+      const parsed = parseKv(kvIdx);
+      return parsed;
+    } catch (e) {
+      console.debug('[pair/local] indexer fallback error', e);
       // final fallback: zeros
+    }
+
+    // Final: indexer account include-all and scan apps-local-state
+    try {
+      const url = `${indexerBase.replace(/\/$/, "")}/v2/accounts/${subjectAddr}?include-all=true`;
+      const r = await fetch(url);
+      const j = await r.json();
+      const apps: any[] = j?.["apps-local-state"] || j?.["applications-local-state"] || [];
+      const hit = (apps || []).find((x: any) => Number(x?.id) === Number(appId));
+      const kvIdxAcct: any[] = hit?.["key-value"] || [];
+      const parsedAcct = parseKv(kvIdxAcct);
+      if (parsedAcct.s !== 0 || parsedAcct.done !== 0 || (Array.isArray(kvIdxAcct) && kvIdxAcct.length > 0)) {
+        return parsedAcct;
+      }
+    } catch (e) {
+      console.debug('[pair/local] indexer account include-all error', e);
     }
 
     return { s: 0, done: 0 };
@@ -373,7 +430,12 @@ export default function SubjectActions() {
       {/* Pair state panel */}
       {(pair.globals || pair.local || pair.error) && (
         <div className="text-xs text-neutral-700">
-          <div className="font-semibold mb-1">Pair state</div>
+          <div className="font-semibold mb-1 flex items-center gap-2">
+            <span>Pair state</span>
+            <button className="text-xs underline" onClick={refreshLocal} disabled={localLoading || !hasResolvedAppId}>
+              {localLoading ? 'Refreshing…' : 'Refresh local'}
+            </button>
+          </div>
           {pair.error && <div className="text-red-600">{pair.error}</div>}
           {pair.globals && (
             <div className="mb-1">
