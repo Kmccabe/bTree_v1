@@ -24,12 +24,15 @@ type ToastShowArgs = { title: string; description?: string; kind?: ToastKind; ac
 const ToastContext = React.createContext<{
   show: (args: ToastShowArgs) => { id: string };
   remove: (id: string) => void;
+  pauseTimer: (id: string) => void;
+  resumeTimer: (id: string, kind: ToastKind) => void;
   toasts: ToastItem[];
 } | null>(null);
 
 function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const timeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const timers = useRef<Record<string, { remaining: number; start?: number }>>({});
 
   const remove = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -38,7 +41,46 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(handle);
       delete timeouts.current[id];
     }
+    if (timers.current[id]) delete timers.current[id];
   }, []);
+
+  const startTimer = useCallback((id: string, kind: ToastKind) => {
+    if (kind === "error") return; // persistent until dismissed
+    const meta = timers.current[id] ?? { remaining: 5500 };
+    meta.start = Date.now();
+    timers.current[id] = meta;
+    const h = setTimeout(() => remove(id), meta.remaining);
+    timeouts.current[id] = h;
+  }, [remove]);
+
+  const pauseTimer = useCallback((id: string) => {
+    const handle = timeouts.current[id];
+    if (handle) {
+      clearTimeout(handle);
+      delete timeouts.current[id];
+    }
+    const meta = timers.current[id];
+    if (meta && meta.start) {
+      const elapsed = Date.now() - meta.start;
+      meta.remaining = Math.max(0, (meta.remaining ?? 0) - elapsed);
+      delete meta.start;
+      timers.current[id] = meta;
+    }
+  }, []);
+
+  const resumeTimer = useCallback((id: string, kind: ToastKind) => {
+    if (kind === "error") return; // persistent
+    if (timeouts.current[id]) return; // already running
+    const meta = timers.current[id];
+    if (!meta) return;
+    if ((meta.remaining ?? 0) <= 0) {
+      remove(id);
+      return;
+    }
+    meta.start = Date.now();
+    const h = setTimeout(() => remove(id), meta.remaining);
+    timeouts.current[id] = h;
+  }, [remove]);
 
   const show = useCallback((args: ToastShowArgs) => {
     const id = Math.random().toString(36).slice(2);
@@ -52,14 +94,14 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
       createdAt: Date.now(),
     };
     setToasts((prev) => [...prev, item]);
-    const ms = kind === "error" ? 8000 : 5000;
-    const h = setTimeout(() => remove(id), ms);
-    timeouts.current[id] = h;
+    const ms = kind === "error" ? 0 : 5500;
+    timers.current[id] = { remaining: ms };
+    if (ms > 0) startTimer(id, kind);
     return { id };
-  }, [remove]);
+  }, [remove, startTimer]);
 
   return (
-    <ToastContext.Provider value={{ show, remove, toasts }}>
+    <ToastContext.Provider value={{ show, remove, pauseTimer, resumeTimer, toasts }}>
       {children}
     </ToastContext.Provider>
   );
@@ -79,11 +121,17 @@ function useToast() {
 function ToastHost() {
   const ctx = useContext(ToastContext);
   if (!ctx) return null;
-  const { toasts, remove } = ctx;
+  const { toasts, remove, pauseTimer, resumeTimer } = ctx;
   return (
-    <div style={{ position: "absolute", bottom: 8, right: 8, zIndex: 10000, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+    <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 40, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none", maxWidth: 360 }}>
       {toasts.map((t) => (
-        <div key={t.id} style={{ pointerEvents: "auto", minWidth: 240, maxWidth: 360 }} className={`rounded-md border shadow-sm px-3 py-2 text-sm bg-white ${t.kind === 'error' ? 'border-red-300' : t.kind === 'success' ? 'border-green-300' : 'border-neutral-200'}`}>
+        <div
+          key={t.id}
+          onMouseEnter={() => pauseTimer(t.id)}
+          onMouseLeave={() => resumeTimer(t.id, t.kind)}
+          style={{ pointerEvents: "auto", minWidth: 240 }}
+          className={`rounded-md border shadow-sm px-3 py-2 text-sm bg-white ${t.kind === 'error' ? 'border-red-300' : t.kind === 'success' ? 'border-green-300' : 'border-neutral-200'}`}
+        >
           <div className="flex items-start gap-2">
             <div className={`mt-1 h-2 w-2 rounded-full ${t.kind === 'error' ? 'bg-red-500' : t.kind === 'success' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
             <div className="flex-1">
@@ -142,6 +190,18 @@ function SubjectActionsInner() {
   const [localDone, setLocalDone] = useState<number | undefined>(undefined);
   const [localS, setLocalS] = useState<number | undefined>(undefined);
   const [localLoading, setLocalLoading] = useState<boolean>(false);
+  type ActivityEntry = {
+    id: string;
+    ts: number;
+    status: 'submitted' | 'confirmed' | 'rejected';
+    round?: number;
+    txId?: string;
+    appCallTxId?: string;
+    paymentTxId?: string;
+    reason?: string;
+  };
+  const [inlineStatus, setInlineStatus] = useState<{ phase: 'submitted' | 'confirmed' | 'rejected'; text: string; round?: number; txId?: string; appCallTxId?: string; paymentTxId?: string } | null>(null);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
 
   const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
 
@@ -449,6 +509,9 @@ function SubjectActionsInner() {
 
     setBusy("invest");
     try {
+      const activityId = Math.random().toString(36).slice(2);
+      setInlineStatus({ phase: 'submitted', text: 'Invest submitted… (waiting for confirmation)' });
+      setActivity(prev => [{ id: activityId, ts: Date.now(), status: 'submitted' as const } as ActivityEntry, ...prev].slice(0, 5));
       const id = resolveAppId();
       console.info("[appId] resolved =", id);
       console.debug("[SubjectActions] invest submit", { sender: activeAddress, appId: id, s });
@@ -469,6 +532,7 @@ function SubjectActionsInner() {
       // Capture both txids if the API returns them; otherwise fall back to single.
       const paymentTxId: string | undefined = r?.paymentTxId || r?.payTxId || r?.paymentTxID;
       const appCallTxId: string | undefined = r?.appCallTxId || r?.appTxId || r?.appCallTxID;
+      setActivity(prev => prev.map(e => e.id === activityId ? { ...e, txId: singleTxId, paymentTxId, appCallTxId } : e));
       const actions = (() => {
         const arr: { label: string; href: string }[] = [];
         if (appCallTxId) arr.push({ label: 'View AppCall', href: loraTxUrl(appCallTxId) });
@@ -486,6 +550,8 @@ function SubjectActionsInner() {
       if (!pendR.ok) {
         const { reason } = parseLogicError(pendText);
         toast.show({ kind: 'error', title: 'Invest rejected', description: reason });
+        setInlineStatus({ phase: 'rejected', text: `Invest rejected: ${reason}` });
+        setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'rejected', reason } : e));
         return;
       }
       let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
@@ -493,12 +559,22 @@ function SubjectActionsInner() {
       if (confirmedRound && Number.isFinite(confirmedRound)) {
         const successActions = actions.length ? actions : (singleTxId ? [{ label: 'View on LoRA', href: loraTxUrl(singleTxId) }] : []);
         toast.show({ kind: 'success', title: 'Invest confirmed', description: `Round ${confirmedRound}`, actions: successActions });
+        setInlineStatus({ phase: 'confirmed', text: `Invest confirmed in round ${confirmedRound}`, round: confirmedRound, txId: singleTxId, appCallTxId, paymentTxId });
+        setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'confirmed', round: confirmedRound } : e));
       }
     } catch (e: any) {
       console.error("[SubjectActions] invest failed", e);
       const msg = e?.message || String(e);
       const { reason } = parseLogicError(msg);
       toast.show({ kind: 'error', title: 'Invest rejected', description: reason });
+      setInlineStatus({ phase: 'rejected', text: `Invest rejected: ${reason}` });
+      setActivity(prev => {
+        const copy: ActivityEntry[] = [...prev];
+        const idx = copy.findIndex(x => x.status === 'submitted');
+        if (idx >= 0) copy[idx] = { ...copy[idx], status: 'rejected', reason };
+        else copy.unshift({ id: Math.random().toString(36).slice(2), ts: Date.now(), status: 'rejected', reason } as ActivityEntry);
+        return copy.slice(0, 5);
+      });
       setErr(msg);
     } finally {
       setBusy(null);
@@ -547,6 +623,69 @@ function SubjectActionsInner() {
           {pair.loading ? "Reading…" : "Read pair states"}
         </button>
       </div>
+
+      {/* Inline status */}
+      {inlineStatus && (
+        <div className="text-xs">
+          {inlineStatus.phase === 'submitted' && (
+            <span className="text-neutral-700">Invest submitted… (waiting for confirmation)</span>
+          )}
+          {inlineStatus.phase === 'confirmed' && (
+            <span className="text-green-700">
+              Invest confirmed in round {inlineStatus.round}
+              {' '}
+              {(() => {
+                const links: { label: string; href: string }[] = [];
+                if (inlineStatus.appCallTxId) links.push({ label: 'View AppCall', href: loraTxUrl(inlineStatus.appCallTxId) });
+                if (inlineStatus.paymentTxId) links.push({ label: 'View Payment', href: loraTxUrl(inlineStatus.paymentTxId) });
+                if (links.length === 0 && inlineStatus.txId) links.push({ label: 'View on LoRA', href: loraTxUrl(inlineStatus.txId) });
+                return links.length ? (
+                  <>
+                    · {links.map((l, i) => (
+                      <a key={i} href={l.href} target="_blank" rel="noreferrer" className="underline text-blue-700">{l.label}</a>
+                    )).reduce((acc, el, i) => acc.length ? [...acc, <span key={`sep-${i}`}> · </span>, el] : [el], [] as any)}
+                  </>
+                ) : null;
+              })()}
+            </span>
+          )}
+          {inlineStatus.phase === 'rejected' && (
+            <span className="text-red-600">{inlineStatus.text}</span>
+          )}
+        </div>
+      )}
+
+      {/* Activity log (last 3-5) */}
+      {activity.length > 0 && (
+        <div className="text-xs text-neutral-700">
+          <div className="font-semibold">Activity</div>
+          <ul className="mt-1">
+            {activity.slice(0, 5).map((e) => (
+              <li key={e.id} className="mt-1">
+                <span className="text-neutral-500">{new Date(e.ts).toLocaleTimeString()}</span>
+                {' '}
+                {e.status === 'submitted' && <span>Invest submitted…</span>}
+                {e.status === 'confirmed' && <span className="text-green-700">Invest confirmed in round {e.round}</span>}
+                {e.status === 'rejected' && <span className="text-red-600">Invest rejected{e.reason ? `: ${e.reason}` : ''}</span>}
+                {' '}
+                {(() => {
+                  const links: { label: string; href: string }[] = [];
+                  if (e.appCallTxId) links.push({ label: 'AppCall', href: loraTxUrl(e.appCallTxId) });
+                  if (e.paymentTxId) links.push({ label: 'Payment', href: loraTxUrl(e.paymentTxId) });
+                  if (links.length === 0 && e.txId) links.push({ label: 'View', href: loraTxUrl(e.txId) });
+                  return links.length ? (
+                    <>
+                      {links.map((l, i) => (
+                        <a key={i} href={l.href} target="_blank" rel="noreferrer" className="underline text-blue-700 ml-1">{l.label}</a>
+                      ))}
+                    </>
+                  ) : null;
+                })()}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* App account (always visible when resolvable) */}
       {appAccountAddr && (
