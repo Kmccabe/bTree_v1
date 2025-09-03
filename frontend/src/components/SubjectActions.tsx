@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { investFlow, optInApp } from "../chain/tx";
-import { resolveAppId, setSelectedAppId, getSelectedAppId } from "../state/appId";
+import { resolveAppId, setSelectedAppId, getSelectedAppId, clearSelectedAppId } from "../state/appId";
 import { getAccountBalanceMicroAlgos } from "../chain/balance";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -10,13 +10,8 @@ export default function SubjectActions() {
   const { activeAddress, signTransactions } = useWallet();
 
   // inputs
-  const [appIdIn, setAppIdIn] = useState<string>(() => {
-    const sel = getSelectedAppId();
-    if (sel && Number.isInteger(sel) && sel > 0) return String(sel);
-    const raw = (import.meta as any)?.env?.VITE_TESTNET_APP_ID as string | undefined;
-    const parsed = raw != null ? Number(raw) : NaN;
-    return Number.isInteger(parsed) && parsed > 0 ? String(parsed) : "";
-  });
+  // Leave blank by default; rely on resolveAppId() for behavior (selected or env fallback)
+  const [appIdIn, setAppIdIn] = useState<string>("");
   const [unit, setUnit] = useState<number>(1000);
   const [E, setE] = useState<number>(100000);
 
@@ -234,9 +229,11 @@ export default function SubjectActions() {
           className="border rounded px-2 py-1 w-44"
           value={appIdIn}
           onChange={(e)=>{
-            setAppIdIn(e.target.value);
-            const n = Number(e.target.value);
+            const v = e.target.value;
+            setAppIdIn(v);
+            const n = Number(v);
             if (Number.isFinite(n) && n > 0) setSelectedAppId(n);
+            else clearSelectedAppId();
           }}
           placeholder="e.g., 745000000"
         />

@@ -16,6 +16,10 @@ export function getSelectedAppId(): number | undefined {
   return selectedAppId;
 }
 
+export function clearSelectedAppId(): void {
+  selectedAppId = undefined;
+}
+
 export function resolveAppId(): number {
   if (Number.isInteger(selectedAppId) && (selectedAppId as number) > 0) {
     return selectedAppId as number;
@@ -25,4 +29,3 @@ export function resolveAppId(): number {
   if (Number.isInteger(parsed) && parsed > 0) return parsed;
   throw new Error("No App ID selected and VITE_TESTNET_APP_ID is missing or invalid");
 }
-
