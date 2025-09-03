@@ -86,7 +86,7 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
       clearProgram: clearProg,
       // Schema must accommodate globals written at create and local used later
       numGlobalByteSlices: 0,
-      numGlobalInts: 5, // E, m, UNIT, phase, t
+      numGlobalInts: 6, // E, m, UNIT, phase, t, ret
       numLocalByteSlices: 0,
       numLocalInts: 3,  // s, done, t
       note,
@@ -181,7 +181,7 @@ export async function deployTrustGame(args: {
     approvalProgram: approvalProg,
     clearProgram: clearProg,
     numGlobalByteSlices: 0,
-    numGlobalInts: 5, // E, m, UNIT, phase, t
+    numGlobalInts: 6, // E, m, UNIT, phase, t, ret
     numLocalByteSlices: 0,
     numLocalInts: 3,  // s, done, t
     appArgs,

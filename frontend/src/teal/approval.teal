@@ -68,6 +68,11 @@ noop:
   ==
   bnz invest
 
+  txn ApplicationArgs 0
+  byte "return"
+  ==
+  bnz retpath
+
   err
 
 // Accept opt-in to allocate local state
@@ -258,5 +263,105 @@ do_refund:
   itxn_submit
 
 invest_end:
+  int 1
+  return
+
+// -------------------------
+// CASE: "return" (Subject 2)
+// Pre-req: t in global from Invest
+// args: [ "return", r:uint ]
+retpath:
+  // Guard phase == 2
+  byte "phase"
+  app_global_get
+  int 2
+  ==
+  assert
+
+  // t > 0
+  byte "t"
+  app_global_get
+  dup
+  store 10              // t in scratch[10]
+  int 0
+  >
+  assert
+
+  // not already returned: ret == 0
+  byte "ret"
+  app_global_get
+  int 0
+  ==
+  assert
+
+  // r = arg[1] (uint)
+  txna ApplicationArgs 1
+  btoi
+  store 11              // r
+
+  // 0 <= r <= t
+  load 11
+  int 0
+  >=
+  assert
+  load 11
+  load 10
+  <=
+  assert
+
+  // S1 = Accounts[0], validate it's the investor: local.t(S1) == global.t and done == 1
+  txna Accounts 0       // push S1
+  dup                   // keep a copy for later
+  byte "t"
+  app_local_get         // read S1.local.t
+  load 10
+  ==
+  assert
+  dup                   // duplicate S1 again for done check
+  byte "done"
+  app_local_get
+  int 1
+  ==
+  assert
+  store 12              // save S1 address for payouts
+
+  // Solvency: app_liquid >= t
+  global CurrentApplicationAddress
+  dup
+  balance
+  swap
+  min_balance
+  -
+  load 10              // t
+  >=
+  assert
+
+  // itxn #1: pay r -> S1
+  itxn_begin
+  int pay
+  itxn_field TypeEnum
+  load 11
+  itxn_field Amount
+  load 12
+  itxn_field Receiver
+  itxn_submit
+
+  // itxn #2: pay (t - r) -> Sender (S2)
+  itxn_begin
+  int pay
+  itxn_field TypeEnum
+  load 10
+  load 11
+  -
+  itxn_field Amount
+  txn Sender
+  itxn_field Receiver
+  itxn_submit
+
+  // mark returned
+  byte "ret"
+  int 1
+  app_global_put
+
   int 1
   return
