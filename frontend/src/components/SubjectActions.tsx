@@ -35,6 +35,7 @@ export default function SubjectActions() {
   const [err, setErr] = useState<string | null>(null);
   const [lastTx, setLastTx] = useState<string | null>(null);
   const [funds, setFunds] = useState<{ balance?: number; checking: boolean; error?: string }>({ checking: false });
+  const [pair, setPair] = useState<{ loading: boolean; error?: string | null; globals?: Record<string, any> | null; local?: { s?: number; done?: number } | null }>({ loading: false, error: null, globals: null, local: null });
 
   const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
 
@@ -99,6 +100,62 @@ export default function SubjectActions() {
     } catch (e: any) {
       console.error("[SubjectActions] checkFunds failed", e);
       setFunds({ checking: false, error: e?.message || String(e) });
+    }
+  }
+
+  async function readPairStates() {
+    setPair({ loading: true, error: null, globals: null, local: null });
+    setErr(null);
+    try {
+      const id = resolveAppId();
+      console.info("[appId] resolved =", id);
+      // Globals via backend pair endpoint
+      const pr = await fetch(`/api/pair?id=${id}`);
+      const pj = await pr.json();
+      console.debug("[SubjectActions] /api/pair (read states)", pr.status, pj);
+      if (!pr.ok) throw new Error(pj?.error || `HTTP ${pr.status}`);
+      const globals = (pj?.globals ?? {}) as Record<string, any>;
+      // Keep existing globals state in sync
+      if (globals) {
+        if (typeof globals.UNIT === 'number') setUnit(Number(globals.UNIT));
+        if (typeof globals.E === 'number') setE(Number(globals.E));
+      }
+
+      // Resolve subject address (investFlow style)
+      const w: any = (globalThis as any) || {};
+      const senderResolved =
+        (typeof activeAddress === "string" && activeAddress) ||
+        (activeAddress as any)?.address ||
+        w.activeAddress ||
+        (w.wallet?.accounts?.[0]?.address ?? "");
+      if (!senderResolved) throw new Error("No connected subject address");
+
+      // Fetch local state from algod
+      const net = ((import.meta as any).env?.VITE_NETWORK as string | undefined)?.toUpperCase?.() || "TESTNET";
+      const server = net === 'MAINNET'
+        ? (((import.meta as any).env?.VITE_MAINNET_ALGOD_URL as string) || "https://mainnet-api.algonode.cloud")
+        : (((import.meta as any).env?.VITE_TESTNET_ALGOD_URL as string) || "https://testnet-api.algonode.cloud");
+      const token = net === 'MAINNET'
+        ? (((import.meta as any).env?.VITE_MAINNET_ALGOD_TOKEN as string) || "")
+        : (((import.meta as any).env?.VITE_TESTNET_ALGOD_TOKEN as string) || "");
+
+      const client = new (algosdk as any).Algodv2(token, server, "");
+      const ai = await client.accountApplicationInformation(senderResolved, id).do();
+      const kv: any[] = ai?.["app-local-state"]?.["key-value"] || ai?.["key-value"] || [];
+      const localMap: Record<string, any> = {};
+      for (const entry of kv) {
+        const keyB64 = String(entry?.key ?? "");
+        let key = "";
+        try { key = atob(keyB64); } catch { try { key = (typeof Buffer !== 'undefined' ? Buffer.from(keyB64, 'base64').toString('utf8') : ""); } catch { key = ""; } }
+        const v = entry?.value;
+        if (v?.type === 2) localMap[key] = Number(v?.uint ?? 0);
+      }
+      const local = { s: Number(localMap.s ?? 0), done: Number(localMap.done ?? 0) };
+
+      setPair({ loading: false, error: null, globals, local });
+    } catch (e: any) {
+      console.error("[SubjectActions] readPairStates failed", e);
+      setPair({ loading: false, error: e?.message || String(e), globals: null, local: null });
     }
   }
 
@@ -199,6 +256,9 @@ export default function SubjectActions() {
         <button className="text-xs underline" onClick={checkFunds} disabled={!!busy || !hasResolvedAppId || funds.checking}>
           {funds.checking ? "Checking…" : "Check funds"}
         </button>
+        <button className="text-xs underline" onClick={readPairStates} disabled={pair.loading || !hasResolvedAppId}>
+          {pair.loading ? "Reading…" : "Read pair states"}
+        </button>
       </div>
 
       {/* App account (always visible when resolvable) */}
@@ -208,7 +268,7 @@ export default function SubjectActions() {
           <div className="flex items-center gap-2">
             <code className="break-all">{appAccountAddr}</code>
             <button className="text-xs underline" onClick={() => navigator.clipboard.writeText(appAccountAddr)}>Copy</button>
-            <a className="text-xs underline" href={`https://testnet.algoexplorer.io/address/${appAccountAddr}`} target="_blank" rel="noreferrer">Open in AlgoExplorer (TestNet)</a>
+            <a className="text-xs underline" href={`https://lora.algorand.foundation/address/${appAccountAddr}?network=testnet`} target="_blank" rel="noreferrer">Open in LoRA (TestNet)</a>
           </div>
           <div className="mt-2">
             <QRCodeCanvas value={appAccountAddr} size={128} />
@@ -249,6 +309,35 @@ export default function SubjectActions() {
             })()
           ) : (
             <span className="text-red-600">{funds.error}</span>
+          )}
+        </div>
+      )}
+
+      {/* Pair state panel */}
+      {(pair.globals || pair.local || pair.error) && (
+        <div className="text-xs text-neutral-700">
+          <div className="font-semibold mb-1">Pair state</div>
+          {pair.error && <div className="text-red-600">{pair.error}</div>}
+          {pair.globals && (
+            <div className="mb-1">
+              Globals: {" "}
+              <span>
+                {(() => {
+                  const g = pair.globals as any;
+                  const parts: string[] = [];
+                  if (g?.E != null) parts.push(`E: ${g.E}`);
+                  if (g?.m != null) parts.push(`m: ${g.m}`);
+                  if (g?.UNIT != null) parts.push(`UNIT: ${g.UNIT}`);
+                  if (g?.phase != null) parts.push(`phase: ${g.phase}`);
+                  return parts.length ? parts.join(" · ") : JSON.stringify(g);
+                })()}
+              </span>
+            </div>
+          )}
+          {pair.local && (
+            <div>
+              Local (subject): s = {pair.local.s ?? 0}, done = {pair.local.done ?? 0}
+            </div>
           )}
         </div>
       )}
