@@ -548,10 +548,15 @@ function SubjectActionsInner() {
       const pendText = await pendR.text();
       console.info('[SubjectActions] /api/pending', pendR.status, pendText);
       if (!pendR.ok) {
-        const { reason } = parseLogicError(pendText);
+        const { reason, pc } = parseLogicError(pendText);
         toast.show({ kind: 'error', title: 'Invest rejected', description: reason });
         setInlineStatus({ phase: 'rejected', text: `Invest rejected: ${reason}` });
         setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'rejected', reason } : e));
+        // If it's the known repeat-invest gate, set done=1 locally to keep button disabled
+        if (pc === 209 || /Already invested/.test(reason)) {
+          setPair(prev => ({ ...prev, local: { ...(prev.local ?? {}), done: 1 } }));
+          setLocalDone(1);
+        }
         return;
       }
       let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
@@ -561,11 +566,15 @@ function SubjectActionsInner() {
         toast.show({ kind: 'success', title: 'Invest confirmed', description: `Round ${confirmedRound}`, actions: successActions });
         setInlineStatus({ phase: 'confirmed', text: `Invest confirmed in round ${confirmedRound}`, round: confirmedRound, txId: singleTxId, appCallTxId, paymentTxId });
         setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'confirmed', round: confirmedRound } : e));
+        // Immediately reflect local state so the Invest button disables without manual refresh
+        setPair(prev => ({ ...prev, local: { s, done: 1 } }));
+        setLocalS(s);
+        setLocalDone(1);
       }
     } catch (e: any) {
       console.error("[SubjectActions] invest failed", e);
       const msg = e?.message || String(e);
-      const { reason } = parseLogicError(msg);
+      const { reason, pc } = parseLogicError(msg);
       toast.show({ kind: 'error', title: 'Invest rejected', description: reason });
       setInlineStatus({ phase: 'rejected', text: `Invest rejected: ${reason}` });
       setActivity(prev => {
@@ -575,6 +584,10 @@ function SubjectActionsInner() {
         else copy.unshift({ id: Math.random().toString(36).slice(2), ts: Date.now(), status: 'rejected', reason } as ActivityEntry);
         return copy.slice(0, 5);
       });
+      if (pc === 209 || /Already invested/.test(reason)) {
+        setPair(prev => ({ ...prev, local: { ...(prev.local ?? {}), done: 1 } }));
+        setLocalDone(1);
+      }
       setErr(msg);
     } finally {
       setBusy(null);
