@@ -3,6 +3,8 @@ import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { Buffer } from "buffer";
 import { investFlow, optInApp } from "../chain/tx";
+import { getParamsNormalized } from "../chain/params";
+import { str, u64 } from "../chain/enc";
 import { resolveAppId, setSelectedAppId, getSelectedAppId, clearSelectedAppId } from "../state/appId";
 import { getAccountBalanceMicroAlgos } from "../chain/balance";
 import { QRCodeCanvas } from "qrcode.react";
@@ -194,14 +196,22 @@ function SubjectActionsInner() {
     id: string;
     ts: number;
     status: 'submitted' | 'confirmed' | 'rejected';
+    op?: 'invest' | 'return';
     round?: number;
     txId?: string;
     appCallTxId?: string;
     paymentTxId?: string;
     reason?: string;
+    rAmount?: number;
+    tAmount?: number;
+    s1?: string;
   };
   const [inlineStatus, setInlineStatus] = useState<{ phase: 'submitted' | 'confirmed' | 'rejected'; text: string; round?: number; txId?: string; appCallTxId?: string; paymentTxId?: string } | null>(null);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  // Subject — Return form/state
+  const [returnS1, setReturnS1] = useState<string>("");
+  const [returnRInput, setReturnRInput] = useState<string>("");
+  const [returnStatus, setReturnStatus] = useState<{ phase: 'submitted' | 'confirmed' | 'rejected'; text: string; round?: number; txId?: string } | null>(null);
 
   const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
 
@@ -511,7 +521,7 @@ function SubjectActionsInner() {
     try {
       const activityId = Math.random().toString(36).slice(2);
       setInlineStatus({ phase: 'submitted', text: 'Invest submitted… (waiting for confirmation)' });
-      setActivity(prev => [{ id: activityId, ts: Date.now(), status: 'submitted' as const } as ActivityEntry, ...prev].slice(0, 5));
+      setActivity(prev => [{ id: activityId, ts: Date.now(), status: 'submitted' as const, op: 'invest' } as ActivityEntry, ...prev].slice(0, 5));
       const id = resolveAppId();
       console.info("[appId] resolved =", id);
       console.debug("[SubjectActions] invest submit", { sender: activeAddress, appId: id, s });
@@ -603,6 +613,86 @@ function SubjectActionsInner() {
     Number(sInput) % unit !== 0 ||
     Number(sInput) > E;
 
+  // ----- Return flow -----
+  const globalsTVal: number = (() => { const g: any = pair.globals as any; const v = g && typeof g.t === 'number' ? Number(g.t) : 0; return Number.isFinite(v) ? v : 0; })();
+  const globalsRet: number = (() => { const g: any = pair.globals as any; const v = g && typeof g.ret === 'number' ? Number(g.ret) : 0; return Number.isFinite(v) ? v : 0; })();
+  const rNum = Number(returnRInput || "0");
+  const rValid = Number.isInteger(rNum) && rNum >= 0 && rNum <= globalsTVal;
+  const hasFundsInfo = typeof funds.balance === 'number';
+  const underfundedForReturn = globalsTVal > 0 && hasFundsInfo && (funds.balance as number) < globalsTVal;
+  const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || globalsTVal <= 0 || globalsRet === 1 || !rValid || underfundedForReturn || !returnS1 || returnS1.length < 58;
+
+  async function doReturn() {
+    setErr(null);
+    if (!activeAddress) return setErr("Connect wallet as subject.");
+    if (!hasResolvedAppId) return setErr("Enter/select a numeric App ID.");
+    const t = globalsTVal;
+    if (!(t > 0)) return setErr("Nothing available to return (t == 0).");
+    const r = Number(returnRInput || "0");
+    if (!Number.isInteger(r) || r < 0 || r > t) return setErr(`Enter r in range 0..${t}.`);
+    const s1 = returnS1.trim();
+    if (s1.length < 58) return setErr("Enter S1 address.");
+    if (hasFundsInfo && underfundedForReturn) return setErr("App underfunded; check funds.");
+
+    setBusy('return');
+    try {
+      const id = resolveAppId();
+      const { senderResolved } = resolveSender();
+      // Toast + status
+      setReturnStatus({ phase: 'submitted', text: 'Return submitted… (waiting for confirmation)' });
+      const activityId = Math.random().toString(36).slice(2);
+      setActivity(prev => [{ id: activityId, ts: Date.now(), status: 'submitted' as const, op: 'return', rAmount: r, tAmount: t, s1 } as ActivityEntry, ...prev].slice(0, 5));
+      toast.show({ kind: 'info', title: 'Return submitted', description: 'Pending confirmation…' });
+
+      const sp: any = await getParamsNormalized();
+      const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
+      const call: any = (algosdk as any).makeApplicationNoOpTxnFromObject({
+        sender: senderResolved,
+        appIndex: id,
+        appArgs: [str('return'), u64(r)],
+        accounts: [s1],
+        suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
+      });
+      const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
+      const payload = { stxns: stxns.map((b: Uint8Array) => Buffer.from(b).toString('base64')) };
+      const sub = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const subText = await sub.text();
+      if (!sub.ok) throw new Error(`Return submit ${sub.status}: ${subText}`);
+      let sj: any; try { sj = JSON.parse(subText); } catch { sj = {}; }
+      const txId: string = sj?.txId || sj?.txid || sj?.txID;
+      if (!txId) throw new Error('Missing txId');
+      // attach txId to activity for LoRA link rendering
+      setActivity(prev => prev.map(e => e.id === activityId ? { ...e, txId } : e));
+
+      const pendR = await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`);
+      const pendText = await pendR.text();
+      if (!pendR.ok) {
+        const { reason } = parseLogicError(pendText);
+        toast.show({ kind: 'error', title: 'Return rejected', description: reason });
+        setReturnStatus({ phase: 'rejected', text: `Return rejected: ${reason}` });
+        setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'rejected', reason } : e));
+        return;
+      }
+      let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
+      const confirmedRound: number | undefined = pend?.['confirmed-round'] ?? pend?.confirmedRound;
+      // Success
+      toast.show({ kind: 'success', title: 'Return confirmed', description: confirmedRound ? `Round ${confirmedRound}` : undefined, actions: txId ? [{ label: 'View on LoRA', href: loraTxUrl(txId) }] : undefined });
+      setReturnStatus({ phase: 'confirmed', text: confirmedRound ? `Return confirmed in round ${confirmedRound}` : 'Return confirmed', round: confirmedRound, txId });
+      setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'confirmed', round: confirmedRound } : e));
+      // reflect ret=1 immediately
+      setPair(prev => ({ ...prev, globals: { ...(prev.globals ?? {}), ret: 1 } } as any));
+    } catch (e: any) {
+      console.error('[SubjectActions] return failed', e);
+      const msg = e?.message || String(e);
+      const { reason } = parseLogicError(msg);
+      toast.show({ kind: 'error', title: 'Return rejected', description: reason });
+      setReturnStatus({ phase: 'rejected', text: `Return rejected: ${reason}` });
+      setErr(msg);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="rounded-2xl border p-4 space-y-3" style={{ position: "relative" }}>
       <h3 className="text-lg font-semibold">Subject — Invest</h3>
@@ -673,29 +763,53 @@ function SubjectActionsInner() {
         <div className="text-xs text-neutral-700">
           <div className="font-semibold">Activity</div>
           <ul className="mt-1">
-            {activity.slice(0, 5).map((e) => (
-              <li key={e.id} className="mt-1">
-                <span className="text-neutral-500">{new Date(e.ts).toLocaleTimeString()}</span>
-                {' '}
-                {e.status === 'submitted' && <span>Invest submitted…</span>}
-                {e.status === 'confirmed' && <span className="text-green-700">Invest confirmed in round {e.round}</span>}
-                {e.status === 'rejected' && <span className="text-red-600">Invest rejected{e.reason ? `: ${e.reason}` : ''}</span>}
-                {' '}
-                {(() => {
-                  const links: { label: string; href: string }[] = [];
-                  if (e.appCallTxId) links.push({ label: 'AppCall', href: loraTxUrl(e.appCallTxId) });
-                  if (e.paymentTxId) links.push({ label: 'Payment', href: loraTxUrl(e.paymentTxId) });
-                  if (links.length === 0 && e.txId) links.push({ label: 'View', href: loraTxUrl(e.txId) });
-                  return links.length ? (
-                    <>
-                      {links.map((l, i) => (
-                        <a key={i} href={l.href} target="_blank" rel="noreferrer" className="underline text-blue-700 ml-1">{l.label}</a>
-                      ))}
-                    </>
-                  ) : null;
-                })()}
-              </li>
-            ))}
+            {activity.slice(0, 5).map((e) => {
+              const isReturn = e.op === 'return';
+              const tStr = typeof e.tAmount === 'number' ? e.tAmount.toLocaleString() : undefined;
+              const rStr = typeof e.rAmount === 'number' ? e.rAmount.toLocaleString() : undefined;
+              const remStr = (typeof e.tAmount === 'number' && typeof e.rAmount === 'number') ? Math.max(0, e.tAmount - e.rAmount).toLocaleString() : undefined;
+              return (
+                <li key={e.id} className="mt-1">
+                  <span className="text-neutral-500">{new Date(e.ts).toLocaleTimeString()}</span>
+                  {' '}
+                  {e.status === 'submitted' && (
+                    isReturn ? (
+                      <span>Return submitted…{(rStr && tStr) ? ` (r: ${rStr}, t: ${tStr})` : ''}</span>
+                    ) : (
+                      <span>Invest submitted…</span>
+                    )
+                  )}
+                  {e.status === 'confirmed' && (
+                    isReturn ? (
+                      <span className="text-green-700">Return confirmed in round {e.round}{(rStr && remStr) ? ` — S1 gets ${rStr}, S2 gets ${remStr}` : ''}</span>
+                    ) : (
+                      <span className="text-green-700">Invest confirmed in round {e.round}</span>
+                    )
+                  )}
+                  {e.status === 'rejected' && (
+                    isReturn ? (
+                      <span className="text-red-600">Return rejected{e.reason ? `: ${e.reason}` : ''}</span>
+                    ) : (
+                      <span className="text-red-600">Invest rejected{e.reason ? `: ${e.reason}` : ''}</span>
+                    )
+                  )}
+                  {' '}
+                  {(() => {
+                    const links: { label: string; href: string }[] = [];
+                    if (e.appCallTxId) links.push({ label: 'AppCall', href: loraTxUrl(e.appCallTxId) });
+                    if (e.paymentTxId) links.push({ label: 'Payment', href: loraTxUrl(e.paymentTxId) });
+                    if (links.length === 0 && e.txId) links.push({ label: 'View', href: loraTxUrl(e.txId) });
+                    return links.length ? (
+                      <>
+                        {links.map((l, i) => (
+                          <a key={i} href={l.href} target="_blank" rel="noreferrer" className="underline text-blue-700 ml-1">{l.label}</a>
+                        ))}
+                      </>
+                    ) : null;
+                  })()}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -824,6 +938,46 @@ function SubjectActionsInner() {
           <span className="text-xs text-amber-600">Already invested (done == 1).</span>
         ) : (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
           <span className="text-xs text-amber-600">App balance low; needs ≥ 0.20 ALGO</span>
+        )}
+      </div>
+
+      {/* Subject — Return */}
+      <div className="mt-4 rounded-xl border p-3 space-y-2">
+        <h4 className="text-md font-semibold">Subject — Return</h4>
+        <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '—'} µAlgos (3 × s)</div>
+        <div className="flex items-center gap-2 text-sm">
+          <span>S1 address:</span>
+          <input
+            className="border rounded px-2 py-1 w-96"
+            placeholder="Investor S1 address"
+            value={returnS1}
+            onChange={(e)=> setReturnS1(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <span>r (µAlgos):</span>
+          <input
+            inputMode="numeric"
+            pattern="\\d*"
+            className="border rounded px-2 py-1 w-44"
+            value={returnRInput}
+            onChange={(e)=> setReturnRInput(e.target.value.replace(/[^\d]/g, ''))}
+            placeholder={`0 ≤ r ≤ ${globalsTVal || 0}`}
+          />
+          <button className="text-xs underline" onClick={doReturn} disabled={returnDisabled}>
+            {busy === 'return' ? 'Returning…' : 'Return'}
+          </button>
+        </div>
+        {globalsRet === 1 && <div className="text-xs text-amber-700">Already returned.</div>}
+        {globalsTVal <= 0 && <div className="text-xs text-amber-700">Nothing available to return (t == 0).</div>}
+        {(!rValid && globalsTVal > 0) && <div className="text-xs text-amber-700">Enter r between 0 and {globalsTVal}.</div>}
+        {underfundedForReturn && <div className="text-xs text-amber-700">Underfunded: needs ≥ {globalsTVal.toLocaleString()} µAlgos in app.</div>}
+        {returnStatus && (
+          <div className="text-xs">
+            {returnStatus.phase === 'submitted' && <span className="text-neutral-700">Return submitted… (waiting for confirmation)</span>}
+            {returnStatus.phase === 'confirmed' && <span className="text-green-700">{returnStatus.text}</span>}
+            {returnStatus.phase === 'rejected' && <span className="text-red-600">{returnStatus.text}</span>}
+          </div>
         )}
       </div>
 
