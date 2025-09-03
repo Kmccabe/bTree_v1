@@ -210,19 +210,21 @@ invest:
   app_local_put
 
   // compute t = 3 * s and persist to local (mirror) and global
-  // assume s in scratch slot 0
+  // assume s in scratch slot 0; use adds to avoid mul opcode
   load 0
-  int 3
-  mul                 // 3*s
-  dup                 // duplicate for local+global stores
+  dup
+  dup
+  add                 // s + s
+  add                 // (s+s) + s = 3*s
+  store 6             // keep t in scratch 6
   // local mirror: sender.t = 3*s
   txn Sender
   byte "t"
-  swap                // bring value under key
+  load 6
   app_local_put
   // global: t = 3*s
   byte "t"
-  swap
+  load 6
   app_global_put
 
   txn Sender
