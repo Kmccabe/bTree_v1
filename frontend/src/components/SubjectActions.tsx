@@ -899,10 +899,10 @@ function SubjectActionsInner() {
               const needsFunding = tVal > 0 && (funds.balance ?? 0) < tVal;
               return (
                 <div>
-                  App balance: {ok ? <span className="text-green-600">OK (>= 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs >= 0.20 ALGO)</span>} · {algo} ALGO
+                  App balance: {ok ? <span className="text-green-600">OK ({'>'}= 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs {'>'}= 0.20 ALGO)</span>} · {algo} ALGO
                   {needsFunding && (
                     <div className="mt-1 text-amber-700">
-                      App underfunded. Needs >= {tVal.toLocaleString()} microAlgos before Subject 2 can return. Use the QR below to fund.
+                      App underfunded. Needs {'>'}= {tVal.toLocaleString()} microAlgos before Subject 2 can return. Use the QR below to fund.
                     </div>
                   )}
                   {((!ok) || needsFunding) && appAddrPreview && (
@@ -1004,7 +1004,7 @@ function SubjectActionsInner() {
         {alreadyInvested ? (
           <span className="text-xs text-amber-600">Already invested (done == 1).</span>
         ) : (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
-          <span className="text-xs text-amber-600">App balance low; needs >= 0.20 ALGO</span>
+          <span className="text-xs text-amber-600">App balance low; needs {'>'}= 0.20 ALGO</span>
         )}
       </div>
 
@@ -1046,7 +1046,7 @@ function SubjectActionsInner() {
         {globalsRet === 1 && <div className="text-xs text-amber-700">Already returned.</div>}
         {globalsTVal <= 0 && <div className="text-xs text-amber-700">Nothing available to return (t == 0).</div>}
         {(!rValid && globalsTVal > 0) && <div className="text-xs text-amber-700">Enter r between 0 and {globalsTVal}.</div>}
-        {underfundedForReturn && <div className="text-xs text-amber-700">Underfunded: needs >= {globalsTVal.toLocaleString()} microAlgos in app.</div>}
+        {underfundedForReturn && <div className="text-xs text-amber-700">Underfunded: needs {'>'}= {globalsTVal.toLocaleString()} microAlgos in app.</div>}
         {returnStatus && (
           <div className="text-xs">
             {returnStatus.phase === 'submitted' && <span className="text-neutral-700">Return submitted… (waiting for confirmation)</span>}
@@ -1059,7 +1059,7 @@ function SubjectActionsInner() {
       {lastTx && <div className="text-xs">TxID: <code>{lastTx}</code></div>}
       {err && <div className="text-sm text-red-600">{err}</div>}
       <p className="text-xs text-neutral-500">
-        Requires: phase = 2, subject opted-in, 2-txn group, s multiple of UNIT, 0 <= s <= E.
+        Requires: phase = 2, subject opted-in, 2-txn group, s multiple of UNIT, 0 {'<='} s {'<='} E.
       </p>
       <ToastHost />
     </div>
