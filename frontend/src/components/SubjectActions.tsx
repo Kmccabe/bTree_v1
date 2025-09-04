@@ -662,6 +662,18 @@ function SubjectActionsInner() {
   })();
   const s1Valid = !!s1FromGlobals && ((algosdk as any).isValidAddress ? (algosdk as any).isValidAddress(s1FromGlobals) : (s1FromGlobals.length === 58));
   const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || globalsTVal <= 0 || globalsRet === 1 || !rValid || underfundedForReturn || !s1Valid;
+  const returnBlockers = useMemo(() => {
+    const msgs: string[] = [];
+    if (!hasResolvedAppId) msgs.push('App ID not set');
+    if (!activeAddress) msgs.push('Connect wallet');
+    if (!(globalsTVal > 0)) msgs.push('t == 0');
+    if (globalsRet === 1) msgs.push('Already returned');
+    if (!rValid) msgs.push(`Enter r between 0 and ${globalsTVal || 0}`);
+    if (!s1Valid) msgs.push('S1 not found (Read pair states after Invest)');
+    if (hasFundsInfo && underfundedForReturn) msgs.push(`Underfunded (needs ≥ ${globalsTVal.toLocaleString()} µAlgos)`);
+    if (busy) msgs.push('Busy');
+    return msgs;
+  }, [hasResolvedAppId, activeAddress, globalsTVal, globalsRet, rValid, s1Valid, hasFundsInfo, underfundedForReturn, busy]);
 
   async function doReturn() {
     setErr(null);
@@ -1027,6 +1039,9 @@ function SubjectActionsInner() {
             {busy === 'return' ? 'Returning…' : 'Return'}
           </button>
         </div>
+        {returnDisabled && returnBlockers.length > 0 && (
+          <div className="text-xs text-amber-700">Cannot return: {returnBlockers.join(' · ')}</div>
+        )}
         {globalsRet === 1 && <div className="text-xs text-amber-700">Already returned.</div>}
         {globalsTVal <= 0 && <div className="text-xs text-amber-700">Nothing available to return (t == 0).</div>}
         {(!rValid && globalsTVal > 0) && <div className="text-xs text-amber-700">Enter r between 0 and {globalsTVal}.</div>}
