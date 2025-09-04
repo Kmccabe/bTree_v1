@@ -641,8 +641,26 @@ function SubjectActionsInner() {
   const rValid = Number.isInteger(rNum) && rNum >= 0 && rNum <= globalsTVal;
   const hasFundsInfo = typeof funds.balance === 'number';
   const underfundedForReturn = globalsTVal > 0 && hasFundsInfo && (funds.balance as number) < globalsTVal;
-  const s1FromGlobals: string = (() => { const g:any = pair.globals as any; return (g && typeof g.s1 === 'string') ? g.s1 : ''; })();
-  const s1Valid = !!s1FromGlobals && (algosdk as any).isValidAddress ? (algosdk as any).isValidAddress(s1FromGlobals) : (s1FromGlobals.length === 58);
+  const s1FromGlobals: string = (() => {
+    const g:any = pair.globals as any;
+    const raw = g?.s1;
+    if (!raw) return '';
+    if (typeof raw === 'string') {
+      try { if ((algosdk as any).isValidAddress && (algosdk as any).isValidAddress(raw)) return raw; } catch {}
+      try {
+        const bytes = Buffer.from(raw, 'base64');
+        if (bytes && bytes.length === 32) { try { return (algosdk as any).encodeAddress(bytes); } catch {} }
+      } catch {}
+    }
+    if (raw && typeof raw.bytes === 'string') {
+      try {
+        const bytes = Buffer.from(raw.bytes, 'base64');
+        if (bytes && bytes.length === 32) { try { return (algosdk as any).encodeAddress(bytes); } catch {} }
+      } catch {}
+    }
+    return '';
+  })();
+  const s1Valid = !!s1FromGlobals && ((algosdk as any).isValidAddress ? (algosdk as any).isValidAddress(s1FromGlobals) : (s1FromGlobals.length === 58));
   const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || globalsTVal <= 0 || globalsRet === 1 || !rValid || underfundedForReturn || !s1Valid;
 
   async function doReturn() {
@@ -991,6 +1009,9 @@ function SubjectActionsInner() {
           </button>
         </div>
         <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '—'} µAlgos (3 × s)</div>
+        {!s1Valid && (
+          <div className="text-xs text-amber-700">S1 (investor) not found yet. Ensure Invest confirmed and click Read pair states.</div>
+        )}
         {/* No S1 input needed; contract tracks S1 globally */}
         <div className="flex items-center gap-2 text-sm">
           <span>r (µAlgos):</span>
