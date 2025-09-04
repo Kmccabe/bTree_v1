@@ -248,6 +248,12 @@ export default function PhaseControl({ appId, account, network }: Props) {
         <strong>Phase Control</strong>
         <span style={{ fontSize: 12, color: "#666" }}>App ID: {resolvedAppId ?? "-"}</span>
       </div>
+
+      <p className="text-sm text-gray-500 mt-2">
+        Phase 1 = Registration (opt-in only)<br/>
+        Phase 2 = Invest &amp; Return<br/>
+        Phase 3 = Settlement (creator-only sweep)
+      </p>
       {!netSanity.loading && (!netSanity.match || netSanity.error) && (
         <div style={{ marginTop: 8, border: "1px solid #f0b429", padding: 8, borderRadius: 6, background: "#fff7ed", color: "#92400e", fontSize: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 2 }}>Network mismatch</div>
