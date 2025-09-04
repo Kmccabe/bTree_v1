@@ -315,11 +315,6 @@ retpath:
   <=
   assert
 
-  // Load S1 from global and use as receiver for r
-  byte "s1"
-  app_global_get
-  store 12              // S1 address
-
   // Solvency: app_liquid >= t
   global CurrentApplicationAddress
   dup
@@ -332,12 +327,13 @@ retpath:
   assert
 
   // itxn #1: pay r -> S1
+  byte "s1"
+  app_global_get         // push S1 addr bytes and keep on stack for Receiver
   itxn_begin
   int pay
   itxn_field TypeEnum
   load 11
   itxn_field Amount
-  load 12
   itxn_field Receiver
   itxn_submit
 

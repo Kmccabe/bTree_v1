@@ -673,7 +673,6 @@ function SubjectActionsInner() {
         sender: senderResolved,
         appIndex: id,
         appArgs: [str('return'), u64(r)],
-        accounts: [s1],
         suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
       });
       const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
@@ -981,6 +980,16 @@ function SubjectActionsInner() {
       {/* Subject — Return */}
       <div className="mt-4 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Subject — Return</h4>
+        <div className="flex items-center gap-2 text-xs text-neutral-700">
+          <span>App ID:</span>
+          <code>{(() => { try { return resolveAppId(); } catch { return '(unset)'; } })()}</code>
+          <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>
+            Load globals
+          </button>
+          <button className="text-xs underline" onClick={doOptIn} disabled={!!busy || !activeAddress || !hasResolvedAppId}>
+            {busy === 'optin' ? 'Opting in…' : 'Opt-In'}
+          </button>
+        </div>
         <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '—'} µAlgos (3 × s)</div>
         {/* No S1 input needed; contract tracks S1 globally */}
         <div className="flex items-center gap-2 text-sm">
