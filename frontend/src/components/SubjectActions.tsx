@@ -699,11 +699,18 @@ function SubjectActionsInner() {
 
       const sp: any = await getParamsNormalized();
       const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
+      // Provide relevant accounts explicitly for compatibility with older TEAL
+      // variants that reference txna Accounts for S1/S2 during Return.
+      const accounts: string[] = [];
+      if (s1 && (algosdk as any).isValidAddress?.(s1)) accounts.push(s1);
+      if (senderResolved && (!accounts.length || accounts[0] !== senderResolved)) accounts.push(senderResolved);
       const call: any = (algosdk as any).makeApplicationNoOpTxnFromObject({
         sender: senderResolved,
         appIndex: id,
         appArgs: [str('return'), u64(r)],
-        suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
+        accounts,
+        // Two inner payments → use higher flat fee
+        suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 4 },
       });
       const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
       const payload = { stxns: stxns.map((b: Uint8Array) => Buffer.from(b).toString('base64')) };
