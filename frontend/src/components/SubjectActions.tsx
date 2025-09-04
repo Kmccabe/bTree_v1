@@ -619,7 +619,9 @@ function SubjectActionsInner() {
   const rValid = Number.isInteger(rNum) && rNum >= 0 && rNum <= globalsTVal;
   const hasFundsInfo = typeof funds.balance === 'number';
   const underfundedForReturn = globalsTVal > 0 && hasFundsInfo && (funds.balance as number) < globalsTVal;
-  const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || globalsTVal <= 0 || globalsRet === 1 || !rValid || underfundedForReturn;
+  const s1FromGlobals: string = (() => { const g:any = pair.globals as any; return (g && typeof g.s1 === 'string') ? g.s1 : ''; })();
+  const s1Valid = !!s1FromGlobals && (algosdk as any).isValidAddress ? (algosdk as any).isValidAddress(s1FromGlobals) : (s1FromGlobals.length === 58);
+  const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || globalsTVal <= 0 || globalsRet === 1 || !rValid || underfundedForReturn || !s1Valid;
 
   async function doReturn() {
     setErr(null);
@@ -629,6 +631,8 @@ function SubjectActionsInner() {
     if (!(t > 0)) return setErr("Nothing available to return (t == 0).");
     const r = Number(returnRInput || "0");
     if (!Number.isInteger(r) || r < 0 || r > t) return setErr(`Enter r in range 0..${t}.`);
+    const s1 = s1FromGlobals;
+    if (!s1Valid) return setErr('Missing S1 (investor) address in globals. Read Pair States or try again.');
     if (hasFundsInfo && underfundedForReturn) return setErr("App underfunded; check funds.");
 
     setBusy('return');
@@ -647,6 +651,7 @@ function SubjectActionsInner() {
         sender: senderResolved,
         appIndex: id,
         appArgs: [str('return'), u64(r)],
+        accounts: [s1],
         suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
       });
       const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
