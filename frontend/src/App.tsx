@@ -349,7 +349,7 @@ export default function App(): JSX.Element {
           <SubjectActions />
         </div>
       </div>
-      <h1>bTree v1 — Trust Game MVP</h1>
+      <h1>bTree v1 - Trust Game MVP</h1>
       <p><strong>Network:</strong> {network} (wallet = use-wallet/Pera)</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
@@ -377,10 +377,10 @@ export default function App(): JSX.Element {
         <p>
           TxID: <code>{txid}</code>
           {loraTxUrl && (
-            <> — <a href={loraTxUrl} target="_blank" rel="noreferrer">View in Lora</a></>
+            <> - <a href={loraTxUrl} target="_blank" rel="noreferrer">View in Lora</a></>
           )}
           {txJsonUrl && (
-            <> — <a href={txJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
+            <> - <a href={txJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
           )}
           {/* Pera Explorer link hidden for now */}
         </p>
@@ -389,10 +389,10 @@ export default function App(): JSX.Element {
         <p>
           ✅ App ID: <strong>{appId}</strong>
           {loraAppUrl && (
-            <> — <a href={loraAppUrl} target="_blank" rel="noreferrer">Open in Lora</a></>
+            <> - <a href={loraAppUrl} target="_blank" rel="noreferrer">Open in Lora</a></>
           )}
           {appJsonUrl && (
-            <> — <a href={appJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
+            <> - <a href={appJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
           )}
           {/* Pera Explorer link hidden for now */}
         </p>

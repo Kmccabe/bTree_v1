@@ -31,7 +31,7 @@ export default function ManifestCard({ manifest }: { manifest: Manifest }) {
       <div style={{ fontSize: 14, lineHeight: 1.5 }}>
         <div><strong>Name:</strong> {manifest.name}</div>
         <div><strong>Network:</strong> {manifest.network}</div>
-        <div><strong>App ID:</strong> {manifest.appId ?? "—"}</div>
+        <div><strong>App ID:</strong> {manifest.appId ?? "-"}</div>
         {manifest.deployTxId && <div><strong>Deploy TxID:</strong> <code>{manifest.deployTxId}</code></div>}
         {manifest.algod && <div><strong>Algod:</strong> {manifest.algod}</div>}
         {manifest.indexer && <div><strong>Indexer:</strong> {manifest.indexer}</div>}

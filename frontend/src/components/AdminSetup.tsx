@@ -150,12 +150,12 @@ export default function AdminSetup() {
 
   return (
     <div className="rounded-2xl border p-4 space-y-4">
-      <h3 className="text-lg font-semibold">Admin — Deploy & Manage Pair</h3>
+      <h3 className="text-lg font-semibold">Admin - Deploy & Manage Pair</h3>
 
       {/* Deploy controls */}
       <div className="grid grid-cols-3 gap-3">
         <label className="flex flex-col">
-          <span className="text-sm">Endowment E (µAlgos)</span>
+          <span className="text-sm">Endowment E (microAlgos)</span>
           <input type="number" min={0} step={UNIT || 1} value={E}
             onChange={(e)=>setE(Number(e.target.value))} className="border rounded p-2" />
         </label>
@@ -165,7 +165,7 @@ export default function AdminSetup() {
             onChange={(e)=>setM(Number(e.target.value))} className="border rounded p-2" />
         </label>
         <label className="flex flex-col">
-          <span className="text-sm">UNIT (µAlgos step)</span>
+          <span className="text-sm">UNIT (microAlgos step)</span>
           <input type="number" min={1} step={1} value={UNIT}
             onChange={(e)=>setUNIT(Number(e.target.value))} className="border rounded p-2" />
         </label>
@@ -241,11 +241,11 @@ export default function AdminSetup() {
             </div>
           )}
           <div className="text-sm">
-            Required pool (est.): <b>{nf(required)}</b> µAlgos ·
+            Required pool (est.): <b>{nf(required)}</b> microAlgos ·
             <button onClick={checkFunding} disabled={!!busy} className="underline ml-2">Check funding</button>
             {fund && (
               <span className={`ml-2 ${fund.ok ? "text-green-600" : "text-amber-600"}`}>
-                {fund.balance != null ? `Balance ${nf(fund.balance)} µAlgos` : ""} {fund.ok ? "(OK)" : "(Needs funds)"}
+                {fund.balance != null ? `Balance ${nf(fund.balance)} microAlgos` : ""} {fund.ok ? "(OK)" : "(Needs funds)"}
               </span>
             )}
           </div>

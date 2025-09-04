@@ -26,9 +26,14 @@ function decodeGlobalState(gs: any[] | undefined) {
       rows.push({ key, type: "uint", uint });
       map[key] = uint;
     } else if (val?.type === 1) {
+      // Always expose bytes as base64 in the primary map to avoid
+      // misinterpreting opaque bytes (like 32-byte addresses) as UTF-8.
+      // Include a best-effort UTF-8 preview only in the rows metadata.
       const { str, bytesB64 } = b64ToUtf8Safe(String(val?.bytes || ""));
       rows.push({ key, type: "bytes", bytesB64, ...(str ? { str } : {}) });
-      map[key] = str ?? bytesB64;
+      // Preserve compatibility with callers that expect either a string
+      // base64 or an object with a `bytes` field.
+      map[key] = { bytes: bytesB64, ...(str ? { str } : {}) };
     }
   }
   return { map, rows };

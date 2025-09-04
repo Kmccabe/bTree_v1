@@ -150,7 +150,7 @@ function ToastHost() {
               )}
             </div>
             <button onClick={() => remove(t.id)} className="ml-2 text-neutral-500 hover:text-neutral-800" aria-label="Dismiss" title="Dismiss">
-              ×
+              x
             </button>
           </div>
         </div>
@@ -534,9 +534,9 @@ function SubjectActionsInner() {
     if (!hasResolvedAppId) return setErr("Enter/select a numeric App ID (not the App Address).");
 
     const s = Number(sInput);
-    if (!Number.isInteger(s) || s < 0) return setErr("Enter a whole number of µAlgos for s.");
+    if (!Number.isInteger(s) || s < 0) return setErr("Enter a whole number of microAlgos for s.");
     if (s % unit !== 0) return setErr(`s must be a multiple of UNIT (${unit}).`);
-    if (s > E) return setErr(`s must be ≤ E (${E}).`);
+    if (s > E) return setErr(`s must be <= E (${E}).`);
 
     setBusy("invest");
     try {
@@ -670,7 +670,7 @@ function SubjectActionsInner() {
     if (globalsRet === 1) msgs.push('Already returned');
     if (!rValid) msgs.push(`Enter r between 0 and ${globalsTVal || 0}`);
     if (!s1Valid) msgs.push('S1 not found (Read pair states after Invest)');
-    if (hasFundsInfo && underfundedForReturn) msgs.push(`Underfunded (needs ≥ ${globalsTVal.toLocaleString()} µAlgos)`);
+    if (hasFundsInfo && underfundedForReturn) msgs.push(`Underfunded (needs >= ${globalsTVal.toLocaleString()} microAlgos)`);
     if (busy) msgs.push('Busy');
     return msgs;
   }, [hasResolvedAppId, activeAddress, globalsTVal, globalsRet, rValid, s1Valid, hasFundsInfo, underfundedForReturn, busy]);
@@ -747,7 +747,7 @@ function SubjectActionsInner() {
 
   return (
     <div className="rounded-2xl border p-4 space-y-3" style={{ position: "relative" }}>
-      <h3 className="text-lg font-semibold">Subject — Invest</h3>
+      <h3 className="text-lg font-semibold">Subject - Invest</h3>
 
       {/* App ID + read */}
       <div className="flex items-center gap-2 text-sm">
@@ -833,7 +833,7 @@ function SubjectActionsInner() {
                   )}
                   {e.status === 'confirmed' && (
                     isReturn ? (
-                      <span className="text-green-700">Return confirmed in round {e.round}{(rStr && remStr) ? ` — S1 gets ${rStr}, S2 gets ${remStr}` : ''}</span>
+                      <span className="text-green-700">Return confirmed in round {e.round}{(rStr && remStr) ? ` - S1 gets ${rStr}, S2 gets ${remStr}` : ''}</span>
                     ) : (
                       <span className="text-green-700">Invest confirmed in round {e.round}</span>
                     )
@@ -899,10 +899,10 @@ function SubjectActionsInner() {
               const needsFunding = tVal > 0 && (funds.balance ?? 0) < tVal;
               return (
                 <div>
-                  App balance: {ok ? <span className="text-green-600">OK (≥ 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs ≥ 0.20 ALGO)</span>} · {algo} ALGO
+                  App balance: {ok ? <span className="text-green-600">OK (>= 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs >= 0.20 ALGO)</span>} · {algo} ALGO
                   {needsFunding && (
                     <div className="mt-1 text-amber-700">
-                      App underfunded. Needs ≥ {tVal.toLocaleString()} µAlgos before Subject 2 can return. Use the QR below to fund.
+                      App underfunded. Needs >= {tVal.toLocaleString()} microAlgos before Subject 2 can return. Use the QR below to fund.
                     </div>
                   )}
                   {((!ok) || needsFunding) && appAddrPreview && (
@@ -968,10 +968,11 @@ function SubjectActionsInner() {
             {(() => {
               const g:any = pair.globals as any;
               const tVal = g && typeof g.t === 'number' ? Number(g.t) : 0;
-              const s1 = g && typeof g.s1 === 'string' ? g.s1 : '';
+              // Display investor address derived from globals.s1 (bytes b64)
+              const s1 = s1FromGlobals;
               return (
                 <div className="space-y-1">
-                  <div>Available for Subject 2: {tVal > 0 ? tVal.toLocaleString() : '—'} µAlgos (3 × s)</div>
+                  <div>Available for Subject 2: {tVal > 0 ? tVal.toLocaleString() : '-'} microAlgos (3 x s)</div>
                   {s1 && (
                     <div>
                       S1 (investor): <code className="break-all">{s1}</code>
@@ -986,14 +987,14 @@ function SubjectActionsInner() {
 
       {/* s input + invest */}
       <div className="flex items-center gap-2 text-sm">
-        <span>Invest s (µAlgos):</span>
+        <span>Invest s (microAlgos):</span>
         <input
           inputMode="numeric"
           pattern="\d*"
           className="border rounded px-2 py-1 w-44"
           value={sInput}
           onChange={(e) => setSInput(e.target.value.replace(/[^\d]/g, ""))}
-          placeholder={`multiple of ${unit}, ≤ ${E}`}
+          placeholder={`multiple of ${unit}, <= ${E}`}
         />
         <button className="text-xs underline" 
           onClick={doInvest}
@@ -1003,13 +1004,13 @@ function SubjectActionsInner() {
         {alreadyInvested ? (
           <span className="text-xs text-amber-600">Already invested (done == 1).</span>
         ) : (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
-          <span className="text-xs text-amber-600">App balance low; needs ≥ 0.20 ALGO</span>
+          <span className="text-xs text-amber-600">App balance low; needs >= 0.20 ALGO</span>
         )}
       </div>
 
-      {/* Subject — Return */}
+      {/* Subject - Return */}
       <div className="mt-4 rounded-xl border p-3 space-y-2">
-        <h4 className="text-md font-semibold">Subject — Return</h4>
+        <h4 className="text-md font-semibold">Subject - Return</h4>
         <div className="flex items-center gap-2 text-xs text-neutral-700">
           <span>App ID:</span>
           <code>{(() => { try { return resolveAppId(); } catch { return '(unset)'; } })()}</code>
@@ -1020,20 +1021,20 @@ function SubjectActionsInner() {
             {busy === 'optin' ? 'Opting in…' : 'Opt-In'}
           </button>
         </div>
-        <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '—'} µAlgos (3 × s)</div>
+        <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '-'} microAlgos (3 x s)</div>
         {!s1Valid && (
           <div className="text-xs text-amber-700">S1 (investor) not found yet. Ensure Invest confirmed and click Read pair states.</div>
         )}
         {/* No S1 input needed; contract tracks S1 globally */}
         <div className="flex items-center gap-2 text-sm">
-          <span>r (µAlgos):</span>
+          <span>r (microAlgos):</span>
           <input
             inputMode="numeric"
             pattern="\\d*"
             className="border rounded px-2 py-1 w-44"
             value={returnRInput}
             onChange={(e)=> setReturnRInput(e.target.value.replace(/[^\d]/g, ''))}
-            placeholder={`0 ≤ r ≤ ${globalsTVal || 0}`}
+            placeholder={`0 <= r <= ${globalsTVal || 0}`}
           />
           <button className="text-xs underline" onClick={doReturn} disabled={returnDisabled}>
             {busy === 'return' ? 'Returning…' : 'Return'}
@@ -1045,7 +1046,7 @@ function SubjectActionsInner() {
         {globalsRet === 1 && <div className="text-xs text-amber-700">Already returned.</div>}
         {globalsTVal <= 0 && <div className="text-xs text-amber-700">Nothing available to return (t == 0).</div>}
         {(!rValid && globalsTVal > 0) && <div className="text-xs text-amber-700">Enter r between 0 and {globalsTVal}.</div>}
-        {underfundedForReturn && <div className="text-xs text-amber-700">Underfunded: needs ≥ {globalsTVal.toLocaleString()} µAlgos in app.</div>}
+        {underfundedForReturn && <div className="text-xs text-amber-700">Underfunded: needs >= {globalsTVal.toLocaleString()} microAlgos in app.</div>}
         {returnStatus && (
           <div className="text-xs">
             {returnStatus.phase === 'submitted' && <span className="text-neutral-700">Return submitted… (waiting for confirmation)</span>}
@@ -1058,7 +1059,7 @@ function SubjectActionsInner() {
       {lastTx && <div className="text-xs">TxID: <code>{lastTx}</code></div>}
       {err && <div className="text-sm text-red-600">{err}</div>}
       <p className="text-xs text-neutral-500">
-        Requires: phase = 2, subject opted-in, 2-txn group, s multiple of UNIT, 0 ≤ s ≤ E.
+        Requires: phase = 2, subject opted-in, 2-txn group, s multiple of UNIT, 0 <= s <= E.
       </p>
       <ToastHost />
     </div>

@@ -27,7 +27,7 @@ export default function WalletStatus({ address }: { address?: string | null }) {
   const fmt = new Intl.NumberFormat();
   return (
     <span style={{ fontSize: 12, color: state.ok ? "#16a34a" : "#dc2626" }}>
-      spendable: {fmt.format(state.spendable)} µAlgos {state.ok ? "(ok)" : "(low)"}
+      spendable: {fmt.format(state.spendable)} microAlgos {state.ok ? "(ok)" : "(low)"}
     </span>
   );
 }

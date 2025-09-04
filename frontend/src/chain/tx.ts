@@ -363,7 +363,7 @@ export async function setPhase(args: {
 export async function investFlow(args: {
   sender: string;
   appId: number;
-  s: number; // µAlgos, non-negative integer
+  s: number; // microAlgos, non-negative integer
   sign: Signer;
   wait?: boolean;
 }): Promise<{ txId: string; confirmedRound?: number }> {
@@ -393,7 +393,7 @@ export async function investFlow(args: {
     throw new Error(`${TAG} invalid appId: ${appId}`);
   }
   if (!Number.isInteger(s) || s < 0) {
-    throw new Error(`${TAG} invalid s (µAlgos): ${s}`);
+    throw new Error(`${TAG} invalid s (microAlgos): ${s}`);
   }
 
   // Derive app address

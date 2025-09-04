@@ -165,7 +165,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     const id = resolveAppId();
     console.info("[appId] resolved =", id);
     if (!Number.isInteger(id) || id <= 0) throw new Error("Enter a valid App ID.");
-    if (!Number.isInteger(microAlgos) || microAlgos < 0) throw new Error("Bid must be a non-negative integer (µAlgos).");
+    if (!Number.isInteger(microAlgos) || microAlgos < 0) throw new Error("Bid must be a non-negative integer (microAlgos).");
     const { txId } = await placeBid({ appId: id, sender, microAlgos, sign: signer });
     const cr = await pollConfirmedRound(txId);
     if (cr) setChain(c => ({ ...c, confirmedRound: cr }));
@@ -246,7 +246,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
     <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 12, borderRadius: 8, background: "#fff" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <strong>Phase Control</strong>
-        <span style={{ fontSize: 12, color: "#666" }}>App ID: {resolvedAppId ?? "—"}</span>
+        <span style={{ fontSize: 12, color: "#666" }}>App ID: {resolvedAppId ?? "-"}</span>
       </div>
       {!netSanity.loading && (!netSanity.match || netSanity.error) && (
         <div style={{ marginTop: 8, border: "1px solid #f0b429", padding: 8, borderRadius: 6, background: "#fff7ed", color: "#92400e", fontSize: 12 }}>
@@ -298,7 +298,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
           TxID: <code>{lastTxId}</code>
           {loraTxUrl && (
             <>
-              {" "}— <a href={loraTxUrl} target="_blank" rel="noreferrer">View in Lora</a>
+              {" "}- <a href={loraTxUrl} target="_blank" rel="noreferrer">View in Lora</a>
             </>
           )}
         </div>
@@ -324,7 +324,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
             <input type="text" value={fakeId} onChange={(e)=>setFakeId(e.target.value)} placeholder="SMOKE_YYYY-MM-DD_KAM" />
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span>Bid (µAlgos)</span>
+            <span>Bid (microAlgos)</span>
             <input type="number" min={0} value={microAlgos} onChange={(e)=>setMicroAlgos(Number(e.target.value||0))} />
           </label>
         </div>

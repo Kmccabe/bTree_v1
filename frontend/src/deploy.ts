@@ -135,7 +135,7 @@ export async function deployTrustGame(args: {
   const E = Number(args.E);
   const m = Number(args.m);
   const UNIT = Number(args.UNIT);
-  if (!Number.isInteger(E) || E < 0) throw new Error("E must be a non-negative integer (µAlgos)");
+  if (!Number.isInteger(E) || E < 0) throw new Error("E must be a non-negative integer (microAlgos)");
   if (!Number.isInteger(m) || m < 1) throw new Error("m must be an integer >= 1");
   if (!Number.isInteger(UNIT) || UNIT < 1) throw new Error("UNIT must be an integer >= 1");
 

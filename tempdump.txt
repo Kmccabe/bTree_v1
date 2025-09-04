@@ -1,0 +1,31 @@
+import React, { useEffect, useMemo, useRef, useState, useContext, useCallback } from "react";
+import { useWallet } from "@txnlab/use-wallet";
+import algosdk from "algosdk";
+import { Buffer } from "buffer";
+import { investFlow, optInApp } from "../chain/tx";
+import { getParamsNormalized } from "../chain/params";
+import { str, u64 } from "../chain/enc";
+import { resolveAppId, setSelectedAppId, getSelectedAppId, clearSelectedAppId } from "../state/appId";
+import { getAccountBalanceMicroAlgos } from "../chain/balance";
+import { QRCodeCanvas } from "qrcode.react";
+
+// ---------------------- Tiny local toast system (no deps) ----------------------
+type ToastKind = "info" | "success" | "error";
+type ToastAction = { label: string; href: string };
+type ToastItem = {
+  id: string;
+  kind: ToastKind;
+  title: string;
+  description?: string;
+  actions?: ToastAction[];
+  createdAt: number;
+};
+
+type ToastShowArgs = { title: string; description?: string; kind?: ToastKind; actions?: ToastAction[] };
+
+const ToastContext = React.createContext<{
+  show: (args: ToastShowArgs) => { id: string };
+  remove: (id: string) => void;
+  pauseTimer: (id: string) => void;
+  resumeTimer:
+
