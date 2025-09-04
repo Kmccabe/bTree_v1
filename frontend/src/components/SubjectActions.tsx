@@ -159,7 +159,11 @@ function ToastHost() {
   );
 }
 
-function loraTxUrl(txId: string) { return `https://lora.algorand.foundation/tx/${txId}?network=testnet`; }
+function loraTxUrl(txId: string) {
+  const net = (((import.meta as any).env?.VITE_NETWORK as string) || 'TESTNET').toUpperCase();
+  const chain = net === 'MAINNET' ? 'mainnet' : 'testnet';
+  return `https://lora.algokit.io/${chain}/tx/${txId}`;
+}
 
 // ---------------------- Component ----------------------
 export default function SubjectActions() {
