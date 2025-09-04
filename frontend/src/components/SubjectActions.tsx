@@ -192,6 +192,7 @@ function SubjectActionsInner() {
   const [localDone, setLocalDone] = useState<number | undefined>(undefined);
   const [localS, setLocalS] = useState<number | undefined>(undefined);
   const [localLoading, setLocalLoading] = useState<boolean>(false);
+  const [creatorAddr, setCreatorAddr] = useState<string>("");
   type ActivityEntry = {
     id: string;
     ts: number;
@@ -239,6 +240,27 @@ function SubjectActionsInner() {
       return typeof raw === "string" ? raw : raw?.toString?.();
     } catch { return ""; }
   }, [resolvedIdForAccount]);
+
+  // Fetch app creator (via indexer) when App ID changes
+  useEffect(() => {
+    (async () => {
+      try {
+        const id = resolveAppId();
+        if (!Number.isInteger(id) || id <= 0) return;
+        const net = ((import.meta as any).env?.VITE_NETWORK as string | undefined)?.toUpperCase?.() || "TESTNET";
+        const indexerBase = net === 'MAINNET'
+          ? ((((import.meta as any).env?.VITE_MAINNET_INDEXER_URL as string) || "https://mainnet-idx.algonode.cloud"))
+          : ((((import.meta as any).env?.VITE_TESTNET_INDEXER_URL as string) || "https://testnet-idx.algonode.cloud"));
+        const url = `${indexerBase.replace(/\/$/, "")}/v2/applications/${id}`;
+        const r = await fetch(url);
+        const j = await r.json().catch(() => ({} as any));
+        const cr = j?.application?.params?.creator || j?.application?.creator || j?.params?.creator || j?.creator;
+        if (typeof cr === 'string' && cr.length >= 58) setCreatorAddr(cr);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [appIdIn, activeAddress]);
 
   async function loadGlobals() {
     setErr(null);
@@ -898,6 +920,14 @@ function SubjectActionsInner() {
                   return parts.length ? parts.join(" · ") : JSON.stringify(g);
                 })()}
               </span>
+            </div>
+          )}
+          {(creatorAddr || (pair.globals as any)?.creator) && (
+            <div className="mb-1">
+              App creator: <code className="break-all">{(pair.globals as any)?.creator || creatorAddr}</code>
+              {((pair.globals as any)?.creator || creatorAddr) && (
+                <button className="text-xs underline ml-2" onClick={() => navigator.clipboard.writeText(((pair.globals as any)?.creator || creatorAddr) as string)}>Copy</button>
+              )}
             </div>
           )}
           {pair.local && (
