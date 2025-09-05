@@ -4,7 +4,6 @@ import { deployTrustGame } from "../deploy";
 import { setPhase, sweepApp } from "../chain/tx";
 import { resolveAppId, setSelectedAppId } from "../state/appId";
 import { QRCodeCanvas } from "qrcode.react";
-import { QRCodeCanvas } from "qrcode.react";
 
 const nf = (n: number) => Intl.NumberFormat().format(n);
 
