@@ -11,7 +11,7 @@ import {
 } from "./chain/tx";
 import { deployPlaceholderApp } from "./deploy";
 import ExportCSVButton from "./components/ExportCSVButton";
-import AdminSetup from "./components/AdminSetup";
+import AdminSetup from "./components/AdminSetup2";
 import SubjectActions from "./components/SubjectActions";
 import PhaseControl from "./components/PhaseControl";
 import AccountSelector from "./components/AccountSelector";

@@ -296,7 +296,7 @@ export async function setPhase(args: {
 
   if (!sender || !algosdk.isValidAddress(sender)) throw new Error(`${TAG} invalid sender`);
   if (!Number.isInteger(appId) || appId <= 0) throw new Error(`${TAG} invalid appId`);
-  if (!Number.isInteger(phase) || phase < 1 || phase > 4) throw new Error(`${TAG} invalid phase ${phase}`);
+  if (!Number.isInteger(phase) || phase < 0 || phase > 3) throw new Error(`${TAG} invalid phase ${phase}`);
 
   const sp: any = await getParamsNormalized();
   console.info("[tx] using params", {

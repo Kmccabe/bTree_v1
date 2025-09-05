@@ -125,17 +125,20 @@ export async function deployPlaceholderApp(fromAddr: string): Promise<{
 /** Deploy Trust Game app with globals E, m, UNIT set at create; returns txId, appId, and app address */
 export async function deployTrustGame(args: {
   sender: string;
-  E: number;
-  m: number;
-  UNIT: number;
+  E1: number;   // display-only (off-chain reference)
+  E2: number;   // paid to S2 at Return
+  m: number;    // multiplier (keep default 3)
+  UNIT: number; // granularity
   sign: (txns: Uint8Array[]) => Promise<Uint8Array[]>;
 }): Promise<{ txId: string; appId: number; appAddress: string }> {
   const from = (args.sender ?? "").toString().trim();
   if (!algosdk.isValidAddress(from)) throw new Error("Invalid sender address");
-  const E = Number(args.E);
+  const E1 = Number(args.E1);
+  const E2 = Number(args.E2);
   const m = Number(args.m);
   const UNIT = Number(args.UNIT);
-  if (!Number.isInteger(E) || E < 0) throw new Error("E must be a non-negative integer (microAlgos)");
+  if (!Number.isInteger(E1) || E1 < 0) throw new Error("E1 must be a non-negative integer (microAlgos)");
+  if (!Number.isInteger(E2) || E2 < 0) throw new Error("E2 must be a non-negative integer (microAlgos)");
   if (!Number.isInteger(m) || m < 1) throw new Error("m must be an integer >= 1");
   if (!Number.isInteger(UNIT) || UNIT < 1) throw new Error("UNIT must be an integer >= 1");
 
@@ -172,18 +175,21 @@ export async function deployTrustGame(args: {
     genesisID: params["genesis-id"],
   } as unknown as algosdk.SuggestedParams;
 
-  const appArgs = [u64(E), u64(m), u64(UNIT)];
-  const note = new TextEncoder().encode("bTree v1 trust game");
+  const appArgs = [u64(E1), u64(E2), u64(m), u64(UNIT)];
+  const note = new TextEncoder().encode("bTree v1 trust game (single-pair)");
   const txn = algosdk.makeApplicationCreateTxnFromObject({
     sender: from,
     suggestedParams,
     onComplete: algosdk.OnApplicationComplete.NoOpOC,
     approvalProgram: approvalProg,
     clearProgram: clearProg,
-    numGlobalByteSlices: 1, // s1
-    numGlobalInts: 7, // E, m, UNIT, phase, t, ret, swept
+    // Globals: UNIT, m, E1, E2, s, t, phase, invested, ret, swept (10 ints)
+    // Bytes: s1, s2 (2 byte-slices)
+    numGlobalByteSlices: 2,
+    numGlobalInts: 10,
     numLocalByteSlices: 0,
-    numLocalInts: 3,  // s, done, t
+    // Locals used by UI gating: s, done (and optionally t mirror)
+    numLocalInts: 3,
     appArgs,
     note,
   } as any);

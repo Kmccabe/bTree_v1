@@ -242,6 +242,16 @@ export default function PhaseControl({ appId, account, network }: Props) {
 
   const disabled = !resolvedAppId || !(account ?? connectedAddress) || !algosdk.isValidAddress((account ?? connectedAddress) as string);
 
+  // Quick phase setters (0..3)
+  const phaseButtons = (
+    <div className="flex items-center gap-2 text-xs mt-2">
+      <button disabled={!!busy || disabled} className="underline" onClick={() => setPhase(0)}>Set Phase: Registration (0)</button>
+      <button disabled={!!busy || disabled} className="underline" onClick={() => setPhase(1)}>Set Phase: Invest (1)</button>
+      <button disabled={!!busy || disabled} className="underline" onClick={() => setPhase(2)}>Set Phase: Return (2)</button>
+      <button disabled={!!busy || disabled} className="underline" onClick={() => setPhase(3)}>Set Phase: Done (3)</button>
+    </div>
+  );
+
   return (
     <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 12, borderRadius: 8, background: "#fff" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -250,10 +260,12 @@ export default function PhaseControl({ appId, account, network }: Props) {
       </div>
 
       <p className="text-sm text-gray-500 mt-2">
-        Phase 1 = Registration (opt-in only)<br/>
-        Phase 2 = Invest &amp; Return<br/>
-        Phase 3 = Settlement (creator-only sweep)
+        Phase 0 = Registration (opt-in S1/S2)<br/>
+        Phase 1 = Invest (S1 grouped payment + AppCall)<br/>
+        Phase 2 = Return (S2 single AppCall; pays r to S1 and t - r + E2 to S2)<br/>
+        Phase 3 = Done (creator-only sweep)
       </p>
+      {phaseButtons}
       {!netSanity.loading && (!netSanity.match || netSanity.error) && (
         <div style={{ marginTop: 8, border: "1px solid #f0b429", padding: 8, borderRadius: 6, background: "#fff7ed", color: "#92400e", fontSize: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 2 }}>Network mismatch</div>

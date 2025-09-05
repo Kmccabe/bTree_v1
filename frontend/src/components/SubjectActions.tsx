@@ -182,7 +182,8 @@ function SubjectActionsInner() {
   // Leave blank by default; rely on resolveAppId() for behavior (selected or env fallback)
   const [appIdIn, setAppIdIn] = useState<string>("");
   const [unit, setUnit] = useState<number>(1000);
-  const [E, setE] = useState<number>(100000);
+  const [E, setE] = useState<number>(100000); // E1 (S1 off-chain reference)
+  const [E2, setE2] = useState<number>(0);    // S2 paid at Return
 
   // invest uses string to avoid leading-zero quirks
   const [sInput, setSInput] = useState<string>("");
@@ -283,7 +284,9 @@ function SubjectActionsInner() {
       console.debug("[SubjectActions] /api/pair", r.status, j);
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
       setUnit(Number(j?.globals?.UNIT ?? 1000));
-      setE(Number(j?.globals?.E ?? 100000));
+      // Map new globals: E1/E2
+      setE(Number(j?.globals?.E1 ?? 100000));
+      setE2(Number(j?.globals?.E2 ?? 0));
 
       // also refresh subject local to keep Invest gating accurate
       try {
@@ -331,7 +334,8 @@ function SubjectActionsInner() {
       // Keep existing globals state in sync
       if (globals) {
         if (typeof globals.UNIT === 'number') setUnit(Number(globals.UNIT));
-        if (typeof globals.E === 'number') setE(Number(globals.E));
+        if (typeof globals.E1 === 'number') setE(Number(globals.E1));
+        if (typeof globals.E2 === 'number') setE2(Number(globals.E2));
       }
 
       const { senderResolved } = resolveSender();
@@ -648,7 +652,7 @@ function SubjectActionsInner() {
   const rNum = Number(returnRInput || "0");
   const rValid = Number.isInteger(rNum) && rNum >= 0 && rNum <= globalsTVal;
   const hasFundsInfo = typeof funds.balance === 'number';
-  const underfundedForReturn = globalsTVal > 0 && hasFundsInfo && (funds.balance as number) < globalsTVal;
+  const underfundedForReturn = globalsTVal > 0 && hasFundsInfo && (funds.balance as number) < (globalsTVal + (E2 || 0));
   const s1FromGlobals: string = (() => {
     const g:any = pair.globals as any;
     const raw = g?.s1;
@@ -678,7 +682,7 @@ function SubjectActionsInner() {
     if (globalsRet === 1) msgs.push('Already returned');
     if (!rValid) msgs.push(`Enter r between 0 and ${globalsTVal || 0}`);
     if (!s1Valid) msgs.push('S1 not found (Read pair states after Invest)');
-    if (hasFundsInfo && underfundedForReturn) msgs.push(`Underfunded (needs >= ${globalsTVal.toLocaleString()} microAlgos)`);
+    if (hasFundsInfo && underfundedForReturn) msgs.push(`Underfunded (needs >= ${(globalsTVal + (E2||0)).toLocaleString()} microAlgos)`);
     if (busy) msgs.push('Busy');
     return msgs;
   }, [hasResolvedAppId, activeAddress, globalsTVal, globalsRet, rValid, s1Valid, hasFundsInfo, underfundedForReturn, busy]);
@@ -1148,7 +1152,8 @@ function SubjectActionsInner() {
             {busy === 'optin' ? 'Opting in…' : 'Opt-In'}
           </button>
         </div>
-        <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '-'} microAlgos (3 x s)</div>
+        <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '-'} microAlgos (m x s, m=3)</div>
+        <div className="text-xs text-neutral-700">Constants: UNIT={unit}, E1={E.toLocaleString()}, E2={E2.toLocaleString()}</div>
         {!s1Valid && (
           <div className="text-xs text-amber-700">S1 (investor) not found yet. Ensure Invest confirmed and click Read pair states.</div>
         )}
@@ -1173,7 +1178,7 @@ function SubjectActionsInner() {
         {globalsRet === 1 && <div className="text-xs text-amber-700">Already returned.</div>}
         {globalsTVal <= 0 && <div className="text-xs text-amber-700">Nothing available to return (t == 0).</div>}
         {(!rValid && globalsTVal > 0) && <div className="text-xs text-amber-700">Enter r between 0 and {globalsTVal}.</div>}
-        {underfundedForReturn && <div className="text-xs text-amber-700">Underfunded: needs {'>'}= {globalsTVal.toLocaleString()} microAlgos in app.</div>}
+        {underfundedForReturn && <div className="text-xs text-amber-700">Underfunded: needs {'>'}= {(globalsTVal + (E2||0)).toLocaleString()} microAlgos in app.</div>}
         {returnStatus && (
           <div className="text-xs">
             {returnStatus.phase === 'submitted' && <span className="text-neutral-700">Return submitted… (waiting for confirmation)</span>}
@@ -1186,7 +1191,7 @@ function SubjectActionsInner() {
       {lastTx && <div className="text-xs">TxID: <code>{lastTx}</code></div>}
       {err && <div className="text-sm text-red-600">{err}</div>}
       <p className="text-xs text-neutral-500">
-        Requires: phase = 2, subject opted-in, 2-txn group, s multiple of UNIT, 0 {'<='} s {'<='} E.
+        Invest: phase 1 or 0 (when both subjects set), 2-txn group, s multiple of UNIT, 0 {'<='} s {'<='} E1. Return: phase 2, r multiple of UNIT, balance {'>='} t + E2.
       </p>
 
       {/* Quick Demo (single account) */}
