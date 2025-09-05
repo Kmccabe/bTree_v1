@@ -4,6 +4,7 @@ import { deployTrustGame } from "../deploy";
 import { setPhase, sweepApp } from "../chain/tx";
 import { resolveAppId, setSelectedAppId } from "../state/appId";
 import { QRCodeCanvas } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 
 const nf = (n: number) => Intl.NumberFormat().format(n);
 
@@ -27,6 +28,10 @@ export default function AdminSetup2() {
 
   // Manage existing pair
   const [manualAppId, setManualAppId] = useState<string>("");
+
+  // Admin controls
+  const [phaseSel, setPhaseSel] = useState<number>(1);
+  const [showQr, setShowQr] = useState<boolean>(false);
 
   // Compute conservative funding needed for Return: t + E2, where t = m*s and s ≤ E1
   const required = useMemo(() => (m - 1) * E1 + E2 + 50_000, [m, E1, E2]);
@@ -159,12 +164,17 @@ export default function AdminSetup2() {
             <span>App Address:</span>
             <code className="break-all">{addr}</code>
             <button onClick={() => navigator.clipboard.writeText(addr)} className="text-xs underline" title="Copy to clipboard">Copy</button>
+            <button onClick={() => setShowQr(v => !v)} className="text-xs underline">{showQr ? 'Hide QR' : 'Show QR'}</button>
+            <a className="text-xs underline" href={`https://lora.algokit.io/testnet/account/${addr}`} target="_blank" rel="noreferrer">View</a>
           </div>
-          <div className="mt-2">
-            <QRCodeCanvas value={addr} size={128} />
-          </div>
+          {showQr && (
+            <div className="mt-2">
+              <QRCodeCanvas value={addr} size={128} />
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check funding</button>
+            <div className="text-xs text-neutral-700">Required pool (est): <span className="font-semibold">{nf(required)}</span> microAlgos</div>
             {fund && (
               <div className="text-xs text-neutral-700">
                 Balance: {nf(fund.balance ?? 0)} μALGO · Required ≥ {nf(fund.required)} μALGO ({nf((m-1)*E1 + E2)} for t+E2)
@@ -173,6 +183,21 @@ export default function AdminSetup2() {
           </div>
         </div>
       )}
+
+      {/* Phase controls */}
+      <div className="flex items-center gap-2 text-sm">
+        <span>Set phase:</span>
+        <select className="border rounded px-2 py-1" value={phaseSel} onChange={(e)=> setPhaseSel(Number(e.target.value))}>
+          <option value={0}>0 (Registration)</option>
+          <option value={1}>1 (Invest)</option>
+          <option value={2}>2 (Return)</option>
+          <option value={3}>3 (Done)</option>
+        </select>
+        <button className="text-xs underline" onClick={()=>onApplyPhase(phaseSel)} disabled={!!busy || !activeAddress}>Apply</button>
+        <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy}>Read pair state</button>
+      </div>
+
+      <div className="text-xs text-neutral-600">Deploy sets globals E1, E2, m, UNIT and phase = 1. Use Set phase to advance to 2 (invest), then 3 (return).</div>
 
       {lastTx && (
         <div className="text-xs">Last tx: <code>{lastTx.id}</code>{lastTx.round ? ` (round ${lastTx.round})` : ``}</div>
