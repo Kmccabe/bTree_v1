@@ -93,3 +93,22 @@ Run the end-to-end Phase 2 flow with one wallet (TestNet):
 - /api/* 404 locally: run `npx vercel dev` alongside `npm run dev`
 - Pending not found: wait a round or two; click Load globals/Read pair states again
 
+## 🔥 Manual Smoke Test
+
+This project includes a **manual smoke test script** for the single-pair trust app with dual endowments (E1 for Subject 1 off-chain, E2 for Subject 2 on-chain).
+
+- Location: [`tests/manual/SMOKE.md`](tests/manual/SMOKE.md)
+
+The smoke test walks through a full lifecycle on **Algorand TestNet**:
+
+1. Compile and deploy contract with parameters (E1, E2, m, UNIT).  
+2. Register a pair of subjects (S1, S2) via opt-in.  
+3. Admin pre-funds the app to satisfy the funding invariant `Balance ≥ t + E2`.  
+4. S1 invests `s` via grouped Payment + AppCall.  
+5. Admin tops up if needed.  
+6. S2 submits a Return AppCall with `r`.  
+7. Contract executes inner payments `r → S1`, `(t−r+E2) → S2`.  
+8. (Optional) Admin sweeps leftover funds.
+
+The checklist includes concrete example parameters, expected balances, and verification steps.  
+**Contributors should run this smoke test whenever contract logic or UI flows are modified** to confirm end-to-end correctness.
