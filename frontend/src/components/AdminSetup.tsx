@@ -126,19 +126,7 @@ export default function AdminSetup() {
     if (manualAppId) {
       const idNum = Number(manualAppId);
       if (Number.isFinite(idNum) && idNum > 0) setSelectedAppId(idNum);
-    }
-  async function onSweep() {
-    setErr(null);
-    try {
-      const id = resolveAppId();
-      if (!activeAddress) throw new Error("Connect the creator wallet.");
-      const r = await sweepApp({ sender: activeAddress, appId: id, sign: (u)=>signTransactions(u), wait: true });
-      setLastTx({ id: r.txId, round: r.confirmedRound });
-      await onReadPairState();
-    } catch (e: any) {
-      setErr(e?.message || String(e));
-    }
-  } else if (appId) {
+    } else if (appId) {
       setSelectedAppId(appId);
     }
     try {
@@ -158,6 +146,19 @@ export default function AdminSetup() {
       setErr(e?.message || String(e));
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function onSweep() {
+    setErr(null);
+    try {
+      const id = resolveAppId();
+      if (!activeAddress) throw new Error("Connect the creator wallet.");
+      const r = await sweepApp({ sender: activeAddress, appId: id, sign: (u)=>signTransactions(u), wait: true });
+      setLastTx({ id: r.txId, round: r.confirmedRound });
+      await onReadPairState();
+    } catch (e: any) {
+      setErr(e?.message || String(e));
     }
   }
 
