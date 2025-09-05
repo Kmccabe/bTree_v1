@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useContext, useCallback } 
 import { useWallet } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { Buffer } from "buffer";
-import { investFlow, optInApp } from "../chain/tx";
+import { investFlow, optInApp, setPhase } from "../chain/tx";
 import { getParamsNormalized } from "../chain/params";
 import { str, u64 } from "../chain/enc";
 import { resolveAppId, setSelectedAppId, getSelectedAppId, clearSelectedAppId } from "../state/appId";
@@ -216,6 +216,10 @@ function SubjectActionsInner() {
   // Subject — Return form/state
   const [returnRInput, setReturnRInput] = useState<string>("");
   const [returnStatus, setReturnStatus] = useState<{ phase: 'submitted' | 'confirmed' | 'rejected'; text: string; round?: number; txId?: string } | null>(null);
+  // Quick demo state
+  const [demoBusy, setDemoBusy] = useState<null | 'demo' | 'return_only'>(null);
+  const [demoInvestTx, setDemoInvestTx] = useState<string | null>(null);
+  const [demoReturnTx, setDemoReturnTx] = useState<string | null>(null);
 
   const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
 
@@ -756,6 +760,118 @@ function SubjectActionsInner() {
     }
   }
 
+  // ---------- Quick Demo helpers ----------
+  async function getAppBalance(): Promise<number> {
+    const id = resolveAppId();
+    const addr = (algosdk as any).getApplicationAddress(id)?.toString?.() || (algosdk as any).getApplicationAddress(id);
+    if (!addr || !(algosdk as any).isValidAddress?.(addr)) throw new Error("Derived app address invalid");
+    return await getAccountBalanceMicroAlgos(addr);
+  }
+
+  async function runDemo() {
+    setErr(null);
+    if (!activeAddress) return setErr("Connect wallet as subject.");
+    if (!hasResolvedAppId) return setErr("Enter/select a numeric App ID.");
+    const s = Number(sInput);
+    if (!Number.isInteger(s) || s < 0) return setErr("Enter a whole number of microAlgos for s.");
+    if (s % unit !== 0) return setErr(`s must be a multiple of UNIT (${unit}).`);
+    if (s > E) return setErr(`s must be <= E (${E}).`);
+
+    setDemoBusy('demo');
+    setDemoInvestTx(null);
+    setDemoReturnTx(null);
+    try {
+      const id = resolveAppId();
+      const { senderResolved } = resolveSender();
+
+      // 1) Phase 2 if creator
+      try {
+        const creator = (pair.globals as any)?.creator || creatorAddr;
+        if (creator && senderResolved === creator) {
+          toast.show({ kind: 'info', title: 'Setting phase', description: 'Attempting phase=2…' });
+          await setPhase({ sender: senderResolved, appId: id, phase: 2, sign: (u)=>signTransactions(u), wait: true });
+        }
+      } catch {}
+
+      // 2) Opt-In (ignore if already opted in)
+      try {
+        await optInApp({ sender: senderResolved, appId: id, sign: (u)=>signTransactions(u), wait: true as any });
+      } catch (e: any) {
+        const msg = e?.message || String(e);
+        if (!/already opted in/i.test(msg)) {
+          // surface other opt-in errors
+          throw e;
+        }
+      }
+
+      // 3) Invest
+      toast.show({ kind: 'info', title: 'Invest submitted', description: 'Pending confirmation…' });
+      const inv = await investFlow({ sender: senderResolved, appId: id, s, sign: (u)=>signTransactions(u), wait: true });
+      if (inv?.txId) setDemoInvestTx(inv.txId);
+
+      // 4) Read states to get t
+      await readPairStates();
+
+      // 5) Ensure app funded for Return
+      const g:any = pair.globals as any;
+      const tNow = Number((g && typeof g.t === 'number') ? g.t : 0);
+      const bal = await getAppBalance();
+      if (tNow > 0 && bal < tNow) {
+        toast.show({ kind: 'error', title: 'Underfunded for Return', description: `Needs >= ${tNow.toLocaleString()} microAlgos` });
+        return;
+      }
+
+      // 6) Return using current r input
+      await runReturnOnly();
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    } finally {
+      setDemoBusy(null);
+    }
+  }
+
+  async function runReturnOnly() {
+    setErr(null);
+    if (!activeAddress) return setErr("Connect wallet as subject.");
+    if (!hasResolvedAppId) return setErr("Enter/select a numeric App ID.");
+    const r = Number(returnRInput || "0");
+    if (!Number.isInteger(r) || r < 0) return setErr("Enter r as a whole number of microAlgos.");
+
+    setDemoBusy('return_only');
+    try {
+      const id = resolveAppId();
+      const { senderResolved } = resolveSender();
+      const sp: any = await getParamsNormalized();
+      const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
+      const s1 = s1FromGlobals;
+      const accounts: string[] = [];
+      if (s1 && (algosdk as any).isValidAddress?.(s1)) accounts.push(s1);
+      if (senderResolved && (!accounts.length || accounts[0] !== senderResolved)) accounts.push(senderResolved);
+      const call: any = (algosdk as any).makeApplicationNoOpTxnFromObject({
+        sender: senderResolved,
+        appIndex: id,
+        appArgs: [str('return'), u64(r)],
+        accounts,
+        suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 4 },
+      });
+      const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
+      const payload = { stxns: stxns.map((b: Uint8Array) => Buffer.from(b).toString('base64')) };
+      const sub = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const subText = await sub.text();
+      if (!sub.ok) throw new Error(`Return submit ${sub.status}: ${subText}`);
+      let sj: any; try { sj = JSON.parse(subText); } catch { sj = {}; }
+      const txId: string = sj?.txId || sj?.txid || sj?.txID;
+      if (txId) setDemoReturnTx(txId);
+      const pendR = await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`);
+      if (!pendR.ok) throw new Error(await pendR.text());
+      toast.show({ kind: 'success', title: 'Return confirmed', actions: txId ? [{ label: 'View on LoRA', href: loraTxUrl(txId) }] : undefined });
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    } finally {
+      setDemoBusy(null);
+    }
+  }
+
   return (
     <div className="rounded-2xl border p-4 space-y-3" style={{ position: "relative" }}>
       <h3 className="text-lg font-semibold">Subject - Invest</h3>
@@ -1072,6 +1188,40 @@ function SubjectActionsInner() {
       <p className="text-xs text-neutral-500">
         Requires: phase = 2, subject opted-in, 2-txn group, s multiple of UNIT, 0 {'<='} s {'<='} E.
       </p>
+
+      {/* Quick Demo (single account) */}
+      <div className="mt-6 rounded-xl border p-3 space-y-2">
+        <h4 className="text-md font-semibold">Quick Demo (single account)</h4>
+        <div className="text-xs text-neutral-700">Runs: [Phase 2 if creator] → Opt-In → Invest → Read Pair States → Return</div>
+        <div className="flex items-center gap-3 text-sm flex-wrap">
+          <label className="flex items-center gap-2">
+            <span>s (microAlgos)</span>
+            <input inputMode="numeric" pattern="\\d*" className="border rounded px-2 py-1 w-36" value={sInput}
+              onChange={(e)=> setSInput(e.target.value.replace(/[^\d]/g, ''))} placeholder={`multiple of ${unit}`} />
+          </label>
+          <label className="flex items-center gap-2">
+            <span>r (microAlgos)</span>
+            <input inputMode="numeric" pattern="\\d*" className="border rounded px-2 py-1 w-36" value={returnRInput}
+              onChange={(e)=> setReturnRInput(e.target.value.replace(/[^\d]/g, ''))} placeholder={`0..${globalsTVal || 0}`} />
+          </label>
+          <button className="text-xs underline" onClick={runDemo}
+            disabled={!!busy || !!demoBusy || !activeAddress || !hasResolvedAppId || !/^\d+$/.test(sInput || '0') || (Number(sInput) % unit !== 0) || (Number(sInput) > E)}>
+            {demoBusy === 'demo' ? 'Running…' : 'Run Demo'}
+          </button>
+          <button className="text-xs underline" onClick={runReturnOnly}
+            disabled={!!busy || !!demoBusy || !activeAddress || !hasResolvedAppId || !(globalsTVal > 0) || globalsRet === 1 || !rValid || underfundedForReturn}>
+            {demoBusy === 'return_only' ? 'Returning…' : 'Run Return only'}
+          </button>
+        </div>
+        {(demoInvestTx || demoReturnTx) && (
+          <div className="text-xs text-neutral-700">
+            {demoInvestTx && (<span>Invest: <a className="underline" href={loraTxUrl(demoInvestTx)} target="_blank" rel="noreferrer">View on LoRA</a></span>)}
+            {demoInvestTx && demoReturnTx && <span> · </span>}
+            {demoReturnTx && (<span>Return: <a className="underline" href={loraTxUrl(demoReturnTx)} target="_blank" rel="noreferrer">View on LoRA</a></span>)}
+          </div>
+        )}
+      </div>
+
       <ToastHost />
     </div>
   );
