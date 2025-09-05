@@ -218,6 +218,16 @@ export default function AdminSetup() {
           >
             Read pair state</button>
         {globals?.phase === 3 && (
+          <button
+            className="text-xs underline"
+            disabled={!!busy || !activeAddress || (globals?.swept === 1)}
+            onClick={onSweep}
+            title={(globals?.swept === 1) ? "Already swept" : "Sweep liquid funds to creator"}
+          >
+            {(globals?.swept === 1) ? "Swept" : "Sweep funds"}
+          </button>
+        )}
+        {globals?.phase === 3 && (
           <button className="text-xs underline" disabled={!!busy || !activeAddress || (globals?.swept === 1)} onClick={onSweep} title={(globals?.swept === 1) ? "Already swept" : "Sweep liquid funds to creator"}>
             {(globals?.swept === 1) ? "Swept" : "Sweep funds"}
           </button>
