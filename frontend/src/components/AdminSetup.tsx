@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
 import { setPhase, sweepApp } from "../chain/tx";
@@ -302,20 +302,29 @@ export default function AdminSetup() {
           disabled={!!busy || (!appId && !manualAppId)}
           onClick={onReadPairState}
         >
-          Read pair state
-        </button>
+          Read pair state</button>
+        {globals?.phase === 3 && (
+          <button
+            className="text-xs underline"
+            disabled={!!busy || !activeAddress || (globals?.swept === 1)}
+            onClick={onSweep}
+            title={(globals?.swept === 1) ? "Already swept" : "Sweep liquid funds to creator"}
+          >
+            {(globals?.swept === 1) ? "Swept" : "Sweep funds"}
+          </button>
+        )}
       </div>
 
       {/* Show decoded globals if available */}
       {globals && (
         <div className="text-xs text-neutral-700">
-          E: {globals.E ?? "?"} · m: {globals.m ?? "?"} · UNIT: {globals.UNIT ?? "?"} · phase: {globals.phase ?? "?"}
+          E: {globals.E ?? "?"} · m: {globals.m ?? "?"} · UNIT: {globals.UNIT ?? "?"} · phase: {globals.phase ?? "?"} · swept: {globals.swept ?? 0}
         </div>
       )}
 
       {lastTx && (
         <div className="text-xs text-neutral-700">
-          Last admin tx: <code>{lastTx.id}</code>{lastTx.round ? ` � round ${lastTx.round}` : ""} � <a className="underline" href={`https://lora.algokit.io/testnet/tx/${lastTx.id}`} target="_blank" rel="noreferrer">View on LoRA</a>
+          Last admin tx: <code>{lastTx.id}</code>{lastTx.round ? ` � round ${lastTx.round}` : ""} � <a className="underline" href={`https://lora.algokit.io/testnet/tx/${lastTx.id}`} target="_blank" rel="noreferrer">View on LoRA</a>
         </div>
       )}
 
