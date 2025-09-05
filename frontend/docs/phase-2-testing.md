@@ -99,3 +99,18 @@ This guide walks you through verifying the current Trust Game app in Phase 2 (In
 
 If behavior differs, capture the yellow blocker text and the last few console lines; this pinpoints the next fix.
 
+## Quick Demo (single account)
+
+Run Phase 2 end‑to‑end with one wallet (fast path):
+
+1) Connect Wallet (TestNet).
+2) Deploy contract (or use an existing App ID).
+3) Fund contract (App Address): for a one‑pass demo, ensure the app will have at least `t = 3 × s` microAlgos after Invest (UI shows low‑balance hints; baseline ~0.20 ALGO).
+4) Set App ID in the Subject panel and click “Load globals”.
+5) Opt‑In in the Subject panel (ignore “already opted in” if it appears).
+6) In “Quick Demo (single account)”, enter:
+   - `s` (microAlgos): multiple of UNIT and `<= E` (e.g., 40000 if UNIT=1000)
+   - `r` (microAlgos): `0..t` and multiple of UNIT (t becomes `3 × s` after Invest)
+7) Click “Run Demo”: [set phase=2 if creator] → Opt‑In → Invest → Read Pair States → check funding → Return.
+   - If underfunded for Return, fund the App Address and use “Run Return only”.
+8) View results: “Invest” and “Return” show “View on LoRA” links (lora.algokit.io/testnet/tx/<txid>), with outer app call and inner payments.
