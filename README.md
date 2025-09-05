@@ -1,18 +1,95 @@
-# bTree v1 — Trust Game MVP (Algorand + Pera/TestNet)Minimal, production‑oriented scaffold for running a Trust Game on Algorand TestNet. The app is built with React + Vite, uses Pera Wallet for signing, and deploys on Vercel with serverless routes that proxy Algod.- Wallet: Pera (TestNet; no mnemonics in‑browser)- Chain access: Vercel serverless functions → Algod- Hosting: Vercel (Root Directory = `frontend/`)- Contracts: Placeholder TEAL for now; upgradeable to full Trust Game logic## Trust Game (MVP)- 📄 Design spec: [frontend/docs/trust-game-design.md](frontend/docs/trust-game-design.md)- 🧪 Variants & treatments: [frontend/docs/trust-game-variants.md](frontend/docs/trust-game-variants.md)- Testing checklist (Phase 2): [frontend/docs/phase-2-testing.md](frontend/docs/phase-2-testing.md)**Quick note:** The app lives under `frontend/` (React + Vite + Vercel serverless). Admin can deploy & fund a per-pair contract from the in-app “Admin — Deploy & Fund” panel.---## Update: Wallet Integration (use-wallet v2)The frontend now uses `@txnlab/use-wallet` v2 with the Pera provider and UI improvements:- Provider init lives in `frontend/src/main.tsx` using `useInitializeProviders` and `<WalletProvider>`.- No forced chainId; make sure Pera’s network matches `VITE_NETWORK`.- Optional auto‑restore on load via `VITE_WALLET_AUTO_RECONNECT=true` (default: disabled).- Account selector appears when multiple accounts are available (`frontend/src/components/AccountSelector.tsx`).- Non‑blocking toasts replace browser alerts (`frontend/src/components/Toaster.tsx`).- The Debug Panel includes “Force Reconnect” and “Reset Wallet Session” actions for recovery.Note: This supersedes earlier mentions of a shared `src/wallet.ts` Pera instance; the app now relies on `@txnlab/use-wallet` hooks and provider.---## Quick StartLocal (with serverless APIs):1) Install deps```cd frontendnpm install```2) Create `frontend/.env` for serverless routes (Algonode needs no token)```TESTNET_ALGOD_URL=https://testnet-api.algonode.cloudTESTNET_ALGOD_TOKEN=```3) Run serverless and UI in two terminals```# Terminal A (serverless):npx vercel dev# Terminal B (Vite UI):npm run dev```4) Open http://localhost:5173, connect Pera (TestNet), click Deploy, then use Phase Control.Deploy to Vercel (summary):- Root Directory: `frontend/`- Build Command: `npm run build`- Output Directory: `dist`- Env vars: set TESTNET_ALGOD_URL/TESTNET_ALGOD_TOKEN (serverless) and optional VITE_* (client)---## Project Structure```contracts/                      # PyTeal scaffold + build script (optional now)  build.py  requirements.txtfrontend/                       # React + Vite + TypeScript app (Pera on TestNet)  api/                          # Serverless routes (Algod proxy)    _algod.ts                   # URL + headers helper    params.ts                   # GET  /api/params    compile.ts                  # POST /api/compile    submit.ts                   # POST /api/submit    pending.ts                  # GET  /api/pending?txid=...  public/    favicon.svg  src/    App.tsx                     # Pera connect, deploy, debug panel    main.tsx                    # use-wallet v2 provider initialization    deploy.ts                   # Build unsigned app-create txn (wallet signs)    components/PhaseControl.tsx # Admin phase switching via app call    polyfills.ts                # Buffer/process/global shims for browser  index.html  package.json```---## Prerequisites- Node.js 18+ and npm- Vercel CLI (optional, for local serverless): `npm i -g vercel`- Pera Wallet (Developer Mode + TestNet enabled, funded TestNet account)Optional (for contracts/tests):- Python 3.10+- Docker + AlgoKit for LocalNet---## Environment VariablesSet these in Vercel → Project → Settings → Environment Variables for Production/Preview/Development (serverless), and in `frontend/.env.local` for local client build.Serverless (used by `/api/*`, stored securely in Vercel):```TESTNET_ALGOD_URL   = https://testnet-api.algonode.cloudTESTNET_ALGOD_TOKEN =            # blank for Algonode, or your provider key```Client (Vite build‑time, safe to expose):```VITE_NETWORK              = TESTNETVITE_TESTNET_APP_ID       =            # optional; shows a known app idVITE_TESTNET_ALGOD_URL    = https://testnet-api.algonode.cloudVITE_TESTNET_INDEXER_URL  = https://testnet-idx.algonode.cloud```Local serverless (only for `vercel dev`):```# frontend/.envTESTNET_ALGOD_URL=https://testnet-api.algonode.cloudTESTNET_ALGOD_TOKEN=```---## Local Development1) Install and run the frontend```cd frontendnpm installnpm run dev         # Vite UI at http://localhost:5173```2) (Optional) Run serverless API routes locally```cd frontendnpx vercel dev      # http://localhost:3000 (includes /api/*)```When both are running, Vite proxies `/api/*` to Vercel dev.---## Deploying to VercelProject settings:- Root Directory: `frontend/`- Build Command: `npm run build`- Output Directory: `dist`- Node.js: 18+- Environment Variables: set the Serverless and Client values aboveFirst deploy:1) Push to your Git host and import the repo into Vercel.2) Confirm the Root Directory and env vars.3) Deploy and visit the site.Post‑deploy health checks:- `https://<your-app>/api/health` → `{ ok: true }`- `https://<your-app>/api/params` → JSON with `"last-round"`---## Using the App1) Connect Pera Wallet (ensure the wallet is on TestNet).2) Deploy placeholder app (creates a minimal TEAL app on TestNet via wallet‑signed transaction).3) Use Phase Control to switch experiment phases (NoOp application calls).Notes:- Transactions are built client‑side and signed in Pera; serverless routes only forward the signed bytes to Algod.- Wallet integration uses `@txnlab/use-wallet` v2; no shared `wallet.ts` singleton. Provider setup lives in `frontend/src/main.tsx`.---## Refactor Highlights- Moved to `@txnlab/use-wallet` v2 (Pera provider) with initialization in `frontend/src/main.tsx`.- Removed legacy wallet singleton (`src/wallet.ts`) and legacy identity modules.- Enforced serverless-only chain I/O via `frontend/api/*` (no direct Algod from the browser).- Clarified env separation: `TESTNET_ALGOD_*` (server) vs `VITE_*` (client).- Local dev uses `vercel dev` with Vite proxying `/api` to `:3000`.---## API Routes- `GET  /api/health`      – basic health check- `GET  /api/params`      – fetch Algod suggested params- `POST /api/compile`     – compile TEAL source- `POST /api/submit`      – submit a signed transaction (base64)- `GET  /api/pending`     – pending info for a txid---## Implementation Details- SuggestedParams normalization (SDK v3‑friendly):  - `fee`/`minFee` (≥ 1000), `flatFee: true`  - `firstValid`/`lastValid` and `firstRound`/`lastRound` aliases  - `genesisID` and base64‑decoded `genesisHash`- Polyfills for browser builds (`Buffer`, `process`, `global`) are provided in `src/polyfills.ts`.- `frontend/public/favicon.svg` is included; `/favicon.ico` redirects to it via `vercel.json`.---## Troubleshooting- Wallet connection issues:  - Ensure Pera is on the same network as `VITE_NETWORK` (TestNet by default).  - Use the Debug Panel actions (Reconnect/Reset) or call `reconnectProviders` via the app to restore sessions.- Zero‑fee rejection ("txgroup had 0 in fees"):  - Params are normalized to enforce a non‑zero fee; refresh and retry.- `/api/*` returns HTML/404 locally:  - Run `npx vercel dev` alongside `npm run dev` so `/api` is routed.- Vercel deploys not triggered on push:  - Set Root Directory = `frontend/`, resync the Git integration, or create a blank commit:    - `git commit --allow-empty -m "chore: trigger deploy" && git push`---## Roadmap- Replace placeholder TEAL with full Trust Game contract- Registration, pairing, commit/reveal, settlement flows- CSV export and integrity digest- LocalNet + CI test coverage
-# bTree v1 �?" Trust Game MVP (Algorand + Pera/TestNet)Minimal, production�?`oriented scaffold for running a Trust Game on Algorand TestNet. The app is built with React + Vite, uses Pera Wallet for signing, and deploys on Vercel with serverless routes that proxy Algod.- Wallet: Pera (TestNet; no mnemonics in�?`browser)- Chain access: Vercel serverless functions �+' Algod- Hosting: Vercel (Root Directory = `frontend/`)- Contracts: Placeholder TEAL for now; upgradeable to full Trust Game logic## Trust Game (MVP)- dY", Design spec: [frontend/docs/trust-game-design.md](frontend/docs/trust-game-design.md)- dY\u0015� Variants & treatments: [frontend/docs/trust-game-variants.md](frontend/docs/trust-game-variants.md)- Testing checklist (Phase 2): [frontend/docs/phase-2-testing.md](frontend/docs/phase-2
+# bTree v1 - Trust Game MVP (Algorand + Pera/TestNet)
+
+Minimal, production-oriented scaffold for running a Trust Game on Algorand TestNet.
+The app is built with React + Vite, uses Pera Wallet for signing, and deploys on
+Vercel with serverless routes that proxy Algod.
+
+- Wallet: Pera (TestNet; no mnemonics in-browser)
+- Chain access: Vercel serverless functions -> Algod
+- Hosting: Vercel (Root Directory = `frontend/`)
+- Contracts: Placeholder TEAL for now; upgradeable to full Trust Game logic
+
+## Trust Game (MVP)
+
+- Design spec: frontend/docs/trust-game-design.md
+- Variants & treatments: frontend/docs/trust-game-variants.md
+- Testing checklist (Phase 2): frontend/docs/phase-2-testing.md
+
+Quick note: The app lives under `frontend/` (React + Vite + Vercel serverless).
+Admin can deploy & fund a per-pair contract from the in-app "Admin - Deploy & Fund" panel.
+
+## Quick Start
+
+Local (with serverless APIs):
+
+1) Install deps
+   - cd frontend
+   - npm install
+
+2) Create `frontend/.env` for serverless routes (Algonode needs no token)
+   - TESTNET_ALGOD_URL=https://testnet-api.algonode.cloud
+   - TESTNET_ALGOD_TOKEN=
+
+3) Run serverless and UI in two terminals
+   - Terminal A (serverless): npx vercel dev
+   - Terminal B (Vite UI): npm run dev
+
+4) Open http://localhost:5173, connect Pera (TestNet), click Deploy, then use Phase Control.
+
+Deploy to Vercel (summary):
+- Root Directory: `frontend/`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Env vars: set TESTNET_ALGOD_URL/TESTNET_ALGOD_TOKEN (serverless) and optional VITE_* (client)
+
+## Project Structure
+
+contracts/
+frontend/
+  api/ (serverless routes)
+  public/
+  src/
+    App.tsx
+    main.tsx
+    deploy.ts
+    components/PhaseControl.tsx
+    components/SubjectActions.tsx
+    polyfills.ts
+
+## Environment Variables
+
+Serverless (used by `/api/*`, secure):
+- TESTNET_ALGOD_URL = https://testnet-api.algonode.cloud
+- TESTNET_ALGOD_TOKEN = (blank for Algonode, or your provider key)
+
+Client (Vite build-time):
+- VITE_NETWORK = TESTNET
+- VITE_TESTNET_APP_ID = (optional; known app id)
+- VITE_TESTNET_ALGOD_URL = https://testnet-api.algonode.cloud
+- VITE_TESTNET_INDEXER_URL = https://testnet-idx.algonode.cloud
+
+Local serverless (`vercel dev`):
+- Put the same TESTNET_ALGOD_* values in `frontend/.env`
+
 ## Quick Demo (single account)
 
 Run the end-to-end Phase 2 flow with one wallet (TestNet):
 
-1) Connect Wallet: ensure the wallet is on TestNet.
-2) Deploy contract (or use an existing App ID): use the Admin panel to Deploy, or use an existing App ID.
-3) Fund the contract: send funds to the App Address. For a full demo in one pass, the app needs at least t = 3 × s microAlgos after Invest (the UI also shows low-balance hints; baseline is ~0.20 ALGO).
-4) Set App ID in the Subject panel: in “Subject - Invest”, enter the App ID and click “Load globals”.
-5) Opt-In: in “Subject - Return”, click “Opt-In” (safe to ignore the “already opted in” error if shown).
-6) Open Quick Demo: in the Subject panel, find “Quick Demo (single account)”.
-7) Enter inputs:
-   - s (microAlgos): multiple of UNIT and <= E (example: 40000 if UNIT=1000).
-   - r (microAlgos): 0..t and multiple of UNIT (t becomes 3 × s after Invest).
-8) Click “Run Demo”: the app will [set phase=2 if you are creator] → Opt-In → Invest → Read Pair States → check funding → Return.
-   - If underfunded for Return, fund the App Address (QR is shown) and use “Run Return only”.
-9) View results on LoRA: after confirmation, “Invest” and “Return” links appear; they open lora.algokit.io/testnet/tx/<txid> with the outer app call and inner payments.
+1) Connect Wallet (TestNet)
+2) Deploy contract (or use an existing App ID)
+3) Fund contract (App Address). For a full demo in one pass, the app needs at least t = 3 x s microAlgos after Invest (UI shows low-balance hints; baseline ~0.20 ALGO)
+4) Set App ID in the Subject panel and click Load globals
+5) Opt-In in the Subject panel (ignore "already opted in" if shown)
+6) In Quick Demo, enter:
+   - s (microAlgos): multiple of UNIT and <= E (e.g., 40000 if UNIT=1000)
+   - r (microAlgos): 0..t and multiple of UNIT (t becomes 3 x s after Invest)
+7) Click Run Demo: [set phase=2 if creator] -> Opt-In -> Invest -> Read Pair States -> check funding -> Return
+   - If underfunded for Return, fund the App Address and use Run Return only
+8) View results: Invest and Return show "View on LoRA" links (lora.algokit.io/testnet/tx/<txid>)
+
+## Troubleshooting
+
+- Wallet on wrong network: ensure wallet network matches VITE_NETWORK (TestNet)
+- /api/* 404 locally: run `npx vercel dev` alongside `npm run dev`
+- Pending not found: wait a round or two; click Load globals/Read pair states again
+
