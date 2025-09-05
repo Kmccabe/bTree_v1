@@ -3,6 +3,7 @@ import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
 import { setPhase, sweepApp } from "../chain/tx";
 import { resolveAppId, setSelectedAppId } from "../state/appId";
+import { QRCodeCanvas } from "qrcode.react";
 
 const nf = (n: number) => Intl.NumberFormat().format(n);
 
@@ -158,6 +159,9 @@ export default function AdminSetup2() {
             <span>App Address:</span>
             <code className="break-all">{addr}</code>
             <button onClick={() => navigator.clipboard.writeText(addr)} className="text-xs underline" title="Copy to clipboard">Copy</button>
+          </div>
+          <div className="mt-2">
+            <QRCodeCanvas value={addr} size={128} />
           </div>
           <div className="flex items-center gap-2">
             <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check funding</button>
