@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
-import { setPhase } from "../chain/tx";
+import { setPhase, sweepApp } from "../chain/tx";
 import { resolveAppId, setSelectedAppId } from "../state/appId";
 import QRCode from "qrcode";
 
@@ -33,6 +33,7 @@ export default function AdminSetup() {
   // Phase control
   const [phaseIn, setPhaseIn] = useState<number>(2);
   const [globals, setGlobals] = useState<any | null>(null);
+  const [lastTx, setLastTx] = useState<{ id: string; round?: number } | null>(null);
 
   // QR code for App Address
   const [showQR, setShowQR] = useState(false);
@@ -125,7 +126,19 @@ export default function AdminSetup() {
     if (manualAppId) {
       const idNum = Number(manualAppId);
       if (Number.isFinite(idNum) && idNum > 0) setSelectedAppId(idNum);
-    } else if (appId) {
+    }
+  async function onSweep() {
+    setErr(null);
+    try {
+      const id = resolveAppId();
+      if (!activeAddress) throw new Error("Connect the creator wallet.");
+      const r = await sweepApp({ sender: activeAddress, appId: id, sign: (u)=>signTransactions(u), wait: true });
+      setLastTx({ id: r.txId, round: r.confirmedRound });
+      await onReadPairState();
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+    }
+  } else if (appId) {
       setSelectedAppId(appId);
     }
     try {
@@ -202,8 +215,12 @@ export default function AdminSetup() {
             onClick={onReadPairState}
             disabled={!!busy || !manualAppId}
           >
-            Read pair state
+            Read pair state</button>
+        {globals?.phase === 3 && (
+          <button className="text-xs underline" disabled={!!busy || !activeAddress || (globals?.swept === 1)} onClick={onSweep} title={(globals?.swept === 1) ? "Already swept" : "Sweep liquid funds to creator"}>
+            {(globals?.swept === 1) ? "Swept" : "Sweep funds"}
           </button>
+        )}
         </div>
       )}
 
@@ -285,6 +302,12 @@ export default function AdminSetup() {
         </div>
       )}
 
+      {lastTx && (
+        <div className="text-xs text-neutral-700">
+          Last admin tx: <code>{lastTx.id}</code>{lastTx.round ? ` — round ${lastTx.round}` : ""} · <a className="underline" href={`https://lora.algokit.io/testnet/tx/${lastTx.id}`} target="_blank" rel="noreferrer">View on LoRA</a>
+        </div>
+      )}
+
       {err && <div className="text-sm text-red-600">{err}</div>}
 
       <p className="text-xs text-neutral-500">
@@ -293,3 +316,6 @@ export default function AdminSetup() {
     </div>
   );
 }
+
+
+

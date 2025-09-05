@@ -73,6 +73,11 @@ noop:
   ==
   bnz retpath
 
+  txn ApplicationArgs 0
+  byte "sweep"
+  ==
+  bnz sweep
+
   err
 
 // Accept opt-in to allocate local state
@@ -269,6 +274,64 @@ do_refund:
   itxn_submit
 
 invest_end:
+  int 1
+  return
+
+// -------------------------
+// CASE: "sweep" (Phase 3, creator-only)
+sweep:
+  // Guard phase == 3
+  byte "phase"
+  app_global_get
+  int 3
+  ==
+  assert
+
+  // creator-only
+  global CreatorAddress
+  txn Sender
+  ==
+  assert
+
+  // not already swept: swept == 0
+  byte "swept"
+  app_global_get
+  int 0
+  ==
+  assert
+
+  // app_liquid = balance(app) - min_balance(app)
+  global CurrentApplicationAddress
+  dup
+  balance
+  swap
+  min_balance
+  -
+  store 20
+
+  // if app_liquid > 0, inner pay to creator
+  load 20
+  int 0
+  >
+  bnz do_sweep
+  b end_sweep
+
+do_sweep:
+  itxn_begin
+  int pay
+  itxn_field TypeEnum
+  load 20
+  itxn_field Amount
+  global CreatorAddress
+  itxn_field Receiver
+  itxn_submit
+
+end_sweep:
+  // mark swept = 1
+  byte "swept"
+  int 1
+  app_global_put
+
   int 1
   return
 
