@@ -1,13 +1,14 @@
-ï»¿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
 import { setPhase, sweepApp } from "../chain/tx";
 import { resolveAppId, setSelectedAppId } from "../state/appId";
 import QRCode from "qrcode";
+import { useToast } from "./Toaster";
 
 const nf = (n: number) => Intl.NumberFormat().format(n);
 
-export default function AdminSetup() {
+export default function AdminSetup() {`n  const toast = useToast();
   const { activeAddress, signTransactions } = useWallet();
 
   // Deploy inputs
@@ -156,6 +157,10 @@ export default function AdminSetup() {
       if (!activeAddress) throw new Error("Connect the creator wallet.");
       const r = await sweepApp({ sender: activeAddress, appId: id, sign: (u)=>signTransactions(u), wait: true });
       setLastTx({ id: r.txId, round: r.confirmedRound });
+      const net = (((import.meta as any).env?.VITE_NETWORK || "TESTNET").toString().toUpperCase());
+      const chain = net === "MAINNET" ? "mainnet" : "testnet";
+      const url = `https://lora.algokit.io/${chain}/tx/${r.txId}`;
+      toast.success(`Sweep confirmed${r.confirmedRound ? ` (round ${r.confirmedRound})` : ``} — View: ${url}`);
       await onReadPairState();
     } catch (e: any) {
       setErr(e?.message || String(e));
@@ -191,7 +196,7 @@ export default function AdminSetup() {
           onClick={onDeploy}
           className="rounded-xl px-3 py-2 border"
         >
-          {busy === "deploy" ? "Deployingâ€¦" : "Deploy"}
+          {busy === "deploy" ? "Deploying…" : "Deploy"}
         </button>
         {appId && <div className="text-sm">App ID: <code>{appId}</code></div>}
       </div>
@@ -269,7 +274,7 @@ export default function AdminSetup() {
             </div>
           )}
           <div className="text-sm">
-            Required pool (est.): <b>{nf(required)}</b> microAlgos Â·
+            Required pool (est.): <b>{nf(required)}</b> microAlgos ·
             <button onClick={checkFunding} disabled={!!busy} className="underline ml-2">Check funding</button>
             {fund && (
               <span className={`ml-2 ${fund.ok ? "text-green-600" : "text-amber-600"}`}>
@@ -318,13 +323,13 @@ export default function AdminSetup() {
       {/* Show decoded globals if available */}
       {globals && (
         <div className="text-xs text-neutral-700">
-          E: {globals.E ?? "?"} Â· m: {globals.m ?? "?"} Â· UNIT: {globals.UNIT ?? "?"} Â· phase: {globals.phase ?? "?"} Â· swept: {globals.swept ?? 0}
+          E: {globals.E ?? "?"} · m: {globals.m ?? "?"} · UNIT: {globals.UNIT ?? "?"} · phase: {globals.phase ?? "?"} · swept: {globals.swept ?? 0}
         </div>
       )}
 
       {lastTx && (
         <div className="text-xs text-neutral-700">
-          Last admin tx: <code>{lastTx.id}</code>{lastTx.round ? ` ï¿½ round ${lastTx.round}` : ""} ï¿½ <a className="underline" href={`https://lora.algokit.io/testnet/tx/${lastTx.id}`} target="_blank" rel="noreferrer">View on LoRA</a>
+          Last admin tx: <code>{lastTx.id}</code>{lastTx.round ? ` ? round ${lastTx.round}` : ""} ? <a className="underline" href={`https://lora.algokit.io/testnet/tx/${lastTx.id}`} target="_blank" rel="noreferrer">View on LoRA</a>
         </div>
       )}
 
@@ -336,6 +341,7 @@ export default function AdminSetup() {
     </div>
   );
 }
+
 
 
 
