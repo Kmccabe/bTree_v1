@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
-import { setPhase, sweepApp, deleteApp } from "../chain/tx";
+import { setPhase, sweepApp, deleteApp, registerExperiment } from "../chain/tx";
 import { resolveAppId, setSelectedAppId } from "../state/appId";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -39,6 +39,10 @@ export default function AdminSetup2() {
   const signer = (u: Uint8Array[]) => signTransactions(u);
   const [currentPhase, setCurrentPhase] = useState<number | null>(null);
   const [history, setHistory] = useState<null | { loading: boolean; error?: string; items?: Array<{ round: number; time: number; txid: string; sender: string; event: string; details?: any; innerPayments?: Array<{ to: string; amount: number }> }> }>(null);
+  // Experiment registration inputs
+  const [expParamsHash, setExpParamsHash] = useState<string>("");
+  const [expNNeeded, setExpNNeeded] = useState<number>(0);
+  const [expContractUri, setExpContractUri] = useState<string>("");
 
   function loraTxUrl(txId: string) {
     return `https://lora.algokit.io/testnet/tx/${txId}`;
@@ -173,6 +177,38 @@ export default function AdminSetup2() {
           <input type="number" min={1} step={1} value={UNIT}
             onChange={(e)=>setUNIT(Number(e.target.value))} className="border rounded p-2" />
         </label>
+      </div>
+
+      {/* Experiment Registration (creator-only) */}
+      <div className="rounded-xl border p-3 space-y-2">
+        <h4 className="text-md font-semibold">Experiment Registration</h4>
+        <div className="text-xs text-neutral-700">Freeze study metadata once before Opt-Ins are allowed (phase must be 0). Creator-only on-chain.</div>
+        <div className="grid grid-cols-3 gap-2 text-sm">
+          <label className="flex flex-col">
+            <span>params_hash (32 bytes)</span>
+            <input className="border rounded px-2 py-1" placeholder="base64 or 64-hex" value={expParamsHash} onChange={(e)=>setExpParamsHash(e.target.value)} />
+          </label>
+          <label className="flex flex-col">
+            <span>n_needed (uint)</span>
+            <input type="number" min={0} step={1} className="border rounded px-2 py-1" value={expNNeeded} onChange={(e)=>setExpNNeeded(Number(e.target.value))} />
+          </label>
+          <label className="flex flex-col">
+            <span>contract_uri (short)</span>
+            <input className="border rounded px-2 py-1" placeholder="trust_v1_sep2025" value={expContractUri} onChange={(e)=>setExpContractUri(e.target.value)} />
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="text-xs underline" onClick={async ()=>{
+            setErr(null);
+            try {
+              const id = resolveAppId();
+              if (!activeAddress) throw new Error('Connect creator wallet');
+              const r = await registerExperiment({ sender: activeAddress, appId: id, paramsHashB64OrHex: expParamsHash, nNeeded: expNNeeded, contractUri: expContractUri, sign: (u)=>signTransactions(u), wait: true });
+              setLastTx({ id: r.txId, round: r.confirmedRound });
+            } catch (e: any) { setErr(e?.message || String(e)); }
+          }} disabled={!!busy || !activeAddress}>Register</button>
+          <div className="text-xs text-neutral-600">Requires: creator wallet · App phase 0 · Not previously registered</div>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
