@@ -124,8 +124,9 @@ optin:
   global CurrentApplicationID
   byte "s1"
   app_global_get_ex        // stack: exists, value
-  store 21                 // s1_val
+  swap                     // value, exists
   store 20                 // s1_exists
+  pop                      // discard value
 
   // If s1 not set, set to sender
   load 20
@@ -135,8 +136,9 @@ optin:
   global CurrentApplicationID
   byte "s2"
   app_global_get_ex        // stack: exists, value
-  store 23                 // s2_val
+  swap                     // value, exists
   store 22                 // s2_exists
+  pop                      // discard value
 
   // If s2 not set, maybe set (but ensure sender != s1)
   load 22
@@ -154,9 +156,10 @@ set_s1:
   return
 
 maybe_set_s2:
-  // Ensure sender != s1 (compare against cached s1_val)
+  // Ensure sender != s1 (compare against s1 fetched bytes)
   txn Sender
-  load 21                  // s1_val
+  byte "s1"
+  app_global_get
   ==
   // if equal -> reject
   bnz opt_reject
@@ -209,14 +212,17 @@ invest:
   global CurrentApplicationID
   byte "s1"
   app_global_get_ex        // exists, value
-  store 31                 // s1_val
+  swap                     // value, exists
   store 30                 // s1_exists
+  pop                      // discard value
   // Must exist
   load 30
   assert
   // And equal to Sender
   txn Sender
-  load 31
+  // Re-fetch s1 as bytes for a stable type in the equality
+  byte "s1"
+  app_global_get
   ==
   assert
 
@@ -238,8 +244,9 @@ invest:
   global CurrentApplicationID
   byte "s2"
   app_global_get_ex        // exists, value
-  store 33                 // s2_val
+  swap                     // value, exists
   store 32                 // s2_exists
+  pop
   load 32
   assert
 
@@ -503,11 +510,14 @@ retpath:
   global CurrentApplicationID
   byte "s1"
   app_global_get_ex      // exists, value
-  store 41               // s1_val
+  swap                   // value, exists
   store 40               // s1_exists
+  pop                    // discard value
   load 40
   assert
-  load 41                // S1 addr bytes
+  // Use a fresh fetch to get S1 address bytes for Receiver field
+  byte "s1"
+  app_global_get
   itxn_begin
   int pay
   itxn_field TypeEnum
