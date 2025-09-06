@@ -8,6 +8,19 @@ function b64utf8(b64?: string) {
   try { return b64 ? Buffer.from(b64, "base64").toString("utf8") : ""; } catch { return ""; }
 }
 
+function isPrintableASCII(s: string): boolean {
+  // Reject if contains control chars (0x00-0x1F or 0x7F)
+  if (!s) return false;
+  if (/[\u0000-\u001F\u007F]/.test(s)) return false;
+  return true;
+}
+
+function decodeEventSafe(b64?: string): string {
+  const s = b64utf8(b64 || "").trim();
+  if (isPrintableASCII(s) && /^[-_.A-Za-z0-9]{1,32}$/.test(s)) return s;
+  return "";
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const idRaw = (req.query.id as string) || (req.query.appId as string) || "";
@@ -34,16 +47,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const args: string[] = appl["application-args"] || [];
       let event = ""; let details: Record<string, any> = {};
       if (args.length > 0) {
-        const a0 = b64utf8(args[0]); event = a0;
+        const a0 = decodeEventSafe(args[0]); event = a0;
         if (a0 === "set_phase" && args[1]) details.new_phase = parseInt(Buffer.from(args[1], "base64").toString("hex"), 16);
         if (a0 === "invest" && args[1]) details.s = parseInt(Buffer.from(args[1], "base64").toString("hex"), 16);
         if (a0 === "return" && args[1]) details.r = parseInt(Buffer.from(args[1], "base64").toString("hex"), 16);
       }
       if (!event && Array.isArray(tx.logs) && tx.logs.length > 0) {
-        const maybe = b64utf8(tx.logs[0]); if (maybe) event = maybe;
+        // Attempt to decode a printable ASCII log, else ignore
+        const maybe = decodeEventSafe(tx.logs[0]); if (maybe) event = maybe;
       }
       const inner: Array<{ to: string; amount: number }> = [];
-      const inners: any[] = tx["inner-txns"] || tx["inner-txns"] || [];
+      const inners: any[] = tx["inner-txns"] || [];
       for (const itx of inners) {
         if (itx["tx-type"] === "pay") {
           const pay = itx["payment-transaction"] || {};
@@ -51,7 +65,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (to && Number.isFinite(amount)) inner.push({ to, amount });
         }
       }
-      return { round, time: ts, txid, sender, event, details, innerPayments: inner };
+      // Default a safer label if we still couldn't find a printable 'event'
+      const ev = event || (args.length ? "appl" : (inners.length ? "inner" : "appl"));
+      return { round, time: ts, txid, sender, event: ev, details, innerPayments: inner };
     });
 
     res.status(200).json({ id: appId, count: out.length, txns: out });
@@ -59,4 +75,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(500).json({ error: e?.message || "server error" });
   }
 }
-
