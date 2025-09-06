@@ -116,23 +116,33 @@ noop:
 // -------------------------
 // Opt-In: latch S1 and S2 (first two opt-ins). Reject further.
 optin:
-  // If s1 unset (len == 0) → set to sender
+  // Robust existence checks using app_global_get_ex to avoid
+  // type-mismatch when keys are unset (unset -> uint 0).
+  // If s1 not set -> set to sender. Else if s2 not set and sender != s1 -> set s2. Else reject.
+
+  // Check s1 existence
+  global CurrentApplicationID
   byte "s1"
-  app_global_get
-  len
-  int 0
-  ==
-  bnz set_s1
+  app_global_get_ex        // stack: exists, value
+  store 21                 // s1_val
+  store 20                 // s1_exists
 
-  // Else if s2 unset → and sender != s1 → set s2
+  // If s1 not set, set to sender
+  load 20
+  bz set_s1
+
+  // s1 exists; now check s2 existence
+  global CurrentApplicationID
   byte "s2"
-  app_global_get
-  len
-  int 0
-  ==
-  bnz maybe_set_s2
+  app_global_get_ex        // stack: exists, value
+  store 23                 // s2_val
+  store 22                 // s2_exists
 
-  // Else: reject third (or more) opt-in
+  // If s2 not set, maybe set (but ensure sender != s1)
+  load 22
+  bz maybe_set_s2
+
+  // Else: both set -> reject further opt-ins
   err
 
 set_s1:
@@ -144,10 +154,9 @@ set_s1:
   return
 
 maybe_set_s2:
-  // Ensure sender != s1
+  // Ensure sender != s1 (compare against cached s1_val)
   txn Sender
-  byte "s1"
-  app_global_get
+  load 21                  // s1_val
   ==
   // if equal -> reject
   bnz opt_reject
@@ -196,10 +205,18 @@ set_phase:
 // - allowed if phase == 1 (Invest) OR (phase == 0 and both S1,S2 set)
 // - grouped with Payment s from S1 -> app (gtxn[0]) and this AppCall (gtxn[1])
 invest:
-  // sender must be S1
-  txn Sender
+  // sender must be S1; use get_ex to avoid type mismatch when unset
+  global CurrentApplicationID
   byte "s1"
-  app_global_get
+  app_global_get_ex        // exists, value
+  store 31                 // s1_val
+  store 30                 // s1_exists
+  // Must exist
+  load 30
+  assert
+  // And equal to Sender
+  txn Sender
+  load 31
   ==
   assert
 
@@ -217,12 +234,13 @@ invest:
   int 0
   ==
   bz invest_fail
-  // s1 set (non-empty) already implied; check s2 set
+  // s1 existence already checked above; check s2 exists via get_ex
+  global CurrentApplicationID
   byte "s2"
-  app_global_get
-  len
-  int 0
-  >
+  app_global_get_ex        // exists, value
+  store 33                 // s2_val
+  store 32                 // s2_exists
+  load 32
   assert
 
 invest_args:
@@ -481,9 +499,15 @@ retpath:
   >=
   assert
 
-  // itxn #1: pay r -> S1
+  // itxn #1: pay r -> S1 (assert s1 exists)
+  global CurrentApplicationID
   byte "s1"
-  app_global_get         // S1 addr bytes
+  app_global_get_ex      // exists, value
+  store 41               // s1_val
+  store 40               // s1_exists
+  load 40
+  assert
+  load 41                // S1 addr bytes
   itxn_begin
   int pay
   itxn_field TypeEnum

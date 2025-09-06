@@ -196,7 +196,7 @@ export default function AdminSetup2() {
         <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy}>Read pair state</button>
       </div>
 
-      <div className="text-xs text-neutral-600">Deploy sets globals E1, E2, m, UNIT and phase = 1. Use Set phase to advance to 2 (invest), then 3 (return).</div>
+      <div className="text-xs text-neutral-600">Deploy sets globals E1, E2, m, UNIT and phase = 0 (Registration). Use Set phase to advance to 1 (Invest), then 2 (Return), then 3 (Done).</div>
 
       {lastTx && (
         <div className="text-xs">Last tx: <code>{lastTx.id}</code>{lastTx.round ? ` (round ${lastTx.round})` : ``}</div>
