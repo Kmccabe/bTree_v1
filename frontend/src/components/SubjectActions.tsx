@@ -655,7 +655,7 @@ function SubjectActionsInner() {
   const underfundedForReturn = globalsTVal > 0 && hasFundsInfo && (funds.balance as number) < (globalsTVal + (E2 || 0));
   const s1FromGlobals: string = (() => {
     const g:any = pair.globals as any;
-    const raw = g?.s1;
+    const raw = g?.s1_addr || g?.s1;
     if (!raw) return '';
     if (typeof raw === 'string') {
       try { if ((algosdk as any).isValidAddress && (algosdk as any).isValidAddress(raw)) return raw; } catch {}
@@ -670,6 +670,19 @@ function SubjectActionsInner() {
         if (bytes && bytes.length === 32) { try { return (algosdk as any).encodeAddress(bytes); } catch {} }
       } catch {}
     }
+    return '';
+  })();
+  const s2FromGlobals: string = (() => {
+    const g:any = pair.globals as any;
+    const raw = g?.s2_addr || g?.s2;
+    try {
+      if (typeof raw === 'string') {
+        const b = Buffer.from(raw, 'base64'); if (b.length === 32) return (algosdk as any).encodeAddress(b);
+        if ((algosdk as any).isValidAddress?.(raw)) return raw;
+      } else if (raw && typeof raw.bytes === 'string') {
+        const b = Buffer.from(raw.bytes, 'base64'); if (b.length === 32) return (algosdk as any).encodeAddress(b);
+      }
+    } catch {}
     return '';
   })();
   const s1Valid = !!s1FromGlobals && ((algosdk as any).isValidAddress ? (algosdk as any).isValidAddress(s1FromGlobals) : (s1FromGlobals.length === 58));
@@ -1156,6 +1169,9 @@ function SubjectActionsInner() {
         <div className="text-xs text-neutral-700">Constants: UNIT={unit}, E1={E.toLocaleString()}, E2={E2.toLocaleString()}</div>
         {!s1Valid && (
           <div className="text-xs text-amber-700">S1 (investor) not found yet. Ensure Invest confirmed and click Read pair states.</div>
+        )}
+        {s2FromGlobals && activeAddress && (s2FromGlobals !== activeAddress) && (
+          <div className="text-xs text-amber-700">Connected wallet is not S2; Return will be rejected by the contract.</div>
         )}
         {/* No S1 input needed; contract tracks S1 globally */}
         <div className="flex items-center gap-2 text-sm">

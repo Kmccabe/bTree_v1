@@ -354,6 +354,49 @@ export async function setPhase(args: {
   return { txId, confirmedRound };
 }
 
+/** Admin: setPair(s1_addr, s2_addr) with raw 32-byte public keys derived from Algorand addresses. */
+export async function setPair(args: {
+  sender: string;   // creator address
+  appId: number;
+  s1: string;       // Algorand address
+  s2: string;       // Algorand address
+  sign: Signer;
+  wait?: boolean;
+}): Promise<{ txId: string; confirmedRound?: number }>{
+  const TAG = '[setPair]';
+  const { sender, appId, s1, s2, sign, wait = true } = args;
+  if (!algosdk.isValidAddress(sender)) throw new Error(`${TAG} invalid sender`);
+  if (!Number.isInteger(appId) || appId <= 0) throw new Error(`${TAG} invalid appId`);
+  if (!algosdk.isValidAddress(s1)) throw new Error(`${TAG} invalid s1 address`);
+  if (!algosdk.isValidAddress(s2)) throw new Error(`${TAG} invalid s2 address`);
+
+  const s1raw = (algosdk as any).decodeAddress(s1)?.publicKey as Uint8Array;
+  const s2raw = (algosdk as any).decodeAddress(s2)?.publicKey as Uint8Array;
+  if (!(s1raw instanceof Uint8Array) || s1raw.length !== 32) throw new Error(`${TAG} could not decode s1 to 32 bytes`);
+  if (!(s2raw instanceof Uint8Array) || s2raw.length !== 32) throw new Error(`${TAG} could not decode s2 to 32 bytes`);
+
+  const sp: any = await getParamsNormalized();
+  const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
+  const appArgs = [str('setPair'), s1raw, s2raw];
+  const call: any = (algosdk as any).makeApplicationNoOpTxnFromObject({
+    sender,
+    appIndex: appId,
+    appArgs,
+    suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
+  });
+  const stxns = await sign([(algosdk as any).encodeUnsignedTransaction(call)]);
+  const payload = { stxns: stxns.map((b) => toBase64(b)) } as any;
+  const sub = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const text = await sub.text();
+  if (!sub.ok) throw new Error(`${TAG} submit ${sub.status}: ${text}`);
+  let sj: any; try { sj = JSON.parse(text); } catch { sj = {}; }
+  const txId: string = sj?.txId || sj?.txid || sj?.txID;
+  if (!wait) return { txId };
+  const pend = await (await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`)).json();
+  const confirmedRound: number | undefined = pend?.['confirmed-round'] ?? pend?.confirmedRound;
+  return { txId, confirmedRound };
+}
+
 /**
  * investFlow: two-txn atomic group
  *   g0: Payment s from sender -> app address

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
-import { setPhase, sweepApp, deleteApp } from "../chain/tx";
+import { setPhase, sweepApp, deleteApp, setPair } from "../chain/tx";
 import { resolveAppId, setSelectedAppId } from "../state/appId";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -39,6 +39,12 @@ export default function AdminSetup2() {
   const signer = (u: Uint8Array[]) => signTransactions(u);
   const [currentPhase, setCurrentPhase] = useState<number | null>(null);
   const [history, setHistory] = useState<null | { loading: boolean; error?: string; items?: Array<{ round: number; time: number; txid: string; sender: string; event: string; details?: any; innerPayments?: Array<{ to: string; amount: number }> }> }>(null);
+  // Recruit Subjects (S1/S2)
+  const [s1Input, setS1Input] = useState<string>("");
+  const [s2Input, setS2Input] = useState<string>("");
+  const isAddr = (a: string) => {
+    try { return (a && (require('algosdk') as any).isValidAddress?.(a)) || false; } catch { return false; }
+  };
 
   function loraTxUrl(txId: string) {
     return `https://lora.algokit.io/testnet/tx/${txId}`;
@@ -53,6 +59,14 @@ export default function AdminSetup2() {
       setAddr(r.appAddress);
       setSelectedAppId(r.appId);
       setFund(null);
+      // If S1/S2 captured, setPair immediately
+      try {
+        if (isAddr(s1Input) && isAddr(s2Input)) {
+          await setPair({ sender: activeAddress, appId: r.appId, s1: s1Input, s2: s2Input, sign: signer, wait: true });
+        }
+      } catch (e: any) {
+        setErr(`Deploy ok, setPair failed: ${e?.message || e}`);
+      }
     } catch (e: any) {
       setErr(e?.message || String(e));
     } finally { setBusy(null); }
@@ -150,6 +164,43 @@ export default function AdminSetup2() {
   return (
     <div className="rounded-2xl border p-4 space-y-4">
       <h3 className="text-lg font-semibold">Admin - Deploy & Manage Pair</h3>
+
+      {/* Recruit Subjects (creator-only pre-deploy) */}
+      <div className="rounded-xl border p-3 space-y-2">
+        <div className="font-semibold">Recruit Subjects</div>
+        <div className="text-xs text-neutral-700">Capture S1/S2 addresses (no opt-in). You can paste addresses or use the connected wallet.</div>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <label className="flex flex-col">
+            <span>S1 address</span>
+            <div className="flex items-center gap-2">
+              <input className="border rounded px-2 py-1 flex-1" placeholder="S1 Algorand address" value={s1Input} onChange={(e)=> setS1Input(e.target.value.trim())} />
+              <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS1Input(activeAddress)}>Use connected</button>
+            </div>
+            {!!s1Input && !isAddr(s1Input) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
+          </label>
+          <label className="flex flex-col">
+            <span>S2 address</span>
+            <div className="flex items-center gap-2">
+              <input className="border rounded px-2 py-1 flex-1" placeholder="S2 Algorand address" value={s2Input} onChange={(e)=> setS2Input(e.target.value.trim())} />
+              <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS2Input(activeAddress)}>Use connected</button>
+            </div>
+            {!!s2Input && !isAddr(s2Input) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
+          </label>
+        </div>
+        <div className="text-xs text-neutral-700">You can replace S1/S2 before deploy. After deploy, call Set Pair (or it will be set automatically).</div>
+        <div className="flex items-center gap-2">
+          <button className="text-xs underline" onClick={async ()=>{
+            setErr(null);
+            try {
+              const id = resolveAppId();
+              if (!activeAddress) throw new Error('Connect creator wallet');
+              if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Enter valid S1/S2 addresses');
+              const r = await setPair({ sender: activeAddress, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
+              setLastTx({ id: r.txId, round: r.confirmedRound });
+            } catch (e: any) { setErr(e?.message || String(e)); }
+          }} disabled={!activeAddress || !isAddr(s1Input) || !isAddr(s2Input)} title="Set S1/S2 on selected App ID">Set Pair (existing App)</button>
+        </div>
+      </div>
 
       {/* Deploy controls */}
       <div className="grid grid-cols-4 gap-3">
