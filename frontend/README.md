@@ -26,3 +26,5 @@ npm run dev
 
 - Design spec: [docs/trust-game-design.md](docs/trust-game-design.md)
 - Variants & treatments: [docs/trust-game-variants.md](docs/trust-game-variants.md)
+
+## usage
