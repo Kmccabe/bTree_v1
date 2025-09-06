@@ -12,7 +12,7 @@ int 0
 ==
 bnz create
 
-// Runtime branch (support NoOp + OptIn)
+// Runtime branch (support NoOp)
 txn OnCompletion
 int NoOp
 ==
@@ -23,10 +23,7 @@ int DeleteApplication
 ==
 bnz delapp
 
-txn OnCompletion
-int OptIn
-==
-bnz optin
+// No subject opt-in; reject OptIn elsewhere
 
 // Reject everything else
 err
@@ -92,6 +89,7 @@ create:
   byte "swept"
   int 0
   app_global_put
+  // s1_addr / s2_addr unset initially; creator will set via setPair
 
   int 1
   return
@@ -125,58 +123,14 @@ noop:
   ==
   bnz sweep
 
-  err
-
-// -------------------------
-// Opt-In: latch S1 and S2 (first two opt-ins). Reject further.
-optin:
-  // Robust existence checks using app_global_get_ex to avoid
-  // type-mismatch when keys are unset (unset -> uint 0).
-  // If s1 not set -> set to sender. Else if s2 not set and sender != s1 -> set s2. Else reject.
-
-  // Check s1 existence
-  global CurrentApplicationID
-  byte "s1"
-  app_global_get_ex        // stack: value, exists
-  bz set_s1                // if not exists -> set s1
-  pop                      // discard value
-
-  // s1 exists; now check s2 existence
-  global CurrentApplicationID
-  byte "s2"
-  app_global_get_ex        // stack: value, exists
-  bz maybe_set_s2          // if not exists -> set s2
-  pop                      // discard value
-
-  // Else: both set -> reject further opt-ins
-  err
-
-set_s1:
-  txn Sender
-  byte "s1"
-  swap
-  app_global_put
-  int 1
-  return
-
-maybe_set_s2:
-  // Ensure sender != s1 (compare against s1 fetched bytes)
-  txn Sender
-  byte "s1"
-  app_global_get
+  txn ApplicationArgs 0
+  byte "setPair"
   ==
-  // if equal -> reject
-  bnz opt_reject
-  // else set s2
-  txn Sender
-  byte "s2"
-  swap
-  app_global_put
-  int 1
-  return
+  bnz set_pair
 
-opt_reject:
   err
+
+// (No OptIn handler)
 
 // -------------------------
 // Admin: set_phase(p) where p in [0..3]; only creator
@@ -208,44 +162,73 @@ set_phase:
   return
 
 // -------------------------
-// invest(s):
-// - allowed if phase == 1 (Invest) OR (phase == 0 and both S1,S2 set)
-// - grouped with Payment s from S1 -> app (gtxn[0]) and this AppCall (gtxn[1])
-invest:
-  // sender must be S1; use get_ex to avoid type mismatch when unset
-  global CurrentApplicationID
-  byte "s1"
-  app_global_get_ex        // value, exists
-  assert                   // must exist
-  pop                      // drop value
-  // And equal to Sender
+// Admin: setPair(s1_raw32, s2_raw32) one-time
+set_pair:
+  // Creator-only
   txn Sender
-  // Re-fetch s1 as bytes for a stable type in the equality
-  byte "s1"
+  global CreatorAddress
+  ==
+  assert
+  // Expect 3 args total: ["setPair", s1_raw32, s2_raw32]
+  txn NumAppArgs
+  int 3
+  ==
+  assert
+  // arg1 and arg2 must be 32 bytes
+  txna ApplicationArgs 1
+  len
+  int 32
+  ==
+  assert
+  txna ApplicationArgs 2
+  len
+  int 32
+  ==
+  assert
+  // Ensure not already set
+  global CurrentApplicationID
+  byte "s1_addr"
+  app_global_get_ex   // value, exists
+  pop
+  !
+  assert
+  global CurrentApplicationID
+  byte "s2_addr"
+  app_global_get_ex   // value, exists
+  pop
+  !
+  assert
+  // Set globals
+  byte "s1_addr"
+  txna ApplicationArgs 1
+  app_global_put
+  byte "s2_addr"
+  txna ApplicationArgs 2
+  app_global_put
+  int 1
+  return
+
+// -------------------------
+// invest(s): grouped with Payment s from S1 -> app (gtxn[0]) and this AppCall (gtxn[1])
+invest:
+  // sender must be S1 (stored in s1_addr)
+  global CurrentApplicationID
+  byte "s1_addr"
+  app_global_get_ex        // value, exists
+  assert
+  pop
+  txn Sender
+  byte "s1_addr"
   app_global_get
   ==
   assert
 
-  // phase check
+  // phase must be 2
   byte "phase"
   app_global_get
-  store 20              // ph
-  // if ph == 1 → ok
-  load 20
-  int 1
+  int 2
   ==
-  bnz invest_args
-  // else if ph == 0 ensure both s1 and s2 set
-  load 20
-  int 0
-  ==
-  bz invest_fail
-  // s1 existence already checked above; check s2 exists via get_ex
-  global CurrentApplicationID
-  byte "s2"
-  app_global_get_ex        // value, exists
-  assert                   // must exist
-  pop                      // drop value
+  assert
 
 invest_args:
   // args: ["invest", s]
@@ -280,21 +263,9 @@ invest_args:
   ==
   assert
 
-  // subject must be opted-in
-  txn Sender
-  global CurrentApplicationID
-  app_opted_in
-  assert
-
-  // not already invested: global invested == 0 and local done == 0
+  // not already invested: global invested == 0
   byte "invested"
   app_global_get
-  int 0
-  ==
-  assert
-  txn Sender
-  byte "done"
-  app_local_get
   int 0
   ==
   assert
@@ -315,7 +286,7 @@ invest_args:
   ==
   assert
   gtxn 0 Sender
-  byte "s1"
+  byte "s1_addr"
   app_global_get
   ==
   assert
@@ -362,21 +333,13 @@ invest_args:
   itxn_field TypeEnum
   load 7
   itxn_field Amount
-  byte "s1"
+  byte "s1_addr"
   app_global_get
   itxn_field Receiver
   itxn_submit
 skip_refund:
 
-  // write local s & done to S1 local state
-  txn Sender
-  byte "s"
-  load 0
-  app_local_put
-  txn Sender
-  byte "done"
-  int 1
-  app_local_put
+  // (no local state)
 
   // compute t = m * s and persist global/local mirror
   byte "m"
@@ -391,19 +354,18 @@ skip_refund:
   load 0
   app_global_put
 
-  // set invested=1, phase=Return(2)
+  // set invested=1, advance phase to Return(3)
   byte "invested"
   int 1
   app_global_put
   byte "phase"
-  int 2
+  int 3
   app_global_put
 
   int 1
   return
 
-invest_fail:
-  err
+// (no alternate Invest branch)
 
 // -------------------------
 // CASE: "sweep" (Phase 3, creator-only)
@@ -467,21 +429,21 @@ end_sweep:
 // CASE: "return" (Subject 2)
 // args: [ "return", r:uint ]
 retpath:
-  // Guard phase == 2
+  // Guard phase == 3
   byte "phase"
   app_global_get
-  int 2
+  int 3
   ==
   assert
 
-  // sender must be S2; assert s2 exists then compare as bytes
+  // sender must be S2; assert s2_addr exists then compare as bytes
   global CurrentApplicationID
-  byte "s2"
+  byte "s2_addr"
   app_global_get_ex      // value, exists
   assert                 // must exist
   pop                    // drop value
   txn Sender
-  byte "s2"
+  byte "s2_addr"
   app_global_get
   ==
   assert
@@ -540,14 +502,14 @@ retpath:
   >=
   assert
 
-  // itxn #1: pay r -> S1 (assert s1 exists)
+  // itxn #1: pay r -> S1 (assert s1_addr exists)
   global CurrentApplicationID
-  byte "s1"
+  byte "s1_addr"
   app_global_get_ex      // value, exists
   assert                 // must exist
   pop                    // drop value
   // Use a fresh fetch to get S1 address bytes for Receiver field
-  byte "s1"
+  byte "s1_addr"
   app_global_get
   itxn_begin
   int pay
