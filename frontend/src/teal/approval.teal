@@ -123,26 +123,18 @@ optin:
   // Check s1 existence
   global CurrentApplicationID
   byte "s1"
-  app_global_get_ex        // stack: exists, value
-  swap                     // value, exists
-  store 20                 // s1_exists
+  app_global_get_ex        // stack: value, exists
+  swap                     // exists, value
+  bz set_s1                // if not exists -> set s1
   pop                      // discard value
-
-  // If s1 not set, set to sender
-  load 20
-  bz set_s1
 
   // s1 exists; now check s2 existence
   global CurrentApplicationID
   byte "s2"
-  app_global_get_ex        // stack: exists, value
-  swap                     // value, exists
-  store 22                 // s2_exists
+  app_global_get_ex        // stack: value, exists
+  swap                     // exists, value
+  bz maybe_set_s2          // if not exists -> set s2
   pop                      // discard value
-
-  // If s2 not set, maybe set (but ensure sender != s1)
-  load 22
-  bz maybe_set_s2
 
   // Else: both set -> reject further opt-ins
   err
