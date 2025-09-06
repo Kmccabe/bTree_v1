@@ -125,11 +125,27 @@ noop:
   ==
   bnz sweep
 
+  txn ApplicationArgs 0
+  byte "registerExperiment"
+  ==
+  bnz reg_exp
+
   err
 
 // -------------------------
 // Opt-In: latch S1 and S2 (first two opt-ins). Reject further.
 optin:
+  // Gate: experiment must be registered and phase must be 0
+  byte "exp_registered"
+  app_global_get
+  int 1
+  ==
+  assert
+  byte "phase"
+  app_global_get
+  int 0
+  ==
+  assert
   // Robust existence checks using app_global_get_ex to avoid
   // type-mismatch when keys are unset (unset -> uint 0).
   // If s1 not set -> set to sender. Else if s2 not set and sender != s1 -> set s2. Else reject.
@@ -155,6 +171,52 @@ set_s1:
   txn Sender
   byte "s1"
   swap
+  app_global_put
+  int 1
+  return
+
+// -------------------------
+// Admin: registerExperiment(raw32 params_hash, uint n_needed, bytes contract_uri)
+// Args: ["registerExperiment", arg1, arg2, arg3]
+reg_exp:
+  // Creator-only
+  txn Sender
+  global CreatorAddress
+  ==
+  assert
+  // Expect 4 args total
+  txn NumAppArgs
+  int 4
+  ==
+  assert
+  // Not already registered
+  byte "exp_registered"
+  app_global_get
+  int 0
+  ==
+  assert
+  // params_hash length must be 32
+  txna ApplicationArgs 1
+  len
+  int 32
+  ==
+  assert
+  // Write globals
+  byte "exp_registered"
+  int 1
+  app_global_put
+  byte "exp_ts"
+  global LatestTimestamp
+  app_global_put
+  byte "n_needed"
+  txna ApplicationArgs 2
+  btoi
+  app_global_put
+  byte "params_hash"
+  txna ApplicationArgs 1
+  app_global_put
+  byte "contract_uri"
+  txna ApplicationArgs 3
   app_global_put
   int 1
   return

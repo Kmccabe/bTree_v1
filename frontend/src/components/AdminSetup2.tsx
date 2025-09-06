@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
 import { setPhase, sweepApp, deleteApp } from "../chain/tx";
+import ExperimentStatus from "./ExperimentStatus";
 import { resolveAppId, setSelectedAppId } from "../state/appId";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -150,6 +151,9 @@ export default function AdminSetup2() {
   return (
     <div className="rounded-2xl border p-4 space-y-4">
       <h3 className="text-lg font-semibold">Admin - Deploy & Manage Pair</h3>
+
+      {/* Experiment status + register (creator-only) */}
+      <ExperimentStatus />
 
       {/* Deploy controls */}
       <div className="grid grid-cols-4 gap-3">
