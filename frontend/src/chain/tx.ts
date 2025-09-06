@@ -592,3 +592,37 @@ export async function sweepApp(args: {
   const confirmedRound: number | undefined = pend?.['confirmed-round'] ?? pend?.confirmedRound;
   return { txId, confirmedRound };
 }
+
+/** Admin: delete the application (creator-only). */
+export async function deleteApp(args: {
+  sender: string;   // creator address
+  appId: number;
+  sign: Signer;
+  wait?: boolean;
+}): Promise<{ txId: string; confirmedRound?: number }>{
+  const TAG = "[delete]";
+  const { sender, appId, sign, wait = true } = args;
+  try { console.info("[appId] resolved =", resolveAppId()); } catch {}
+  if (!algosdk.isValidAddress(sender)) throw new Error(`${TAG} invalid sender`);
+  if (!Number.isInteger(appId) || appId <= 0) throw new Error(`${TAG} invalid appId`);
+
+  const sp: any = await getParamsNormalized();
+  const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
+  const call: any = (algosdk as any).makeApplicationDeleteTxnFromObject({
+    from: sender,
+    sender,
+    appIndex: appId,
+    suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
+  } as any);
+  const stxns = await sign([(algosdk as any).encodeUnsignedTransaction(call)]);
+  const payload = { stxns: stxns.map((b) => toBase64(b)) } as any;
+  const sub = await fetch("/api/submit", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const text = await sub.text();
+  if (!sub.ok) throw new Error(`${TAG} submit ${sub.status}: ${text}`);
+  let sj: any; try { sj = JSON.parse(text); } catch { sj = {}; }
+  const txId: string = sj?.txId || sj?.txid || sj?.txID;
+  if (!wait) return { txId };
+  const pend = await (await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`)).json();
+  const confirmedRound: number | undefined = pend?.['confirmed-round'] ?? pend?.confirmedRound;
+  return { txId, confirmedRound };
+}

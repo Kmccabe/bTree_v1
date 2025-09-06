@@ -19,12 +19,26 @@ int NoOp
 bnz noop
 
 txn OnCompletion
+int DeleteApplication
+==
+bnz delapp
+
+txn OnCompletion
 int OptIn
 ==
 bnz optin
 
 // Reject everything else
 err
+
+// Creator-only DeleteApplication
+delapp:
+  global CreatorAddress
+  txn Sender
+  ==
+  assert
+  int 1
+  return
 
 create:
   // Expect 4 creation args: E1, E2, m, UNIT

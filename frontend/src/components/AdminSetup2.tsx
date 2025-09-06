@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
-import { setPhase, sweepApp } from "../chain/tx";
+import { setPhase, sweepApp, deleteApp } from "../chain/tx";
 import { resolveAppId, setSelectedAppId } from "../state/appId";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -37,6 +37,7 @@ export default function AdminSetup2() {
   const [fund, setFund] = useState<{ required: number; balance?: number; ok?: boolean } | null>(null);
 
   const signer = (u: Uint8Array[]) => signTransactions(u);
+  const [currentPhase, setCurrentPhase] = useState<number | null>(null);
   const [history, setHistory] = useState<null | { loading: boolean; error?: string; items?: Array<{ round: number; time: number; txid: string; sender: string; event: string; details?: any; innerPayments?: Array<{ to: string; amount: number }> }> }>(null);
 
   function loraTxUrl(txId: string) {
@@ -85,6 +86,7 @@ export default function AdminSetup2() {
     setBusy("phase");
     try {
       await setPhase({ sender: activeAddress, appId: id, phase: p, sign: signer });
+      setCurrentPhase(p);
     } catch (e: any) { setErr(e?.message || String(e)); }
     finally { setBusy(null); }
   }
@@ -96,6 +98,8 @@ export default function AdminSetup2() {
       const r = await fetch(`/api/pair?id=${id}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+      const ph = Number(j?.globals?.phase);
+      if (Number.isFinite(ph)) setCurrentPhase(ph);
       // No special UI here; this validates the app exists and backend network matches
     } catch (e: any) { setErr(e?.message || String(e)); }
   }
@@ -128,6 +132,17 @@ export default function AdminSetup2() {
       const id = resolveAppId();
       if (!activeAddress) throw new Error("Connect the creator wallet.");
       const r = await sweepApp({ sender: activeAddress, appId: id, sign: (u)=>signTransactions(u), wait: true });
+      setLastTx({ id: r.txId, round: r.confirmedRound });
+    } catch (e: any) { setErr(e?.message || String(e)); }
+  }
+
+  async function onDelete() {
+    setErr(null);
+    try {
+      const id = resolveAppId();
+      if (!activeAddress) throw new Error("Connect the creator wallet.");
+      if (!confirm(`Delete application ${id}? This cannot be undone.`)) return;
+      const r = await deleteApp({ sender: activeAddress, appId: id, sign: (u)=>signTransactions(u), wait: true });
       setLastTx({ id: r.txId, round: r.confirmedRound });
     } catch (e: any) { setErr(e?.message || String(e)); }
   }
@@ -221,9 +236,20 @@ export default function AdminSetup2() {
         </select>
         <button className="text-xs underline" onClick={()=>onApplyPhase(phaseSel)} disabled={!!busy || !activeAddress}>Apply</button>
         <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy}>Read pair state</button>
+        {Number.isFinite(currentPhase as any) && (
+          <span className="text-xs text-neutral-600">Current phase: <code>{currentPhase}</code></span>
+        )}
         {/* Always show Sweep here so it's available even when appId is set */}
         <button className="text-xs underline" onClick={onSweep} disabled={!!busy || !activeAddress}>Sweep</button>
         <button className="text-xs underline" onClick={onLoadHistory} disabled={!!busy}>View history</button>
+        <button
+          className="text-xs underline text-red-700"
+          onClick={onDelete}
+          disabled={!!busy || !activeAddress || currentPhase !== 3}
+          title={currentPhase === 3 ? 'Delete application (creator only). Sweep first to reclaim liquid.' : 'Enabled only in Done (3). Use Sweep first, then Delete.'}
+        >
+          Delete app
+        </button>
       </div>
 
       {/* History viewer */}
