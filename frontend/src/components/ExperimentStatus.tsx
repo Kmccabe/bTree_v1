@@ -162,9 +162,27 @@ export default function ExperimentStatus() {
         </div>
       )}
 
-      {!registered && isCreator && (
-        <div className="mt-2">
-          <button className="text-xs underline" onClick={()=> setShowModal(true)}>Register Experiment</button>
+      {!registered && (
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            className={`text-xs underline ${(!appId || !activeAddress || !creatorEnv || !isCreator) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={()=> setShowModal(true)}
+            disabled={!appId || !activeAddress || !creatorEnv || !isCreator}
+            title={(() => {
+              if (!appId) return 'Select or configure App ID';
+              if (!activeAddress) return 'Connect wallet';
+              if (!creatorEnv) return 'Set VITE_CREATOR_ADDRESS on Vercel';
+              if (!isCreator) return 'Only the creator address may register';
+              return '';
+            })()}
+          >
+            Register Experiment
+          </button>
+          {(!creatorEnv || (activeAddress && creatorEnv && !isCreator)) && (
+            <span className="text-[11px] text-neutral-600">
+              {(!creatorEnv) ? 'Missing VITE_CREATOR_ADDRESS env' : 'Connect the creator wallet to enable'}
+            </span>
+          )}
         </div>
       )}
 
