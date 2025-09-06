@@ -37,6 +37,11 @@ export default function AdminSetup2() {
   const [fund, setFund] = useState<{ required: number; balance?: number; ok?: boolean } | null>(null);
 
   const signer = (u: Uint8Array[]) => signTransactions(u);
+  const [history, setHistory] = useState<null | { loading: boolean; error?: string; items?: Array<{ round: number; time: number; txid: string; sender: string; event: string; details?: any; innerPayments?: Array<{ to: string; amount: number }> }> }>(null);
+
+  function loraTxUrl(txId: string) {
+    return `https://lora.algokit.io/testnet/tx/${txId}`;
+  }
 
   async function onDeploy() {
     setBusy("deploy"); setErr(null);
@@ -93,6 +98,28 @@ export default function AdminSetup2() {
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
       // No special UI here; this validates the app exists and backend network matches
     } catch (e: any) { setErr(e?.message || String(e)); }
+  }
+
+  async function onLoadHistory() {
+    setHistory({ loading: true });
+    try {
+      const id = resolveAppId();
+      const r = await fetch(`/api/history?id=${id}&limit=100`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+      const items = (j?.txns as any[] || []).map((t) => ({
+        round: Number(t.round || 0),
+        time: Number(t.time || 0),
+        txid: String(t.txid || ''),
+        sender: String(t.sender || ''),
+        event: String(t.event || ''),
+        details: t.details || {},
+        innerPayments: Array.isArray(t.innerPayments) ? t.innerPayments : [],
+      }));
+      setHistory({ loading: false, items });
+    } catch (e: any) {
+      setHistory({ loading: false, error: e?.message || String(e) });
+    }
   }
 
   async function onSweep() {
@@ -196,7 +223,49 @@ export default function AdminSetup2() {
         <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy}>Read pair state</button>
         {/* Always show Sweep here so it's available even when appId is set */}
         <button className="text-xs underline" onClick={onSweep} disabled={!!busy || !activeAddress}>Sweep</button>
+        <button className="text-xs underline" onClick={onLoadHistory} disabled={!!busy}>View history</button>
       </div>
+
+      {/* History viewer */}
+      {history && (
+        <div className="rounded-xl border p-3 space-y-2 text-xs text-neutral-800">
+          <div className="flex items-center justify-between">
+            <div className="font-semibold">History (last {history.items?.length ?? 0})</div>
+            <button className="underline" onClick={()=>setHistory(null)}>Close</button>
+          </div>
+          {history.loading && <div>Loading…</div>}
+          {history.error && <div className="text-red-600">{history.error}</div>}
+          {!history.loading && !history.error && (
+            <ul className="space-y-1">
+              {(history.items || []).map((h, i) => (
+                <li key={h.txid || i} className="flex items-start gap-2">
+                  <div className="text-neutral-500 w-28">{h.time ? new Date(h.time * 1000).toLocaleString() : ''}</div>
+                  <div className="flex-1">
+                    <div>
+                      <span className="font-medium">{h.event || '(noop)'}</span>
+                      {' '}by <code>{h.sender?.slice(0,6)}…{h.sender?.slice(-6)}</code>
+                      {' '}· <a href={loraTxUrl(h.txid)} target="_blank" rel="noreferrer" className="underline text-blue-700">LoRA</a>
+                    </div>
+                    {(() => {
+                      const p = h.innerPayments || [];
+                      return p.length ? (
+                        <div>
+                          Payments: {p.map((x, idx) => (
+                            <span key={idx} className="ml-1">{x.amount.toLocaleString()} → <code>{x.to.slice(0,6)}…{x.to.slice(-6)}</code></span>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+                    {h.details && Object.keys(h.details).length > 0 && (
+                      <div className="text-neutral-600">{JSON.stringify(h.details)}</div>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="text-xs text-neutral-600">Deploy sets globals E1, E2, m, UNIT and phase = 0 (Registration). Use Set phase to advance to 1 (Invest), then 2 (Return), then 3 (Done).</div>
 
