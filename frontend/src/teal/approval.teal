@@ -428,7 +428,12 @@ retpath:
   ==
   assert
 
-  // sender must be S2
+  // sender must be S2; assert s2 exists then compare as bytes
+  global CurrentApplicationID
+  byte "s2"
+  app_global_get_ex      // value, exists
+  assert                 // must exist
+  pop                    // drop value
   txn Sender
   byte "s2"
   app_global_get
