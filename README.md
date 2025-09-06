@@ -1,114 +1,74 @@
-# bTree v1 - Trust Game MVP (Algorand + Pera/TestNet)
+# bTree v1 — Trust Game (Algorand TestNet)
 
-Minimal, production-oriented scaffold for running a Trust Game on Algorand TestNet.
-The app is built with React + Vite, uses Pera Wallet for signing, and deploys on
-Vercel with serverless routes that proxy Algod.
+Professional, production‑oriented scaffold for a single‑pair Trust Game on Algorand TestNet.
+The web client (under `frontend/`) uses React + Vite and Vercel serverless functions to
+proxy all Algod/Indexer calls. Wallet signing is via Pera (`@txnlab/use-wallet`).
 
-- Wallet: Pera (TestNet; no mnemonics in-browser)
-- Chain access: Vercel serverless functions -> Algod
-- Hosting: Vercel (Root Directory = `frontend/`)
-- Contracts: Placeholder TEAL for now; upgradeable to full Trust Game logic
+- Hosting: Vercel (Root Directory `frontend/`)
+- Chain access: serverless `/api/*` → Algod/Indexer
+- Contracts: TEAL in `frontend/src/teal/*.teal`
 
-## Trust Game (MVP)
+## Documentation
 
-- Design spec: frontend/docs/trust-game-design.md
-- Variants & treatments: frontend/docs/trust-game-variants.md
-- Testing checklist (Phase 2): frontend/docs/phase-2-testing.md
+- Frontend README (run/deploy, UI): `frontend/README.md`
+- Game design: `frontend/docs/trust-game-design.md`
+- Variants & treatments: `frontend/docs/trust-game-variants.md`
+- Manual smoke test: `tests/manual/SMOKE.md`
 
-Quick note: The app lives under `frontend/` (React + Vite + Vercel serverless).
-Admin can deploy & fund a per-pair contract from the in-app "Admin - Deploy & Fund" panel.
+## Trust Game Flow (Phases & Funding)
 
-## Quick Start
+- Phase 0 (Registration): S1 and S2 opt‑in (globals latch `s1`, `s2`).
+- Phase 1 (Invest): S1 invests `s` (UNIT‑aligned, `s ≤ E1`).
+  - Inner payment refund to S1: `E1 − s`.
+  - App sets `t = m × s`; advance to Phase 2.
+  - Funding before Invest: app liquid ≥ `E1 − s`.
+- Phase 2 (Return): S2 returns `r` (`0 ≤ r ≤ t`, UNIT‑aligned).
+  - Inner payments: `r → S1`; `(t − r + E2) → S2`.
+  - Funding before Return: app liquid ≥ `t + E2`.
+- Phase 3 (Done): Admin may Sweep (liquid → creator) and Delete app (creator‑only).
+  - Note: app must always keep ≥ 0.1 ALGO minimum; Sweep moves only liquid (balance − min).
 
-Local (with serverless APIs):
+## Quick Start (Local)
 
-1) Install deps
-   - cd frontend
-   - npm install
+1) Install UI dependencies
+   - `cd frontend && npm i`
+2) Configure serverless env (`frontend/.env.local`)
+   - `TESTNET_ALGOD_URL=https://testnet-api.algonode.cloud`
+   - `TESTNET_ALGOD_TOKEN=` (blank for Algonode)
+3) Run serverless and UI
+   - Terminal A: `npx vercel dev` (exposes `/api` on :3000)
+   - Terminal B: `npm run dev` (Vite on :5173; proxies `/api`)
+4) Open http://localhost:5173, connect Pera (TestNet), use Admin panel to deploy/manage.
 
-2) Create `frontend/.env` for serverless routes (Algonode needs no token)
-   - TESTNET_ALGOD_URL=https://testnet-api.algonode.cloud
-   - TESTNET_ALGOD_TOKEN=
+## Deploy to Vercel (Summary)
 
-3) Run serverless and UI in two terminals
-   - Terminal A (serverless): npx vercel dev
-   - Terminal B (Vite UI): npm run dev
-
-4) Open http://localhost:5173, connect Pera (TestNet), click Deploy, then use Phase Control.
-
-Deploy to Vercel (summary):
 - Root Directory: `frontend/`
 - Build Command: `npm run build`
 - Output Directory: `dist`
-- Env vars: set TESTNET_ALGOD_URL/TESTNET_ALGOD_TOKEN (serverless) and optional VITE_* (client)
+- Server envs: `TESTNET_ALGOD_URL`, `TESTNET_ALGOD_TOKEN`
+- Client envs (optional): `VITE_NETWORK`, `VITE_TESTNET_APP_ID`, etc.
 
-## Project Structure
+## Project Structure (Top‑Level)
 
-contracts/
-frontend/
-  api/ (serverless routes)
-  public/
-  src/
-    App.tsx
-    main.tsx
-    deploy.ts
-    components/PhaseControl.tsx
-    components/SubjectActions.tsx
-    polyfills.ts
-
-## Environment Variables
-
-Serverless (used by `/api/*`, secure):
-- TESTNET_ALGOD_URL = https://testnet-api.algonode.cloud
-- TESTNET_ALGOD_TOKEN = (blank for Algonode, or your provider key)
-
-Client (Vite build-time):
-- VITE_NETWORK = TESTNET
-- VITE_TESTNET_APP_ID = (optional; known app id)
-- VITE_TESTNET_ALGOD_URL = https://testnet-api.algonode.cloud
-- VITE_TESTNET_INDEXER_URL = https://testnet-idx.algonode.cloud
-
-Local serverless (`vercel dev`):
-- Put the same TESTNET_ALGOD_* values in `frontend/.env`
-
-## Quick Demo (single account)
-
-Run the end-to-end Phase 2 flow with one wallet (TestNet):
-
-1) Connect Wallet (TestNet)
-2) Deploy contract (or use an existing App ID)
-3) Fund contract (App Address). For a full demo in one pass, the app needs at least t = 3 x s microAlgos after Invest (UI shows low-balance hints; baseline ~0.20 ALGO)
-4) Set App ID in the Subject panel and click Load globals
-5) Opt-In in the Subject panel (ignore "already opted in" if shown)
-6) In Quick Demo, enter:
-   - s (microAlgos): multiple of UNIT and <= E (e.g., 40000 if UNIT=1000)
-   - r (microAlgos): 0..t and multiple of UNIT (t becomes 3 x s after Invest)
-7) Click Run Demo: [set phase=2 if creator] -> Opt-In -> Invest -> Read Pair States -> check funding -> Return
-   - If underfunded for Return, fund the App Address and use Run Return only
-8) View results: Invest and Return show "View on LoRA" links (lora.algokit.io/testnet/tx/<txid>)
+- `contracts/` — PyTeal scaffolds and tests
+- `frontend/`
+  - `api/` — serverless functions (`/api/*`)
+  - `src/` — React app, TEAL, chain helpers, components
+  - `public/` — static assets
+- `tests/manual/SMOKE.md` — end‑to‑end manual script
 
 ## Troubleshooting
 
-- Wallet on wrong network: ensure wallet network matches VITE_NETWORK (TestNet)
-- /api/* 404 locally: run `npx vercel dev` alongside `npm run dev`
-- Pending not found: wait a round or two; click Load globals/Read pair states again
+- Wallet network mismatch: ensure wallet = TestNet and UI `VITE_NETWORK=TESTNET`.
+- `/api/*` 404 locally: ensure `npx vercel dev` is running.
+- Pending not found: wait a few rounds; retry “Load globals/Read pair state”.
+- History characters: viewer filters non‑printable logs; follow LoRA links to verify.
 
-## 🔥 Manual Smoke Test
+## Explorer
 
-This project includes a **manual smoke test script** for the single-pair trust app with dual endowments (E1 for Subject 1 off-chain, E2 for Subject 2 on-chain).
+- LoRA (TestNet): https://lora.algokit.io/testnet
+- App page: https://lora.algokit.io/testnet/app/<AppID>
+- Tx page: https://lora.algokit.io/testnet/tx/<TXID>
 
-- Location: [`tests/manual/SMOKE.md`](tests/manual/SMOKE.md)
+For details on UI, APIs, and contract behavior, see `frontend/README.md` and the docs above.
 
-The smoke test walks through a full lifecycle on **Algorand TestNet**:
-
-1. Compile and deploy contract with parameters (E1, E2, m, UNIT).  
-2. Register a pair of subjects (S1, S2) via opt-in.  
-3. Admin pre-funds the app to satisfy the funding invariant `Balance ≥ t + E2`.  
-4. S1 invests `s` via grouped Payment + AppCall.  
-5. Admin tops up if needed.  
-6. S2 submits a Return AppCall with `r`.  
-7. Contract executes inner payments `r → S1`, `(t−r+E2) → S2`.  
-8. (Optional) Admin sweeps leftover funds.
-
-The checklist includes concrete example parameters, expected balances, and verification steps.  
-**Contributors should run this smoke test whenever contract logic or UI flows are modified** to confirm end-to-end correctness.
