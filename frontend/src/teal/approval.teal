@@ -124,7 +124,6 @@ optin:
   global CurrentApplicationID
   byte "s1"
   app_global_get_ex        // stack: value, exists
-  swap                     // exists, value
   bz set_s1                // if not exists -> set s1
   pop                      // discard value
 
@@ -132,7 +131,6 @@ optin:
   global CurrentApplicationID
   byte "s2"
   app_global_get_ex        // stack: value, exists
-  swap                     // exists, value
   bz maybe_set_s2          // if not exists -> set s2
   pop                      // discard value
 
@@ -203,13 +201,9 @@ invest:
   // sender must be S1; use get_ex to avoid type mismatch when unset
   global CurrentApplicationID
   byte "s1"
-  app_global_get_ex        // exists, value
-  swap                     // value, exists
-  store 30                 // s1_exists
-  pop                      // discard value
-  // Must exist
-  load 30
-  assert
+  app_global_get_ex        // value, exists
+  assert                   // must exist
+  pop                      // drop value
   // And equal to Sender
   txn Sender
   // Re-fetch s1 as bytes for a stable type in the equality
@@ -235,12 +229,9 @@ invest:
   // s1 existence already checked above; check s2 exists via get_ex
   global CurrentApplicationID
   byte "s2"
-  app_global_get_ex        // exists, value
-  swap                     // value, exists
-  store 32                 // s2_exists
-  pop
-  load 32
-  assert
+  app_global_get_ex        // value, exists
+  assert                   // must exist
+  pop                      // drop value
 
 invest_args:
   // args: ["invest", s]
@@ -501,12 +492,9 @@ retpath:
   // itxn #1: pay r -> S1 (assert s1 exists)
   global CurrentApplicationID
   byte "s1"
-  app_global_get_ex      // exists, value
-  swap                   // value, exists
-  store 40               // s1_exists
-  pop                    // discard value
-  load 40
-  assert
+  app_global_get_ex      // value, exists
+  assert                 // must exist
+  pop                    // drop value
   // Use a fresh fetch to get S1 address bytes for Receiver field
   byte "s1"
   app_global_get
