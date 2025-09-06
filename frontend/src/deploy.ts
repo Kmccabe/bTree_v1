@@ -183,10 +183,10 @@ export async function deployTrustGame(args: {
     onComplete: algosdk.OnApplicationComplete.NoOpOC,
     approvalProgram: approvalProg,
     clearProgram: clearProg,
-    // Globals: UNIT, m, E1, E2, s, t, phase, invested, ret, swept (10 ints)
-    // Bytes: s1, s2 (2 byte-slices)
-    numGlobalByteSlices: 2,
-    numGlobalInts: 10,
+    // Globals: UNIT, m, E1, E2, s, t, phase, invested, ret, swept, exp_registered, exp_ts, n_needed (13 ints)
+    // Bytes: s1, s2, params_hash, contract_uri (4 byte-slices)
+    numGlobalByteSlices: 4,
+    numGlobalInts: 13,
     numLocalByteSlices: 0,
     // Locals used by UI gating: s, done (and optionally t mirror)
     numLocalInts: 3,
