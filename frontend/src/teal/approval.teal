@@ -322,6 +322,38 @@ invest_args:
   ==
   assert
 
+  // refund to S1: amount = E1 - s (subject receives leftover of endowment)
+  byte "E1"
+  app_global_get
+  load 0
+  -
+  store 7                 // refund = E1 - s
+  // Solvency: (balance - min_balance) >= refund
+  global CurrentApplicationAddress
+  dup
+  balance
+  swap
+  min_balance
+  -
+  load 7
+  >=
+  assert
+  // If refund > 0, inner payment to S1
+  load 7
+  int 0
+  >
+  bz skip_refund
+  itxn_begin
+  int pay
+  itxn_field TypeEnum
+  load 7
+  itxn_field Amount
+  byte "s1"
+  app_global_get
+  itxn_field Receiver
+  itxn_submit
+skip_refund:
+
   // write local s & done to S1 local state
   txn Sender
   byte "s"

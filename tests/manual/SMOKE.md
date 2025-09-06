@@ -13,13 +13,14 @@
 
 ## Quick Checklist (TL;DR)
 - Admin → Deploy & Manage Pair: click "Deploy"; note App ID (phase = 0).
-- Admin: click "Check funding" (optional), then fund the app address with ≥ E2.
+- Admin: click "Check funding" (optional).
+- Before Invest, fund app so liquid ≥ E1 − s (worst-case, fund E1 up-front).
 - Subject - Invest: click "Opt-In" as S1 (latches s1).
 - Subject - Return: click "Opt-In" as S2 (latches s2).
 - Admin: set phase with buttons (e.g., "Phase: Invest(1)") if needed.
 - Subject - Invest: enter s, click "Invest" (must be multiple of UNIT and ≤ E1).
 - Subject - Return: click "Load globals" then "Read pair states"; ensure S1 shows.
-- Admin: fund app so balance ≥ t + E2, where t = m × s.
+- After Invest, fund app so liquid ≥ t + E2, where t = m × s.
 - Subject - Return: enter r and click "Return" (0 ≤ r ≤ t, multiple of UNIT).
 - Verify: phase → 3 (Done), ret = 1; payouts r → S1 and (t − r + E2) → S2.
 - Optional: Admin: click "Sweep" (phase 3) to send leftover to creator.
@@ -35,12 +36,12 @@
 - r = 1.0 ALGO (S2 returns; multiple of UNIT)
 
 **Math expectations:**
+- Invest stage refund: E1 − s = 2.0 − 1.2 = **0.8 ALGO** (paid to S1 at Invest)
 - t = m × s = 3 × 1.2 = **3.6 ALGO**
-- Funding bound: F ≥ (m−1)·s + E2 = 2·1.2 + 0.5 = **2.9 ALGO**
-- Required balance at Return: B ≥ t + E2 = **4.1 ALGO**
-- Payouts on Return:
-  - To S1: **1.0 ALGO**
-  - To S2: **3.1 ALGO**
+- Return requirement: liquid ≥ t + E2 = **4.1 ALGO**
+- Return payouts:
+  - To S1: **r = 1.0 ALGO**
+  - To S2: **t − r + E2 = 3.1 ALGO**
   - Total = **4.1 ALGO**
 
 ---
@@ -61,10 +62,12 @@
 - [ ] Subject - Return panel: enter App ID if needed, click "Opt-In" as S2 → `s2` latched.
 - [ ] Admin: if still phase 0, click "Phase: Invest(1)" (or select phase 1 and "Apply").
 
-### 2. Seed Funding
-- [ ] Admin: click "Check funding" (optional) to see required and current balance.
-- [ ] From wallet, send **0.5 ALGO** (≥ E2) to the displayed app address.
-- [ ] Click "Check funding" again to confirm app balance increases.
+### 2. Seed Funding (Pre-Invest)
+- [ ] Admin: click "Check funding" (optional) to see current balance.
+- [ ] Pre-fund app so liquid ≥ E1 − s (worst-case, fund E1 if s not known yet).
+  - Example here: E1 − s = 0.8 ALGO → fund at least 0.8 ALGO before Invest.
+  - Note: Group payment of s goes to app, but solvency checks for refund use current liquid balance; don’t rely on the incoming s.
+  - Keep ≥ 0.1 ALGO minimum in account at all times.
 
 ### 3. Invest
 - [ ] Subject - Invest: set `s = 1.2 ALGO` (enter microAlgos) and click "Invest".
@@ -76,15 +79,17 @@
   - Phase = 1
   - `s % UNIT == 0`, `0 ≤ s ≤ E1`
   - Payment matches amount/receiver
+- [ ] Inner payment at Invest:
+  - **E1 − s = 0.8 ALGO → S1** (refund of S1’s endowment)
 - [ ] Post-state (click "Read pair states"):
   - `s=1.2`, `t=3.6`, `invested=1`
   - Phase = **2 (Return)**
-- [ ] App balance now = 0.5 (seed) + 1.2 (s) = **1.7 ALGO**.
+- [ ] App balance now reflects: +s (payment) − (E1 − s) (refund) + prior seed − fees.
 
-### 4. Top-Up
-- [ ] Admin tops up **2.4 ALGO** so total pre-fund = 2.9 ALGO.
-- [ ] Click "Check funding" to verify: app balance = s + F = 1.2 + 2.9 = **4.1 ALGO**.
-- [ ] (Optional buffer: send 2.45 for balance 4.15 ALGO to test "Sweep" later.)
+### 4. Top-Up (Pre-Return)
+- [ ] Admin tops up so liquid ≥ t + E2 (example: 3.6 + 0.5 = 4.1 ALGO).
+- [ ] Click "Check funding" to verify.
+- [ ] (Optional buffer for fees; Sweep later will transfer leftover liquid except 0.1 ALGO min.)
 
 ### 5. Return
 - [ ] Subject - Return: click "Load globals" then "Read pair states" to surface S1.

@@ -248,13 +248,15 @@ export default function AdminSetup2() {
                     </div>
                     {(() => {
                       const p = h.innerPayments || [];
-                      return p.length ? (
+                      if (!p.length) return null;
+                      return (
                         <div>
-                          Payments: {p.map((x, idx) => (
-                            <span key={idx} className="ml-1">{x.amount.toLocaleString()} → <code>{x.to.slice(0,6)}…{x.to.slice(-6)}</code></span>
+                          <div>Payments:</div>
+                          {p.map((x, idx) => (
+                            <div key={idx} className="ml-4">{x.amount.toLocaleString()} → <code>{x.to.slice(0,6)}…{x.to.slice(-6)}</code></div>
                           ))}
                         </div>
-                      ) : null;
+                      );
                     })()}
                     {h.details && Object.keys(h.details).length > 0 && (
                       <div className="text-neutral-600">{JSON.stringify(h.details)}</div>
@@ -267,7 +269,15 @@ export default function AdminSetup2() {
         </div>
       )}
 
-      <div className="text-xs text-neutral-600">Deploy sets globals E1, E2, m, UNIT and phase = 0 (Registration). Use Set phase to advance to 1 (Invest), then 2 (Return), then 3 (Done).</div>
+      <div className="text-xs text-neutral-600">
+        Deploy sets globals E1, E2, m, UNIT and phase = 0 (Registration). Use Set phase to advance to 1 (Invest), then 2 (Return), then 3 (Done).
+        Funding guide:
+        
+        
+        - Before Invest: app liquid ≥ (E1 − s) to refund S1’s leftover endowment.
+        - Before Return: app liquid ≥ (t + E2) where t = m × s.
+        - App must always keep ≥ 0.1 ALGO minimum; Sweep transfers only liquid = balance − min.
+      </div>
 
       {lastTx && (
         <div className="text-xs">Last tx: <code>{lastTx.id}</code>{lastTx.round ? ` (round ${lastTx.round})` : ``}</div>
