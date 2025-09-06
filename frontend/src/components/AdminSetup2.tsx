@@ -44,6 +44,22 @@ export default function AdminSetup2() {
   const [expNNeeded, setExpNNeeded] = useState<number>(0);
   const [expContractUri, setExpContractUri] = useState<string>("");
 
+  function toB64(u8: Uint8Array) {
+    let s = ""; for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+    // btoa expects binary string
+    return btoa(s);
+  }
+  function fillFakeHash() {
+    try {
+      const u8 = new Uint8Array(32);
+      (globalThis.crypto || (window as any).crypto).getRandomValues(u8);
+      setExpParamsHash(toB64(u8));
+    } catch {
+      // fallback: all zeros (still valid 32 bytes)
+      setExpParamsHash(toB64(new Uint8Array(32)));
+    }
+  }
+
   function loraTxUrl(txId: string) {
     return `https://lora.algokit.io/testnet/tx/${txId}`;
   }
@@ -186,7 +202,10 @@ export default function AdminSetup2() {
         <div className="grid grid-cols-3 gap-2 text-sm">
           <label className="flex flex-col">
             <span>params_hash (32 bytes)</span>
-            <input className="border rounded px-2 py-1" placeholder="base64 or 64-hex" value={expParamsHash} onChange={(e)=>setExpParamsHash(e.target.value)} />
+            <div className="flex items-center gap-2">
+              <input className="border rounded px-2 py-1 flex-1" placeholder="base64 or 64-hex" value={expParamsHash} onChange={(e)=>setExpParamsHash(e.target.value)} />
+              <button type="button" className="text-xs underline" onClick={fillFakeHash} title="Fill with a random 32-byte value (base64)">Use fake</button>
+            </div>
           </label>
           <label className="flex flex-col">
             <span>n_needed (uint)</span>
