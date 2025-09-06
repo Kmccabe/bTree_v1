@@ -28,3 +28,13 @@ npm run dev
 - Variants & treatments: [docs/trust-game-variants.md](docs/trust-game-variants.md)
 
 ## usage
+## 🛠️ Admin Controls
+
+After phase 3 (Done), the admin has several tools available:
+
+- **View history** – Displays a chronological log of all actions (opt-ins, invest, return, sweep) with timestamps, actors, and amounts. Data is pulled directly from LoRA for auditability.  
+- **Sweep** – Transfers any remaining funds in the app back to the creator’s wallet. Only available once the game is finished.  
+- **Delete app** – Permanently deletes the application from chain. Enabled only at phase 3 to prevent accidental deletion mid-game.  
+
+These controls provide a complete lifecycle: deploy → run experiment → review history → reclaim funds → clean up.
+
