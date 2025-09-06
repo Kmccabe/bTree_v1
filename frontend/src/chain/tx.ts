@@ -355,6 +355,69 @@ export async function setPhase(args: {
 }
 
 /**
+ * Admin: one-time experiment registration.
+ * Sends NoOp call: ["registerExperiment", raw32(params_hash), u64(n_needed), bytes(contract_uri)].
+ * `paramsHashB64OrHex` may be 64-char hex (optionally 0x-prefixed) or base64 of 32 bytes.
+ */
+export async function registerExperiment(args: {
+  sender: string;
+  appId: number;
+  paramsHashB64OrHex: string;
+  nNeeded: number;
+  contractUri: string;
+  sign: Signer;
+  wait?: boolean;
+}): Promise<{ txId: string; confirmedRound?: number }>{
+  const TAG = "[registerExperiment]";
+  const { sender, appId, paramsHashB64OrHex, nNeeded, contractUri, sign, wait = true } = args;
+  try { console.info("[appId] resolved =", resolveAppId()); } catch {}
+  if (!algosdk.isValidAddress(sender)) throw new Error(`${TAG} invalid sender`);
+  if (!Number.isInteger(appId) || appId <= 0) throw new Error(`${TAG} invalid appId`);
+  if (!Number.isInteger(nNeeded) || nNeeded < 0) throw new Error(`${TAG} invalid nNeeded`);
+
+  function parseHash(raw: string): Uint8Array {
+    const s = (raw || '').trim();
+    const h = s.startsWith('0x') ? s.slice(2) : s;
+    if (/^[0-9a-fA-F]{64}$/.test(h)) {
+      const bytes = h.match(/.{1,2}/g)!.map((b) => parseInt(b, 16));
+      return new Uint8Array(bytes);
+    }
+    try {
+      const u8 = Uint8Array.from(Buffer.from(s, 'base64'));
+      if (u8.length === 32) return u8;
+    } catch {}
+    throw new Error(`${TAG} paramsHash must be 32 bytes as hex or base64`);
+  }
+  const hash32 = parseHash(paramsHashB64OrHex);
+
+  const sp: any = await getParamsNormalized();
+  const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
+  const appArgs: Uint8Array[] = [
+    str('registerExperiment'),
+    hash32,
+    u64(nNeeded),
+    str(contractUri || ''),
+  ];
+  const call: any = (algosdk as any).makeApplicationNoOpTxnFromObject({
+    sender,
+    appIndex: appId,
+    appArgs,
+    suggestedParams: { ...(sp as any), flatFee: true, fee: mf },
+  });
+  const stxns = await sign([(algosdk as any).encodeUnsignedTransaction(call)]);
+  const payload = { stxns: stxns.map((b) => toBase64(b)) } as any;
+  const sub = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const text = await sub.text();
+  if (!sub.ok) throw new Error(`${TAG} submit ${sub.status}: ${text}`);
+  let sj: any; try { sj = JSON.parse(text); } catch { sj = {}; }
+  const txId: string = sj?.txId || sj?.txid || sj?.txID;
+  if (!wait) return { txId };
+  const pend = await (await fetch(`/api/pending?txid=${encodeURIComponent(txId)}`)).json();
+  const confirmedRound: number | undefined = pend?.['confirmed-round'] ?? pend?.confirmedRound;
+  return { txId, confirmedRound };
+}
+
+/**
  * investFlow: two-txn atomic group
  *   g0: Payment s from sender -> app address
  *   g1: AppCall NoOp ["invest", u64(s)] with fee bumped to cover 1 inner-pay
