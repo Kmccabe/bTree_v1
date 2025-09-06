@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import algosdk from "algosdk";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
 import { setPhase, sweepApp, deleteApp, setPair } from "../chain/tx";
@@ -43,7 +44,7 @@ export default function AdminSetup2() {
   const [s1Input, setS1Input] = useState<string>("");
   const [s2Input, setS2Input] = useState<string>("");
   const isAddr = (a: string) => {
-    try { return (a && (require('algosdk') as any).isValidAddress?.(a)) || false; } catch { return false; }
+    try { return !!a && (algosdk as any).isValidAddress?.(a) === true; } catch { return false; }
   };
 
   function loraTxUrl(txId: string) {
