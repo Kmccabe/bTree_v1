@@ -194,6 +194,8 @@ export default function AdminSetup2() {
         </select>
         <button className="text-xs underline" onClick={()=>onApplyPhase(phaseSel)} disabled={!!busy || !activeAddress}>Apply</button>
         <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy}>Read pair state</button>
+        {/* Always show Sweep here so it's available even when appId is set */}
+        <button className="text-xs underline" onClick={onSweep} disabled={!!busy || !activeAddress}>Sweep</button>
       </div>
 
       <div className="text-xs text-neutral-600">Deploy sets globals E1, E2, m, UNIT and phase = 0 (Registration). Use Set phase to advance to 1 (Invest), then 2 (Return), then 3 (Done).</div>
