@@ -400,8 +400,10 @@ export default function AdminSetup2() {
                           try {
                             const id = resolveAppId();
                             if (!activeAddress) throw new Error('Connect the experimenter wallet');
-                            await setPhase({ sender: activeAddress, appId: id, phase: 2, sign: signer, wait: true });
-                            setCurrentPhase(2);
+                        await setPhase({ sender: activeAddress, appId: id, phase: 2, sign: signer, wait: true });
+                        setCurrentPhase(2);
+                        // Disconnect experimenter wallet after starting experiment
+                        try { await disconnectExperimenter(); } catch {}
                           } catch (e: any) {
                             setErr(e?.message || String(e));
                           } finally {
@@ -430,7 +432,6 @@ export default function AdminSetup2() {
 
       {/* End Experiment */}
       <div className="mt-4 rounded-xl border p-3 space-y-2">
-        <div className="text-sm font-semibold">End Experiment</div>
         <div className="flex items-center gap-2 text-xs text-neutral-700">
           <span>Connect Experimenter:</span>
           {!activeAddress ? (

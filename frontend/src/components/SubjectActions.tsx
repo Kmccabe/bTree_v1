@@ -967,6 +967,16 @@ function SubjectActionsInner() {
             })}
           </ul>
         </div>
+        {returnStatus?.phase === 'confirmed' && (
+          <div className="mt-2">
+            <button
+              className="rounded px-2 py-1 border"
+              onClick={async ()=>{ try { await handleDisconnect(); } catch {} }}
+            >
+              Return Done
+            </button>
+          </div>
+        )}
       )}
 
       <h3 className="text-lg font-semibold">Subject 1's Decision</h3>
@@ -1101,6 +1111,8 @@ function SubjectActionsInner() {
                     const actions = r?.txId ? [{ label: 'View on LoRA', href: loraTxUrl(r.txId) }] : undefined;
                     toast.show({ kind: 'success', title: 'Phase set to 3 (Return)', description: r?.confirmedRound ? `Round ${r.confirmedRound}` : undefined, actions });
                     await loadGlobals();
+                    // Disconnect Subject 1 wallet after Invest Done
+                    try { await handleDisconnect(); } catch {}
                   } catch(e:any) { setErr(e?.message || String(e)); }
                 }}
               >
@@ -1134,9 +1146,7 @@ function SubjectActionsInner() {
         {!s1Valid && (
           <div className="text-xs text-amber-700">S1 (investor) not found yet. Ensure Invest confirmed and click Load globals.</div>
         )}
-        {s2FromGlobals && activeAddress && (s2FromGlobals !== activeAddress) && (
-          <div className="text-xs text-amber-700">Connected wallet is not S2; Return will be rejected by the contract.</div>
-        )}
+        {/* Removed S2 mismatch warning for simplified flow */}
         {/* No S1 input needed; contract tracks S1 globally */}
         <div className="flex items-center gap-2 text-sm">
           <span>r (microAlgos):</span>
@@ -1165,7 +1175,7 @@ function SubjectActionsInner() {
         )}
       </div>
 
-      {lastTx && <div className="text-xs">TxID: <code>{lastTx}</code></div>}
+      {/* Removed TxID line for a cleaner UI */}
       {err && <div className="text-sm text-red-600">{err}</div>}
       <p className="text-xs text-neutral-500">
         Invest: phase 1 or 0 (when both subjects set), 2-txn group, s multiple of UNIT, 0 {'<='} s {'<='} E1. Return: phase 2, r multiple of UNIT, balance {'>='} t + E2.
