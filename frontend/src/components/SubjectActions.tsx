@@ -238,6 +238,8 @@ function SubjectActionsInner() {
   const [demoBusy, setDemoBusy] = useState<null | 'demo' | 'return_only'>(null);
   const [demoInvestTx, setDemoInvestTx] = useState<string | null>(null);
   const [demoReturnTx, setDemoReturnTx] = useState<string | null>(null);
+  // Inline phase control state (for creator convenience)
+  const [phaseSelLocal, setPhaseSelLocal] = useState<number>(0);
 
   const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
 
