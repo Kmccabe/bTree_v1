@@ -186,11 +186,11 @@ export default function AdminSetup2() {
 
       {/* Start Session hidden to reduce confusion (admin actions still enforced on-chain) */}
 
-      {/* Step 0 — Deploy Session (new app) */}
-      <div className="text-sm font-semibold">Deploy Session (new app)</div>
-      <div className="text-xs text-neutral-700 mb-1">Connect any wallet and click Deploy — that wallet becomes the on-chain experimenter. Then Register Subjects and Finish & Set Pair.</div>
+      {/* Step 0 — Experiment parameters */}
+      <div className="text-sm font-semibold">Experiment Paramaters</div>
+      <div className="text-xs text-neutral-700 mb-1">&nbsp;</div>
       {/* Deploy controls */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <label className="flex flex-col">
           <span className="text-sm">E1 (S1 off-chain)</span>
           <input type="number" min={0} step={UNIT || 1} value={E1}

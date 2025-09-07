@@ -343,12 +343,12 @@ export default function App(): JSX.Element {
 
   return (
     <div style={{ fontFamily: "system-ui, Arial", padding: 24 }}>
-      <h1 style={{ marginTop: 0 }}>bTree v1 - Trust Game MVP</h1>
+      <h1 style={{ marginTop: 0 }}>bTree - Trust Game POC</h1>
       <p><strong>Network:</strong> {network} (wallet = use-wallet/Pera)</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
         {!account ? (
-          <button onClick={handleConnect}>Connect Pera Wallet</button>
+          <button onClick={handleConnect}>Connect Experimenter</button>
         ) : (
           <>
             <p style={{ margin: 0 }}><strong>Connected:</strong> {account}</p>
