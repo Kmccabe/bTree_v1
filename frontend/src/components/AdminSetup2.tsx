@@ -348,9 +348,13 @@ export default function AdminSetup2() {
             <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check funding</button>
             <div className="text-xs text-neutral-700">Required pool (est): <span className="font-semibold">{nf(required)}</span> microAlgos</div>
             {fund && (
-              <div className="text-xs text-neutral-700">
-                Balance: {nf(fund.balance ?? 0)} μALGO · Required ≥ {nf(fund.required)} μALGO (for max payout m x E1 + E2)
-              </div>
+              <>
+                <div className="text-xs text-neutral-700">
+                  Balance: {nf(fund.balance ?? 0)} μALGO · Required ≥ {nf(fund.required)} μALGO (for max payout m x E1 + E2)
+                </div>
+                <div style={{ height: 12 }} />
+                <div className="text-sm font-semibold">Start Experiment</div>
+              </>
             )}
           </div>
           {showFundQr && (
