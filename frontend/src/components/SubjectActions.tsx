@@ -674,7 +674,8 @@ function SubjectActionsInner() {
     (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) ||
     !/^\d+$/.test(sInput || "0") ||
     Number(sInput) % unit !== 0 ||
-    Number(sInput) > E;
+    Number(sInput) > E ||
+    (inlineStatus?.phase === 'confirmed');
 
   // ----- Return flow -----
   const globalsTVal: number = (() => { const g: any = pair.globals as any; const v = g && typeof g.t === 'number' ? Number(g.t) : 0; return Number.isFinite(v) ? v : 0; })();
@@ -976,26 +977,11 @@ function SubjectActionsInner() {
         )}
       </div>
 
-      {/* App ID + read */}
+      {/* App ID (resolved) + read */}
       <div className="flex items-center gap-2 text-sm">
         <span>App ID:</span>
-        <input
-          type="number"
-          className="border rounded px-2 py-1 w-44"
-          value={appIdIn}
-          onChange={(e)=>{
-            const v = e.target.value;
-            setAppIdIn(v);
-            const n = Number(v);
-            if (Number.isFinite(n) && n > 0) setSelectedAppId(n);
-            else clearSelectedAppId();
-          }}
-          placeholder="e.g., 745000000"
-        />
-        <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>
-          Load globals
-        </button>
-        {/* Opt-In not used in no-opt-in flow; hide extra diagnostic buttons */}
+        <code>{(() => { try { return resolveAppId(); } catch { return '(unset)'; } })()}</code>
+        <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>Load globals</button>
       </div>
 
       {/* Inline status */}
@@ -1026,6 +1012,36 @@ function SubjectActionsInner() {
           {inlineStatus.phase === 'rejected' && (
             <span className="text-red-600">{inlineStatus.text}</span>
           )}
+          {inlineStatus.phase === 'confirmed' && (
+            <div className="mt-2">
+              {(() => {
+                const creatorGlobal = (pair.globals as any)?.creator || creatorAddr;
+                const isCreatorWallet = !!activeAddress && !!creatorGlobal && activeAddress === creatorGlobal;
+                const disabled = !!busy || !activeAddress || !isCreatorWallet;
+                const title = !activeAddress
+                  ? 'Connect wallet'
+                  : (!isCreatorWallet ? 'Experimenter only' : '');
+                return (
+                  <button
+                    className="rounded px-2 py-1 border"
+                    disabled={disabled}
+                    title={title}
+                    onClick={async () => {
+                      try {
+                        const id = resolveAppId();
+                        const r = await setPhase({ sender: activeAddress!, appId: id, phase: 3, sign: (u)=>signTransactions(u), wait: true });
+                        const actions = r?.txId ? [{ label: 'View on LoRA', href: loraTxUrl(r.txId) }] : undefined;
+                        toast.show({ kind: 'success', title: 'Phase set to 3 (Return)', description: r?.confirmedRound ? `Round ${r.confirmedRound}` : undefined, actions });
+                        await loadGlobals();
+                      } catch(e:any) { setErr(e?.message || String(e)); }
+                    }}
+                  >
+                    Start Return
+                  </button>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 
@@ -1033,12 +1049,7 @@ function SubjectActionsInner() {
 
       {/* App account QR/section removed */}
 
-      {/* Connected + derived app address */}
-      <div className="text-xs text-neutral-600">
-        Connected: <code>{connected}</code>
-        {appAddrPreview && <> · App Address: <code>{appAddrPreview}</code></>}
-        <span className="ml-2">UNIT: {unit} · E: {E}</span>
-      </div>
+      {/* Connected + derived app address (removed for cleaner UI) */}
 
       {/* Funds status (QR removed) */}
       {(typeof funds.balance === 'number' || funds.error) && (
@@ -1093,25 +1104,13 @@ function SubjectActionsInner() {
       {/* Subject - Return */}
       <div className="mt-4 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Subject - Return</h4>
-        {/* Inline phase control (creator convenience) */}
         <div className="flex items-center gap-2 text-xs text-neutral-700">
-          <span>Set phase:</span>
-          <select className="border rounded px-2 py-1" value={phaseSelLocal} onChange={(e)=> setPhaseSelLocal(Number(e.target.value))}>
-            <option value={0}>0 (Registration)</option>
-            <option value={1}>1 (Setup)</option>
-            <option value={2}>2 (Invest)</option>
-            <option value={3}>3 (Return/Done)</option>
-          </select>
-          <button className="text-xs underline" onClick={async ()=>{
-            try { const id = resolveAppId(); await setPhase({ sender: activeAddress!, appId: id, phase: phaseSelLocal, sign: (u)=>signTransactions(u), wait: true }); await loadGlobals(); } catch(e:any){ setErr(e?.message||String(e)); }
-          }} disabled={!!busy || !activeAddress}>Apply</button>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-neutral-700">
+          <span>Connect Subject 2:</span>
           {!activeAddress ? (
             <button className="text-xs underline" onClick={handleConnect}>Connect wallet</button>
           ) : (
             <>
-              <span>Connected: <code>{shortAddr(activeAddress)}</code></span>
+              <span><code>{shortAddr(activeAddress)}</code></span>
               <button className="text-xs underline" onClick={handleDisconnect}>Disconnect</button>
             </>
           )}
@@ -1121,8 +1120,7 @@ function SubjectActionsInner() {
           <code>{(() => { try { return resolveAppId(); } catch { return '(unset)'; } })()}</code>
           <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>Load globals</button>
         </div>
-        <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '-'} microAlgos (m x s, m=3)</div>
-        <div className="text-xs text-neutral-700">Constants: UNIT={unit}, E1={E.toLocaleString()}, E2={E2.toLocaleString()}</div>
+        {/* Available/Constants lines removed for simpler UI */}
         {!s1Valid && (
           <div className="text-xs text-amber-700">S1 (investor) not found yet. Ensure Invest confirmed and click Load globals.</div>
         )}
