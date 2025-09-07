@@ -225,6 +225,66 @@ export default function AdminSetup2() {
         {appId && <div className="text-sm">App ID: <code>{appId}</code></div>}
       </div>
 
+      {/* Step 2 — Register Subjects (capture only; no on-chain) */}
+      <div className="rounded-xl border p-3 space-y-2">
+        <div className="font-semibold">Register Subjects</div>
+        <div className="text-xs text-neutral-700">Capture S1 and S2 by connecting each wallet and clicking “Use connected”. This does not write on-chain.</div>
+        <div className="flex items-center gap-2">
+          <button className="text-xs underline" onClick={()=> setShowRegister((v)=>!v)}>
+            {showRegister ? 'Hide' : 'Register Subjects'}
+          </button>
+          <div className="text-xs text-neutral-700">S1: <code>{s1Input || '(not set)'}</code> · S2: <code>{s2Input || '(not set)'}</code></div>
+        </div>
+        {showRegister && (
+          <div className="mt-2 space-y-2">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <label className="flex flex-col">
+                <span>S1 address</span>
+                <div className="flex items-center gap-2">
+                  <input className="border rounded px-2 py-1 flex-1" placeholder="S1 Algorand address" value={s1Temp} onChange={(e)=> setS1Temp(e.target.value.trim())} />
+                  <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS1Temp(activeAddress)}>Use connected</button>
+                </div>
+                {!!s1Temp && !isAddr(s1Temp) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
+              </label>
+              <label className="flex flex-col">
+                <span>S2 address</span>
+                <div className="flex items-center gap-2">
+                  <input className="border rounded px-2 py-1 flex-1" placeholder="S2 Algorand address" value={s2Temp} onChange={(e)=> setS2Temp(e.target.value.trim())} />
+                  <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS2Temp(activeAddress)}>Use connected</button>
+                </div>
+                {!!s2Temp && !isAddr(s2Temp) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
+              </label>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button className="text-xs underline" onClick={()=> setShowRegister(false)}>Cancel</button>
+              <button className="text-xs underline" onClick={()=>{ setS1Input(s1Temp); setS2Input(s2Temp); setShowRegister(false); }} disabled={!isAddr(s1Temp) || !isAddr(s2Temp)} title="Capture S1 and S2">Done</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Step 3 — Finish & Set Pair (creator-only on-chain) */}
+      <div className="rounded-xl border p-3 space-y-2">
+        <div className="font-semibold">Finish & Set Pair</div>
+        <div className="text-xs text-neutral-700">Switch back to the creator wallet and write S1/S2 on-chain for the selected App ID.</div>
+        <div className="flex items-center gap-2">
+          <button className="text-xs underline"
+            onClick={async ()=>{
+              setErr(null);
+              try {
+                const id = resolveAppId();
+                if (!isCreator) throw new Error('Connect the creator wallet');
+                if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Capture S1 and S2 first');
+                const r = await setPair({ sender: activeAddress!, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
+                setLastTx({ id: r.txId, round: r.confirmedRound });
+              } catch (e: any) { setErr(e?.message || String(e)); }
+            }}
+            disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
+            title={!isCreator ? 'Creator only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
+          >Finish & Set Pair</button>
+        </div>
+      </div>
+
       {/* Manage existing pair */}
       {!appId && (
         <div className="flex items-center gap-2 text-sm">
