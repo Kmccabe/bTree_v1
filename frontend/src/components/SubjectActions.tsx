@@ -720,12 +720,12 @@ function SubjectActionsInner() {
     return '';
   })();
   const s1Valid = !!s1FromGlobals && ((algosdk as any).isValidAddress ? (algosdk as any).isValidAddress(s1FromGlobals) : (s1FromGlobals.length === 58));
-  const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || globalsTVal <= 0 || globalsRet === 1 || !rValid || underfundedForReturn || !s1Valid;
+  const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || /* allow t==0 */ globalsRet === 1 || !rValid || underfundedForReturn || !s1Valid;
   const returnBlockers = useMemo(() => {
     const msgs: string[] = [];
     if (!hasResolvedAppId) msgs.push('App ID not set');
     if (!activeAddress) msgs.push('Connect wallet');
-    if (!(globalsTVal > 0)) msgs.push('t == 0');
+    // allow t==0 (S1 invested 0)
     if (globalsRet === 1) msgs.push('Already returned');
     if (!rValid) msgs.push(`Enter r between 0 and ${globalsTVal || 0}`);
     if (!s1Valid) msgs.push('S1 not found (Read pair states after Invest)');
@@ -738,8 +738,7 @@ function SubjectActionsInner() {
     setErr(null);
     if (!activeAddress) return setErr("Connect wallet as subject.");
     if (!hasResolvedAppId) return setErr("Enter/select a numeric App ID.");
-    const t = globalsTVal;
-    if (!(t > 0)) return setErr("Nothing available to return (t == 0).");
+    const t = globalsTVal; // allow r=0 when t==0
     const r = Number(returnRInput || "0");
     if (!Number.isInteger(r) || r < 0 || r > t) return setErr(`Enter r in range 0..${t}.`);
     const s1 = s1FromGlobals;

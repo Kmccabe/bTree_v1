@@ -365,66 +365,8 @@ export default function App(): JSX.Element {
         </div>
       </div>
 
-      <hr />
-      <h3>Deploy placeholder app (no mnemonic; Pera signs)</h3>
-      <button onClick={handleDeploy} disabled={!isValidAccount || deploying}>
-        {deploying ? "Deploying..." : "Deploy to TestNet"}
-      </button>
-
-      {!isValidAccount && account && (
-        <p style={{ color: "#b00" }}>Connected address looks invalid. Reconnect your wallet.</p>
-      )}
-      {txid && (
-        <p>
-          TxID: <code>{txid}</code>
-          {loraTxUrl && (
-            <> - <a href={loraTxUrl} target="_blank" rel="noreferrer">View in Lora</a></>
-          )}
-          {txJsonUrl && (
-            <> - <a href={txJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
-          )}
-          {/* Pera Explorer link hidden for now */}
-        </p>
-      )}
-      {appId && (
-        <p>
-          ✅ App ID: <strong>{appId}</strong>
-          {loraAppUrl && (
-            <> - <a href={loraAppUrl} target="_blank" rel="noreferrer">Open in Lora</a></>
-          )}
-          {appJsonUrl && (
-            <> - <a href={appJsonUrl} target="_blank" rel="noreferrer">View JSON</a></>
-          )}
-          {/* Pera Explorer link hidden for now */}
-        </p>
-      )}
-      {(manifest?.txid || manifest?.appId) && (
-        <div style={{ marginTop: 16, border: "1px solid #ddd", padding: 12, borderRadius: 8, background: "#fff" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <strong>Experiment Manifest</strong>
-            <button onClick={handleCopyManifest}>Copy</button>
-          </div>
-          <div style={{ marginTop: 8, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, lineHeight: 1.6 }}>
-            {manifest?.appId && <div>App ID: {manifest.appId}</div>}
-            {manifest?.txid && <div>TxID: {manifest.txid}</div>}
-            {manifest?.timestamp && <div>Timestamp: {manifest.timestamp}</div>}
-          </div>
-        </div>
-      )}
-            {/* Export CSV button */}
-      <div style={{ marginTop: 16 }}>
-        <ExportCSVButton appId={resolvedAppId} />
-      </div>
-      <div style={{ marginTop: 16 }}>
-        <PhaseControl appId={resolvedAppId} account={account} network={network} />
-      </div>
-
+      {/* Removed placeholder deploy/debug sections for production UI */}
       {false && (
-        <p style={{ marginTop: 4, color: "#666" }}>
-          Pera Explorer links are disabled for now.
-        </p>
-      )}
-
       <div style={{ marginTop: 24, border: "1px dashed #bbb", padding: 12, borderRadius: 6, background: "#fafafa" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <strong>Debug Panel</strong>
@@ -546,6 +488,7 @@ export default function App(): JSX.Element {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
