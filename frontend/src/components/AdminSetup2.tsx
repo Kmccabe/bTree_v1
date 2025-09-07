@@ -246,6 +246,9 @@ export default function AdminSetup2() {
         {appId && <div className="text-sm">App ID: <code>{appId}</code>{' '}</div>}
       </div>
 
+      {/* spacer before Register Subjects */}
+      <div className="h-4" />
+
       {/* Step 2 — Register Subjects (always visible; capture only; no on-chain) */}
       <div className="rounded-xl border p-3 space-y-2">
         <div className="font-bold">Register Subjects</div>
@@ -273,13 +276,18 @@ export default function AdminSetup2() {
             <button className="text-xs underline" onClick={()=>{ setS1Temp(""); setS2Temp(""); }}>Clear</button>
             <button className="text-xs underline" onClick={()=>{ setS1Input(s1Temp); setS2Input(s2Temp); }} disabled={!isAddr(s1Temp) || !isAddr(s2Temp)} title="Capture S1 and S2">Done</button>
           </div>
+          {(s1Input || s2Input) && (
+            <div className="text-xs text-neutral-700">
+              Captured — S1: <code>{s1Input || '(not set)'}</code> · S2: <code>{s2Input || '(not set)'}</code>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Step 3 — Finish & Set Pair (experimenter-only on-chain) */}
       <div className="rounded-xl border p-3 space-y-2">
         <div className="font-semibold">Finish & Set Pair</div>
-        <div className="text-xs text-neutral-700">Switch back to the experimenter wallet and write S1/S2 on-chain for the selected App ID.</div>
+        {/* Removed instructional line to reduce clutter */}
         <div className="flex items-center gap-2">
           <button className="text-xs underline"
             onClick={async ()=>{
@@ -430,7 +438,7 @@ export default function AdminSetup2() {
       {/* Step 3 — Finalize Subjects (experimenter-only on-chain) */}
       <div className="rounded-xl border p-3 space-y-2">
         <div className="font-semibold">Finish & Set Pair</div>
-        <div className="text-xs text-neutral-700">Switch back to the experimenter wallet and set S1/S2 on-chain for the selected App ID.</div>
+        {/* Removed instructional line to reduce clutter */}
         <div className="flex items-center gap-2">
           <button className="text-xs underline"
             onClick={async ()=>{
