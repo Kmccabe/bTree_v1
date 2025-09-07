@@ -245,14 +245,11 @@ export default function AdminSetup2() {
         </button>
         {appId && <div className="text-sm">App ID: <code>{appId}</code>{' '}</div>}
       </div>
-
-      {/* spacer before Register Subjects */}
-      <div className="h-4" />
+      {appId && (<div className="h-4" />)}
 
       {/* Step 2 — Register Subjects (always visible; capture only; no on-chain) */}
-      <div className="rounded-xl border p-3 space-y-2">
+      <div className="mt-4 rounded-xl border p-3 space-y-2">
         <div className="font-bold">Register Subjects</div>
-        <div className="text-xs text-neutral-700">Capture S1 and S2 by connecting each wallet and clicking “Use connected”. This does not write on-chain.</div>
         <div className="mt-2 space-y-2">
           <div className="grid grid-cols-2 gap-3 text-sm">
             <label className="flex flex-col">
