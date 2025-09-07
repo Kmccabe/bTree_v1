@@ -17,6 +17,12 @@ export default function AdminSetup2() {
   const [m, setM] = useState<number>(3);
   const [UNIT, setUNIT] = useState<number>(1_000);
   const [nNeeded, setNNeeded] = useState<number>(2); // display-only for now
+  // string mirrors to allow clean editing without forced leading zeros
+  const [E1Str, setE1Str] = useState<string>("100000");
+  const [E2Str, setE2Str] = useState<string>("100000");
+  const [mStr, setMStr] = useState<string>("3");
+  const [unitStr, setUnitStr] = useState<string>("1000");
+  const [nNeededStr, setNNeededStr] = useState<string>("2");
 
   // State
   const [busy, setBusy] = useState<string | null>(null);
@@ -71,6 +77,14 @@ export default function AdminSetup2() {
   const isAddr = (a: string) => {
     try { return !!a && (algosdk as any).isValidAddress?.(a) === true; } catch { return false; }
   };
+
+  // helper to sanitize numeric text and update string+number states
+  function handleNumInput(raw: string, setStr: (s: string) => void, setNum: (n: number) => void) {
+    let v = (raw || '').replace(/[^\d]/g, '');
+    if (v.length > 1) v = v.replace(/^0+/, ''); // strip leading zeros but keep single 0
+    setStr(v);
+    setNum(v === '' ? 0 : Number(v));
+  }
 
   function loraTxUrl(txId: string) {
     return `https://lora.algokit.io/testnet/tx/${txId}`;
@@ -193,28 +207,28 @@ export default function AdminSetup2() {
       <div className="grid grid-cols-1 gap-3">
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <label className="text-sm">E1 (S1 off-chain)</label>
-          <input type="number" min={0} step={UNIT || 1} value={E1}
-            onChange={(e)=>setE1(Number(e.target.value))} className="border rounded p-2" />
+          <input type="text" inputMode="numeric" pattern="\\d*" value={E1Str}
+            onChange={(e)=>handleNumInput(e.target.value, setE1Str, setE1)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <label className="text-sm">E2 (S2 at Return)</label>
-          <input type="number" min={0} step={UNIT || 1} value={E2}
-            onChange={(e)=>setE2(Number(e.target.value))} className="border rounded p-2" />
+          <input type="text" inputMode="numeric" pattern="\\d*" value={E2Str}
+            onChange={(e)=>handleNumInput(e.target.value, setE2Str, setE2)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <label className="text-sm">Multiplier m</label>
-          <input type="number" min={1} step={1} value={m}
-            onChange={(e)=>setM(Number(e.target.value))} className="border rounded p-2" />
+          <input type="text" inputMode="numeric" pattern="\\d*" value={mStr}
+            onChange={(e)=>handleNumInput(e.target.value, setMStr, setM)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <label className="text-sm">UNIT (microAlgos step)</label>
-          <input type="number" min={1} step={1} value={UNIT}
-            onChange={(e)=>setUNIT(Number(e.target.value))} className="border rounded p-2" />
+          <input type="text" inputMode="numeric" pattern="\\d*" value={unitStr}
+            onChange={(e)=>handleNumInput(e.target.value, setUnitStr, setUNIT)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <label className="text-sm">n_needed (subjects)</label>
-          <input type="number" min={2} step={1} value={nNeeded}
-            onChange={(e)=>setNNeeded(Number(e.target.value))} className="border rounded p-2" />
+          <input type="text" inputMode="numeric" pattern="\\d*" value={nNeededStr}
+            onChange={(e)=>handleNumInput(e.target.value, setNNeededStr, setNNeeded)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
       </div>
 
