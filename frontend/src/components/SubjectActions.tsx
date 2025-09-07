@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useContext, useCallback } from "react";
-import { useWallet } from "@txnlab/use-wallet";
+import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { Buffer } from "buffer";
 import { investFlow, optInApp, setPhase } from "../chain/tx";
@@ -175,7 +175,24 @@ export default function SubjectActions() {
 }
 
 function SubjectActionsInner() {
-  const { activeAddress, signTransactions } = useWallet();
+  const { activeAddress, signTransactions, providers, clients } = useWallet();
+
+  // Lightweight wallet connect/disconnect helpers (local copies for subject panels)
+  const handleConnect = useCallback(async () => {
+    try {
+      const p = providers?.find(p => p.metadata.id === PROVIDER_ID.PERA);
+      if (!p) return;
+      await p.connect();
+      if (!p.isActive) p.setActiveProvider();
+    } catch {}
+  }, [providers]);
+  const handleDisconnect = useCallback(async () => {
+    try { await providers?.find(p => p.metadata.id === PROVIDER_ID.PERA)?.disconnect(); } catch {}
+    try { await clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {}
+  }, [providers, clients]);
+  function shortAddr(addr?: string | null) {
+    return typeof addr === 'string' && addr.length > 12 ? `${addr.slice(0,6)}…${addr.slice(-6)}` : (addr || '');
+  }
   const toast = useToast();
 
   // inputs
@@ -898,6 +915,29 @@ function SubjectActionsInner() {
   return (
     <div className="rounded-2xl border p-4 space-y-3" style={{ position: "relative" }}>
       <h3 className="text-lg font-semibold">Subject - Invest</h3>
+      {/* Inline phase control (creator convenience) */}
+      <div className="flex items-center gap-2 text-xs text-neutral-700 mb-1">
+        <span>Set phase:</span>
+        <select className="border rounded px-2 py-1" value={phaseSelLocal} onChange={(e)=> setPhaseSelLocal(Number(e.target.value))}>
+          <option value={0}>0 (Registration)</option>
+          <option value={1}>1 (Setup)</option>
+          <option value={2}>2 (Invest)</option>
+          <option value={3}>3 (Return/Done)</option>
+        </select>
+        <button className="text-xs underline" onClick={async ()=>{
+          try { const id = resolveAppId(); await setPhase({ sender: activeAddress!, appId: id, phase: phaseSelLocal, sign: (u)=>signTransactions(u), wait: true }); await loadGlobals(); } catch(e:any){ setErr(e?.message||String(e)); }
+        }} disabled={!!busy || !activeAddress}>Apply</button>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-neutral-700">
+        {!activeAddress ? (
+          <button className="text-xs underline" onClick={handleConnect}>Connect wallet</button>
+        ) : (
+          <>
+            <span>Connected: <code>{shortAddr(activeAddress)}</code></span>
+            <button className="text-xs underline" onClick={handleDisconnect}>Disconnect</button>
+          </>
+        )}
+      </div>
 
       {/* App ID + read */}
       <div className="flex items-center gap-2 text-sm">
@@ -1151,6 +1191,29 @@ function SubjectActionsInner() {
       {/* Subject - Return */}
       <div className="mt-4 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Subject - Return</h4>
+        {/* Inline phase control (creator convenience) */}
+        <div className="flex items-center gap-2 text-xs text-neutral-700">
+          <span>Set phase:</span>
+          <select className="border rounded px-2 py-1" value={phaseSelLocal} onChange={(e)=> setPhaseSelLocal(Number(e.target.value))}>
+            <option value={0}>0 (Registration)</option>
+            <option value={1}>1 (Setup)</option>
+            <option value={2}>2 (Invest)</option>
+            <option value={3}>3 (Return/Done)</option>
+          </select>
+          <button className="text-xs underline" onClick={async ()=>{
+            try { const id = resolveAppId(); await setPhase({ sender: activeAddress!, appId: id, phase: phaseSelLocal, sign: (u)=>signTransactions(u), wait: true }); await loadGlobals(); } catch(e:any){ setErr(e?.message||String(e)); }
+          }} disabled={!!busy || !activeAddress}>Apply</button>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-neutral-700">
+          {!activeAddress ? (
+            <button className="text-xs underline" onClick={handleConnect}>Connect wallet</button>
+          ) : (
+            <>
+              <span>Connected: <code>{shortAddr(activeAddress)}</code></span>
+              <button className="text-xs underline" onClick={handleDisconnect}>Disconnect</button>
+            </>
+          )}
+        </div>
         <div className="flex items-center gap-2 text-xs text-neutral-700">
           <span>App ID:</span>
           <code>{(() => { try { return resolveAppId(); } catch { return '(unset)'; } })()}</code>
