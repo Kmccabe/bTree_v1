@@ -16,6 +16,7 @@ export default function AdminSetup2() {
   const [E2, setE2] = useState<number>(100_000);
   const [m, setM] = useState<number>(3);
   const [UNIT, setUNIT] = useState<number>(1_000);
+  const [nNeeded, setNNeeded] = useState<number>(2); // display-only for now
 
   // State
   const [busy, setBusy] = useState<string | null>(null);
@@ -185,42 +186,6 @@ export default function AdminSetup2() {
 
       {/* Start Session hidden to reduce confusion (admin actions still enforced on-chain) */}
 
-      {/* Step 2 — Register Subjects (capture only) */}
-      <div className="rounded-xl border p-3 space-y-2">
-        <div className="font-semibold">Register Subjects</div>
-        <div className="text-xs text-neutral-700">Capture S1 and S2 by connecting each wallet and clicking “Use connected”. No on-chain action yet.</div>
-        <div className="flex items-center gap-2">
-          <button
-            className={`text-xs underline`}
-            onClick={()=> setShowRegister(true)}
-            disabled={false}
-          >Register Subjects</button>
-          <div className="text-xs text-neutral-700">S1: <code>{s1Input || '(not set)'}</code> · S2: <code>{s2Input || '(not set)'}</code></div>
-        </div>
-      </div>
-
-      {/* Step 3 — Finalize Subjects (creator-only on-chain) */}
-      <div className="rounded-xl border p-3 space-y-2">
-        <div className="font-semibold">Finish & Set Pair</div>
-        <div className="text-xs text-neutral-700">Switch back to the creator wallet and set S1/S2 on-chain for the selected App ID.</div>
-        <div className="flex items-center gap-2">
-          <button className="text-xs underline"
-            onClick={async ()=>{
-              setErr(null);
-              try {
-                const id = resolveAppId();
-                if (!isCreator) throw new Error('Connect the creator wallet');
-                if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Capture S1 and S2 first');
-                const r = await setPair({ sender: activeAddress!, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
-                setLastTx({ id: r.txId, round: r.confirmedRound });
-              } catch (e: any) { setErr(e?.message || String(e)); }
-            }}
-            disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
-            title={!isCreator ? 'Creator only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
-          >Finish & Set Pair</button>
-        </div>
-      </div>
-
       {/* Step 0 — Deploy Session (new app) */}
       <div className="text-sm font-semibold">Deploy Session (new app)</div>
       <div className="text-xs text-neutral-700 mb-1">Connect any wallet and click Deploy — that wallet becomes the on-chain creator. Then Register Subjects and Finish & Set Pair.</div>
@@ -245,6 +210,11 @@ export default function AdminSetup2() {
           <span className="text-sm">UNIT (microAlgos step)</span>
           <input type="number" min={1} step={1} value={UNIT}
             onChange={(e)=>setUNIT(Number(e.target.value))} className="border rounded p-2" />
+        </label>
+        <label className="flex flex-col">
+          <span className="text-sm">n_needed (subjects)</span>
+          <input type="number" min={2} step={1} value={nNeeded}
+            onChange={(e)=>setNNeeded(Number(e.target.value))} className="border rounded p-2" />
         </label>
       </div>
 
@@ -381,6 +351,41 @@ export default function AdminSetup2() {
       {lastTx && (
         <div className="text-xs">Last tx: <code>{lastTx.id}</code>{lastTx.round ? ` (round ${lastTx.round})` : ``}</div>
       )}
+
+      {/* Step 2 — Register Subjects (capture only) */}
+      <div className="rounded-xl border p-3 space-y-2">
+        <div className="font-semibold">Register Subjects</div>
+        <div className="text-xs text-neutral-700">Capture S1 and S2 by connecting each wallet and clicking “Use connected”. No on-chain action yet.</div>
+        <div className="flex items-center gap-2">
+          <button
+            className={`text-xs underline`}
+            onClick={()=> setShowRegister(true)}
+          >Register Subjects</button>
+          <div className="text-xs text-neutral-700">S1: <code>{s1Input || '(not set)'}</code> · S2: <code>{s2Input || '(not set)'}</code></div>
+        </div>
+      </div>
+
+      {/* Step 3 — Finalize Subjects (creator-only on-chain) */}
+      <div className="rounded-xl border p-3 space-y-2">
+        <div className="font-semibold">Finish & Set Pair</div>
+        <div className="text-xs text-neutral-700">Switch back to the creator wallet and set S1/S2 on-chain for the selected App ID.</div>
+        <div className="flex items-center gap-2">
+          <button className="text-xs underline"
+            onClick={async ()=>{
+              setErr(null);
+              try {
+                const id = resolveAppId();
+                if (!isCreator) throw new Error('Connect the creator wallet');
+                if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Capture S1 and S2 first');
+                const r = await setPair({ sender: activeAddress!, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
+                setLastTx({ id: r.txId, round: r.confirmedRound });
+              } catch (e: any) { setErr(e?.message || String(e)); }
+            }}
+            disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
+            title={!isCreator ? 'Creator only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
+          >Finish & Set Pair</button>
+        </div>
+      </div>
       {err && <div className="text-sm text-red-600">{err}</div>}
 
       {/* Register Subjects Wizard Modal */}
