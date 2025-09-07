@@ -296,10 +296,12 @@ function SubjectActionsInner() {
       const j = await r.json();
       console.debug("[SubjectActions] /api/pair", r.status, j);
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
-      setUnit(Number(j?.globals?.UNIT ?? 1000));
-      // Map new globals: E1/E2
-      setE(Number(j?.globals?.E1 ?? 100000));
-      setE2(Number(j?.globals?.E2 ?? 0));
+      const g = (j?.globals ?? {}) as Record<string, any>;
+      setUnit(Number(g?.UNIT ?? 1000));
+      // Map new globals: E1/E2 and publish into pair.globals so Return sees t and addresses
+      setE(Number(g?.E1 ?? 100000));
+      setE2(Number(g?.E2 ?? 0));
+      setPair(prev => ({ ...prev, loading: false, error: null, globals: g, local: prev.local ?? null }));
 
       // also refresh subject local to keep Invest gating accurate
       try {
