@@ -341,9 +341,12 @@ export default function AdminSetup2() {
         </div>
       )}
 
-      {/* App address + funding */}
+      {/* App funding */}
       {addr && (
         <div className="space-y-2">
+          {/* explicit blank line before funding section */}
+          <div style={{ height: 12 }} />
+          <div className="text-sm font-semibold">Fund Experiment</div>
           <div className="flex items-center gap-2">
             <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check funding</button>
             <div className="text-xs text-neutral-700">Required pool (est): <span className="font-semibold">{nf(required)}</span> microAlgos</div>
