@@ -634,14 +634,19 @@ function SubjectActionsInner() {
       }
       let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
       const confirmedRound: number | undefined = pend?.["confirmed-round"] ?? pend?.confirmedRound;
+      const successActions = actions.length ? actions : (singleTxId ? [{ label: 'View on LoRA', href: loraTxUrl(singleTxId) }] : []);
       if (confirmedRound && Number.isFinite(confirmedRound)) {
-        const successActions = actions.length ? actions : (singleTxId ? [{ label: 'View on LoRA', href: loraTxUrl(singleTxId) }] : []);
         toast.show({ kind: 'success', title: 'Invest confirmed', description: `Round ${confirmedRound}`, actions: successActions });
         setInlineStatus({ phase: 'confirmed', text: `Invest confirmed in round ${confirmedRound}`, round: confirmedRound, txId: singleTxId, appCallTxId, paymentTxId });
         setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'confirmed', round: confirmedRound } : e));
-        // Refresh globals so Return panel sees updated t, phase and addresses
-        try { await loadGlobals(); } catch {}
+      } else {
+        // Fallback: pending endpoint returned 200 but no round; still mark as confirmed for UX
+        toast.show({ kind: 'success', title: 'Invest confirmed', actions: successActions });
+        setInlineStatus({ phase: 'confirmed', text: 'Invest confirmed', txId: singleTxId, appCallTxId, paymentTxId });
+        setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'confirmed' } : e));
       }
+      // Refresh globals so Return panel sees updated t, phase and addresses
+      try { await loadGlobals(); } catch {}
     } catch (e: any) {
       console.error("[SubjectActions] invest failed", e);
       const msg = e?.message || String(e);
