@@ -115,7 +115,7 @@ export default function AdminSetup2() {
     }
     let id: number;
     try { id = resolveAppId(); } catch (e: any) { return setErr(e?.message || String(e)); }
-    if (!activeAddress) return setErr("Connect the creator wallet.");
+    if (!activeAddress) return setErr("Connect the experimenter wallet.");
     setBusy("phase");
     try {
       await setPhase({ sender: activeAddress, appId: id, phase: p, sign: signer });
@@ -163,7 +163,7 @@ export default function AdminSetup2() {
     setErr(null);
     try {
       const id = resolveAppId();
-      if (!activeAddress) throw new Error("Connect the creator wallet.");
+      if (!activeAddress) throw new Error("Connect the experimenter wallet.");
       const r = await sweepApp({ sender: activeAddress, appId: id, sign: (u)=>signTransactions(u), wait: true });
       setLastTx({ id: r.txId, round: r.confirmedRound });
     } catch (e: any) { setErr(e?.message || String(e)); }
@@ -173,7 +173,7 @@ export default function AdminSetup2() {
     setErr(null);
     try {
       const id = resolveAppId();
-      if (!activeAddress) throw new Error("Connect the creator wallet.");
+      if (!activeAddress) throw new Error("Connect the experimenter wallet.");
       if (!confirm(`Delete application ${id}? This cannot be undone.`)) return;
       const r = await deleteApp({ sender: activeAddress, appId: id, sign: (u)=>signTransactions(u), wait: true });
       setLastTx({ id: r.txId, round: r.confirmedRound });
@@ -182,13 +182,13 @@ export default function AdminSetup2() {
 
   return (
     <div className="rounded-2xl border p-4 space-y-4">
-      <h3 className="text-lg font-semibold">Admin - Deploy & Manage Pair</h3>
+      <h3 className="text-lg font-semibold">Experimenter - Register Experiment</h3>
 
       {/* Start Session hidden to reduce confusion (admin actions still enforced on-chain) */}
 
       {/* Step 0 — Deploy Session (new app) */}
       <div className="text-sm font-semibold">Deploy Session (new app)</div>
-      <div className="text-xs text-neutral-700 mb-1">Connect any wallet and click Deploy — that wallet becomes the on-chain creator. Then Register Subjects and Finish & Set Pair.</div>
+      <div className="text-xs text-neutral-700 mb-1">Connect any wallet and click Deploy — that wallet becomes the on-chain experimenter. Then Register Subjects and Finish & Set Pair.</div>
       {/* Deploy controls */}
       <div className="grid grid-cols-4 gap-3">
         <label className="flex flex-col">
@@ -266,21 +266,21 @@ export default function AdminSetup2() {
       {/* Step 3 — Finish & Set Pair (creator-only on-chain) */}
       <div className="rounded-xl border p-3 space-y-2">
         <div className="font-semibold">Finish & Set Pair</div>
-        <div className="text-xs text-neutral-700">Switch back to the creator wallet and write S1/S2 on-chain for the selected App ID.</div>
+        <div className="text-xs text-neutral-700">Switch back to the experimenter wallet and write S1/S2 on-chain for the selected App ID.</div>
         <div className="flex items-center gap-2">
           <button className="text-xs underline"
             onClick={async ()=>{
               setErr(null);
               try {
                 const id = resolveAppId();
-                if (!isCreator) throw new Error('Connect the creator wallet');
+                if (!isCreator) throw new Error('Connect the experimenter wallet');
                 if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Capture S1 and S2 first');
                 const r = await setPair({ sender: activeAddress!, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
                 setLastTx({ id: r.txId, round: r.confirmedRound });
               } catch (e: any) { setErr(e?.message || String(e)); }
             }}
             disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
-            title={!isCreator ? 'Creator only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
+            title={!isCreator ? 'Experimenter only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
           >Finish & Set Pair</button>
         </div>
       </div>
@@ -349,7 +349,7 @@ export default function AdminSetup2() {
           className="text-xs underline text-red-700"
           onClick={onDelete}
           disabled={!!busy || !activeAddress || currentPhase !== 3}
-          title={currentPhase === 3 ? 'Delete application (creator only). Sweep first to reclaim liquid.' : 'Enabled only in Done (3). Use Sweep first, then Delete.'}
+          title={currentPhase === 3 ? 'Delete application (experimenter only). Sweep first to reclaim liquid.' : 'Enabled only in Done (3). Use Sweep first, then Delete.'}
         >
           Delete app
         </button>
@@ -428,21 +428,21 @@ export default function AdminSetup2() {
       {/* Step 3 — Finalize Subjects (creator-only on-chain) */}
       <div className="rounded-xl border p-3 space-y-2">
         <div className="font-semibold">Finish & Set Pair</div>
-        <div className="text-xs text-neutral-700">Switch back to the creator wallet and set S1/S2 on-chain for the selected App ID.</div>
+        <div className="text-xs text-neutral-700">Switch back to the experimenter wallet and set S1/S2 on-chain for the selected App ID.</div>
         <div className="flex items-center gap-2">
           <button className="text-xs underline"
             onClick={async ()=>{
               setErr(null);
               try {
                 const id = resolveAppId();
-                if (!isCreator) throw new Error('Connect the creator wallet');
+                if (!isCreator) throw new Error('Connect the experimenter wallet');
                 if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Capture S1 and S2 first');
                 const r = await setPair({ sender: activeAddress!, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
                 setLastTx({ id: r.txId, round: r.confirmedRound });
               } catch (e: any) { setErr(e?.message || String(e)); }
             }}
             disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
-            title={!isCreator ? 'Creator only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
+            title={!isCreator ? 'Experimenter only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
           >Finish & Set Pair</button>
         </div>
       </div>

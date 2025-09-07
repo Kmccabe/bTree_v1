@@ -263,7 +263,7 @@ export default function PhaseControl({ appId, account, network }: Props) {
         Phase 0 = Registration (opt-in S1/S2)<br/>
         Phase 1 = Invest (S1 grouped payment + AppCall)<br/>
         Phase 2 = Return (S2 single AppCall; pays r to S1 and t - r + E2 to S2)<br/>
-        Phase 3 = Done (creator-only sweep)
+        Phase 3 = Done (experimenter-only sweep)
       </p>
       {phaseButtons}
       {!netSanity.loading && (!netSanity.match || netSanity.error) && (

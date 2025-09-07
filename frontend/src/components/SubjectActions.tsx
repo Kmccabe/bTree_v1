@@ -1137,7 +1137,7 @@ function SubjectActionsInner() {
           )}
           {(creatorAddr || (pair.globals as any)?.creator) && (
             <div className="mb-1">
-              App creator: <code className="break-all">{(pair.globals as any)?.creator || creatorAddr}</code>
+              Experimenter: <code className="break-all">{(pair.globals as any)?.creator || creatorAddr}</code>
               {((pair.globals as any)?.creator || creatorAddr) && (
                 <button className="text-xs underline ml-2" onClick={() => navigator.clipboard.writeText(((pair.globals as any)?.creator || creatorAddr) as string)}>Copy</button>
               )}
@@ -1269,7 +1269,7 @@ function SubjectActionsInner() {
       {/* Quick Demo (single account) */}
       <div className="mt-6 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Quick Demo (single account)</h4>
-        <div className="text-xs text-neutral-700">Runs: [Phase 2 if creator] → Invest → Return</div>
+        <div className="text-xs text-neutral-700">Runs: [Phase 2 if experimenter] → Invest → Return</div>
         <div className="flex items-center gap-3 text-sm flex-wrap">
           <label className="flex items-center gap-2">
             <span>s (microAlgos)</span>
