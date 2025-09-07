@@ -343,13 +343,7 @@ export default function App(): JSX.Element {
 
   return (
     <div style={{ fontFamily: "system-ui, Arial", padding: 24 }}>
-      <div style={{ marginBottom: 16 }}>
-        <AdminSetup />
-        <div style={{ marginTop: 16 }}>
-          <SubjectActions />
-        </div>
-      </div>
-      <h1>bTree v1 - Trust Game MVP</h1>
+      <h1 style={{ marginTop: 0 }}>bTree v1 - Trust Game MVP</h1>
       <p><strong>Network:</strong> {network} (wallet = use-wallet/Pera)</p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
@@ -362,6 +356,13 @@ export default function App(): JSX.Element {
           </>
         )}
         <AccountSelector />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <AdminSetup />
+        <div style={{ marginTop: 16 }}>
+          <SubjectActions />
+        </div>
       </div>
 
       <hr />

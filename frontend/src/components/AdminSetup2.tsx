@@ -183,22 +183,7 @@ export default function AdminSetup2() {
     <div className="rounded-2xl border p-4 space-y-4">
       <h3 className="text-lg font-semibold">Admin - Deploy & Manage Pair</h3>
 
-      {/* Step 1 — Creator Sign-In */}
-      <div className="rounded-xl border p-3 flex items-center justify-between">
-        <div className="text-sm">
-          <div className="font-semibold">Start Session</div>
-          <div className="text-xs text-neutral-700">For a new session, just deploy next — the deployer becomes the creator. For an existing session, select the App ID and connect its creator to run admin actions.</div>
-          <div className="text-xs mt-1">Creator env: <code>{creatorEnv || '(unset)'}</code> · On-chain: <code>{creatorOnChain || '(unknown)'}</code></div>
-          <div className="text-xs">Connected: <code>{activeAddress || '(none)'}</code></div>
-        </div>
-        <button
-          className="text-xs underline"
-          onClick={()=> setSessionStarted(true)}
-          title="Starts the guided flow. Admin actions are still enforced on-chain."
-        >
-          {sessionStarted ? 'Session started' : 'Start Session'}
-        </button>
-      </div>
+      {/* Start Session hidden to reduce confusion (admin actions still enforced on-chain) */}
 
       {/* Step 2 — Register Subjects (capture only) */}
       <div className="rounded-xl border p-3 space-y-2">
@@ -206,10 +191,10 @@ export default function AdminSetup2() {
         <div className="text-xs text-neutral-700">Capture S1 and S2 by connecting each wallet and clicking “Use connected”. No on-chain action yet.</div>
         <div className="flex items-center gap-2">
           <button
-            className={`text-xs underline ${(!sessionStarted ? 'opacity-50 cursor-not-allowed' : '')}`}
-            onClick={()=> sessionStarted && setShowRegister(true)}
-            disabled={!sessionStarted}
-          >Open wizard</button>
+            className={`text-xs underline`}
+            onClick={()=> setShowRegister(true)}
+            disabled={false}
+          >Register Subjects</button>
           <div className="text-xs text-neutral-700">S1: <code>{s1Input || '(not set)'}</code> · S2: <code>{s2Input || '(not set)'}</code></div>
         </div>
       </div>
@@ -236,6 +221,9 @@ export default function AdminSetup2() {
         </div>
       </div>
 
+      {/* Step 0 — Deploy Session (new app) */}
+      <div className="text-sm font-semibold">Deploy Session (new app)</div>
+      <div className="text-xs text-neutral-700 mb-1">Connect any wallet and click Deploy — that wallet becomes the on-chain creator. Then Register Subjects and Finish & Set Pair.</div>
       {/* Deploy controls */}
       <div className="grid grid-cols-4 gap-3">
         <label className="flex flex-col">
