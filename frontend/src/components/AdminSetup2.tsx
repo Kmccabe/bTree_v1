@@ -239,13 +239,13 @@ export default function AdminSetup2() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mt-2" style={{ marginBottom: 12 }}>
+      <div className="flex items-center gap-3 mt-2">
         <button disabled={!!busy || !activeAddress} onClick={onDeploy} className="rounded-xl px-3 py-2 border">
           {busy === "deploy" ? "Deploying…" : "Deploy"}
         </button>
         {appId && <div className="text-sm">App ID: <code>{appId}</code>{' '}</div>}
       </div>
-      {appId && (<div style={{ height: 12 }} />)}
+      {/* No spacer here; App Address follows immediately */}
       {/* Show App Address directly after App ID */}
       {addr && (
         <div className="text-sm">
