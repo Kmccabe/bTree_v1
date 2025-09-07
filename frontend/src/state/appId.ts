@@ -24,8 +24,12 @@ export function resolveAppId(): number {
   if (Number.isInteger(selectedAppId) && (selectedAppId as number) > 0) {
     return selectedAppId as number;
   }
-  const raw = (import.meta as any)?.env?.VITE_TESTNET_APP_ID as string | undefined;
-  const parsed = raw != null ? Number(raw) : NaN;
-  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  const envAny = (import.meta as any)?.env || {};
+  const rawPrimary = envAny?.VITE_APP_ID as string | undefined;
+  const rawTestnet = envAny?.VITE_TESTNET_APP_ID as string | undefined;
+  const parsedPrimary = rawPrimary != null ? Number(rawPrimary) : NaN;
+  const parsedTestnet = rawTestnet != null ? Number(rawTestnet) : NaN;
+  if (Number.isInteger(parsedPrimary) && parsedPrimary > 0) return parsedPrimary;
+  if (Number.isInteger(parsedTestnet) && parsedTestnet > 0) return parsedTestnet;
   throw new Error("No App ID selected and VITE_TESTNET_APP_ID is missing or invalid");
 }

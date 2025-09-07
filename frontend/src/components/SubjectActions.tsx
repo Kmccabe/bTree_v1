@@ -238,6 +238,19 @@ function SubjectActionsInner() {
     }
   } catch { /* ignore */ }
 
+  // Accept ?appId= in the URL and auto-select it
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const q = sp.get('appId') || sp.get('appid') || sp.get('id');
+      const n = q ? Number(q) : NaN;
+      if (Number.isInteger(n) && n > 0) {
+        setAppIdIn(String(n));
+        setSelectedAppId(n);
+      }
+    } catch {}
+  }, []);
+
   // Always-computed app account details (independent of funds state)
   const resolvedIdForAccount = useMemo(() => {
     try { return resolveAppId(); } catch { return undefined; }
