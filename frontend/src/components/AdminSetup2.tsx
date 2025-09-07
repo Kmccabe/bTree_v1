@@ -17,12 +17,14 @@ export default function AdminSetup2() {
   const [m, setM] = useState<number>(3);
   const [UNIT, setUNIT] = useState<number>(1_000);
   const [nNeeded, setNNeeded] = useState<number>(2); // display-only for now
+  const [numContracts, setNumContracts] = useState<number>(1); // new: number of contracts
   // string mirrors to allow clean editing without forced leading zeros
   const [E1Str, setE1Str] = useState<string>("100000");
   const [E2Str, setE2Str] = useState<string>("100000");
   const [mStr, setMStr] = useState<string>("3");
   const [unitStr, setUnitStr] = useState<string>("1000");
   const [nNeededStr, setNNeededStr] = useState<string>("2");
+  const [numContractsStr, setNumContractsStr] = useState<string>("1");
 
   // State
   const [busy, setBusy] = useState<string | null>(null);
@@ -206,29 +208,34 @@ export default function AdminSetup2() {
       {/* Deploy controls */}
       <div className="grid grid-cols-1 gap-3">
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <label className="text-sm">E1 (S1 off-chain)</label>
+          <label className="text-sm">S1 Endowment (e1)</label>
           <input type="text" inputMode="numeric" pattern="\\d*" value={E1Str}
             onChange={(e)=>handleNumInput(e.target.value, setE1Str, setE1)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <label className="text-sm">E2 (S2 at Return)</label>
+          <label className="text-sm">S2 Endowment (e2)</label>
           <input type="text" inputMode="numeric" pattern="\\d*" value={E2Str}
             onChange={(e)=>handleNumInput(e.target.value, setE2Str, setE2)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <label className="text-sm">Multiplier m</label>
+          <label className="text-sm">Multiplier (m)</label>
           <input type="text" inputMode="numeric" pattern="\\d*" value={mStr}
             onChange={(e)=>handleNumInput(e.target.value, setMStr, setM)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <label className="text-sm">UNIT (microAlgos step)</label>
+          <label className="text-sm">microAlgos step size</label>
           <input type="text" inputMode="numeric" pattern="\\d*" value={unitStr}
             onChange={(e)=>handleNumInput(e.target.value, setUnitStr, setUNIT)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <label className="text-sm">n_needed (subjects)</label>
+          <label className="text-sm">Number of subjects (ns)</label>
           <input type="text" inputMode="numeric" pattern="\\d*" value={nNeededStr}
             onChange={(e)=>handleNumInput(e.target.value, setNNeededStr, setNNeeded)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label className="text-sm">Number of contracts (nc)</label>
+          <input type="text" inputMode="numeric" pattern="\\d*" value={numContractsStr}
+            onChange={(e)=>handleNumInput(e.target.value, setNumContractsStr, setNumContracts)} className="border rounded p-2 w-[15ch]" style={{ width: '15ch' }} />
         </div>
       </div>
 
