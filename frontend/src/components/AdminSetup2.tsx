@@ -43,8 +43,8 @@ export default function AdminSetup2() {
   const [showQr, setShowQr] = useState<boolean>(false); // legacy (no longer used for display)
   const [showFundQr, setShowFundQr] = useState<boolean>(false);
 
-  // Compute conservative funding needed for Return: t + E2, where t = m*s and s ≤ E1
-  const required = useMemo(() => (m - 1) * E1 + E2 + 50_000, [m, E1, E2]);
+  // Required initial pool (no mid-session funding): max payout = m*E1 + E2, plus buffer
+  const required = useMemo(() => (m * E1) + E2 + 50_000, [m, E1, E2]);
   const [fund, setFund] = useState<{ required: number; balance?: number; ok?: boolean } | null>(null);
 
   const signer = (u: Uint8Array[]) => signTransactions(u);
@@ -349,7 +349,7 @@ export default function AdminSetup2() {
             <div className="text-xs text-neutral-700">Required pool (est): <span className="font-semibold">{nf(required)}</span> microAlgos</div>
             {fund && (
               <div className="text-xs text-neutral-700">
-                Balance: {nf(fund.balance ?? 0)} μALGO · Required ≥ {nf(fund.required)} μALGO ({nf((m-1)*E1 + E2)} for t+E2)
+                Balance: {nf(fund.balance ?? 0)} μALGO · Required ≥ {nf(fund.required)} μALGO (for max payout m x E1 + E2)
               </div>
             )}
           </div>
