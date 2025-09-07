@@ -186,21 +186,15 @@ export default function AdminSetup2() {
       {/* Step 1 — Creator Sign-In */}
       <div className="rounded-xl border p-3 flex items-center justify-between">
         <div className="text-sm">
-          <div className="font-semibold">Start Session (Creator)</div>
-          <div className="text-xs text-neutral-700">Connect the creator wallet to enable admin actions.</div>
+          <div className="font-semibold">Start Session</div>
+          <div className="text-xs text-neutral-700">For a new session, just deploy next — the deployer becomes the creator. For an existing session, select the App ID and connect its creator to run admin actions.</div>
           <div className="text-xs mt-1">Creator env: <code>{creatorEnv || '(unset)'}</code> · On-chain: <code>{creatorOnChain || '(unknown)'}</code></div>
           <div className="text-xs">Connected: <code>{activeAddress || '(none)'}</code></div>
         </div>
         <button
-          className={`text-xs underline ${(!isCreator ? 'opacity-50 cursor-not-allowed' : '')}`}
-          onClick={()=> isCreator && setSessionStarted(true)}
-          disabled={!isCreator}
-          title={(() => {
-            if (!activeAddress) return 'Connect wallet';
-            if (!creatorEnv && !creatorOnChain) return 'Set VITE_CREATOR_ADDRESS or select an App ID to read on-chain creator';
-            if (!isCreator) return 'Connect the creator wallet (env or on-chain)';
-            return '';
-          })()}
+          className="text-xs underline"
+          onClick={()=> setSessionStarted(true)}
+          title="Starts the guided flow. Admin actions are still enforced on-chain."
         >
           {sessionStarted ? 'Session started' : 'Start Session'}
         </button>
