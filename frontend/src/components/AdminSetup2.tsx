@@ -42,7 +42,23 @@ export default function AdminSetup2() {
   const [history, setHistory] = useState<null | { loading: boolean; error?: string; items?: Array<{ round: number; time: number; txid: string; sender: string; event: string; details?: any; innerPayments?: Array<{ to: string; amount: number }> }> }>(null);
   // Creator/session guidance
   const creatorEnv = (import.meta as any)?.env?.VITE_CREATOR_ADDRESS as string | undefined;
-  const isCreator = !!activeAddress && !!creatorEnv && activeAddress === creatorEnv;
+  const [creatorOnChain, setCreatorOnChain] = useState<string | null>(null);
+  const isCreator = !!activeAddress && (
+    (!!creatorEnv && activeAddress === creatorEnv) || (!!creatorOnChain && activeAddress === creatorOnChain)
+  );
+  // Try to learn creator from on-chain app params when an App ID is selected
+  useEffect(() => {
+    (async () => {
+      try {
+        const id = resolveAppId();
+        if (!Number.isInteger(id) || id <= 0) return;
+        const r = await fetch(`/api/pair?id=${id}`);
+        const j = await r.json().catch(() => ({} as any));
+        const cr = j?.creator || j?.params?.creator || j?.application?.params?.creator;
+        if (typeof cr === 'string' && cr.length >= 58) setCreatorOnChain(cr);
+      } catch { /* ignore until App ID is set */ }
+    })();
+  }, [activeAddress, appId, manualAppId]);
   const [sessionStarted, setSessionStarted] = useState<boolean>(false);
   // Register Subjects modal
   const [showRegister, setShowRegister] = useState<boolean>(false);
@@ -172,14 +188,19 @@ export default function AdminSetup2() {
         <div className="text-sm">
           <div className="font-semibold">Start Session (Creator)</div>
           <div className="text-xs text-neutral-700">Connect the creator wallet to enable admin actions.</div>
-          <div className="text-xs mt-1">Creator env: <code>{creatorEnv || '(unset)'}</code></div>
+          <div className="text-xs mt-1">Creator env: <code>{creatorEnv || '(unset)'}</code> · On-chain: <code>{creatorOnChain || '(unknown)'}</code></div>
           <div className="text-xs">Connected: <code>{activeAddress || '(none)'}</code></div>
         </div>
         <button
           className={`text-xs underline ${(!isCreator ? 'opacity-50 cursor-not-allowed' : '')}`}
           onClick={()=> isCreator && setSessionStarted(true)}
           disabled={!isCreator}
-          title={!creatorEnv ? 'Set VITE_CREATOR_ADDRESS' : (!activeAddress ? 'Connect wallet' : (!isCreator ? 'Connect the creator wallet' : ''))}
+          title={(() => {
+            if (!activeAddress) return 'Connect wallet';
+            if (!creatorEnv && !creatorOnChain) return 'Set VITE_CREATOR_ADDRESS or select an App ID to read on-chain creator';
+            if (!isCreator) return 'Connect the creator wallet (env or on-chain)';
+            return '';
+          })()}
         >
           {sessionStarted ? 'Session started' : 'Start Session'}
         </button>
