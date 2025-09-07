@@ -99,19 +99,101 @@ export default function AdminSetup2() {
     try { await clients?.pera?.disconnect?.(); } catch {}
   }, [providers, clients]);
 
-  // Placeholder: Download CSV (to be implemented next)
-  function onDownloadCsv() {
+  // Download CSV with summary fields from on-chain state + history
+  async function onDownloadCsv() {
     try {
-      const id = (()=>{ try { return resolveAppId(); } catch { return null; } })();
-      const blob = new Blob([`appId,round,event\n${id ?? ''},,`], { type: 'text/csv' });
+      const id = resolveAppId();
+      if (!Number.isInteger(id) || id <= 0) throw new Error('Select a valid App ID');
+
+      const decodeAddr = (val: any): string => {
+        try {
+          if (!val) return '';
+          if (typeof val === 'string') {
+            if ((algosdk as any).isValidAddress?.(val)) return val;
+            try {
+              const raw = Uint8Array.from(atob(val), c => c.charCodeAt(0));
+              if (raw && raw.length === 32) return (algosdk as any).encodeAddress(raw);
+            } catch {}
+          } else if (val && typeof val.bytes === 'string') {
+            const raw = Uint8Array.from(atob(val.bytes), c => c.charCodeAt(0));
+            if (raw && raw.length === 32) return (algosdk as any).encodeAddress(raw);
+          }
+        } catch {}
+        return '';
+      };
+
+      // Globals
+      const pairR = await fetch('/api/pair?id=' + id);
+      const pairJ: any = await pairR.json().catch(()=>({}));
+      if (!pairR.ok) throw new Error(pairJ && pairJ.error ? pairJ.error : ('pair HTTP ' + pairR.status));
+      const g: any = (pairJ && pairJ.globals) || {};
+      const E1v = Number(g && g.E1 != null ? g.E1 : (g && g.E != null ? g.E : 0));
+      const E2v = Number(g && g.E2 != null ? g.E2 : 0);
+      const mv = Number(g && g.m != null ? g.m : 0);
+      const sv = Number(g && g.s != null ? g.s : 0);
+      const s1Addr = decodeAddr((g && (g.s1_addr || g.s1)) || '');
+      const s2Addr = decodeAddr((g && (g.s2_addr || g.s2)) || '');
+
+      // History
+      const histR = await fetch('/api/history?id=' + id + '&limit=1000');
+      const histJ: any = await histR.json().catch(()=>({}));
+      if (!histR.ok) throw new Error(histJ && histJ.error ? histJ.error : ('history HTTP ' + histR.status));
+      const items: any[] = Array.isArray(histJ && histJ.txns) ? histJ.txns : [];
+
+      let firstRegistered = '';
+      let subjectsAdded = '';
+      let rVal = 0;
+      let s1Pay = 0;
+      let s2Pay = 0;
+      let createTx = '';
+      let setPairTx = '';
+      let investAppTx = '';
+      let investPayTx = '';
+      let returnTx = '';
+      let sweepTx = '';
+      let deleteTx = '';
+
+      for (const it of items) {
+        const evt = String((it && it.event) || '');
+        const tsSec = Number((it && it.time) || 0);
+        const when = tsSec > 0 ? new Date(tsSec * 1000).toISOString() : '';
+        if (!firstRegistered && (evt === 'appl' || evt === 'create' || evt === 'register')) { firstRegistered = when; createTx = String(it?.txid || ''); }
+        if (!subjectsAdded && evt.toLowerCase() === 'setpair') { subjectsAdded = when; setPairTx = String(it?.txid || ''); }
+        if (!investAppTx && evt.toLowerCase() === 'invest') { investAppTx = String(it?.txid || ''); }
+        if (!sweepTx && evt.toLowerCase() === 'sweep') { sweepTx = String(it?.txid || ''); }
+        if (!deleteTx && evt.toLowerCase() === 'delete') { deleteTx = String(it?.txid || ''); }
+        if (evt.toLowerCase() === 'return') {
+          const details = (it && it.details) || {};
+          const rMaybe = Number((details && (details.r != null ? details.r : 0)));
+          if (isFinite(rMaybe)) rVal = rMaybe;
+          if (!returnTx) returnTx = String(it?.txid || '');
+        }
+        const pays: any[] = Array.isArray(it && it.innerPayments) ? it.innerPayments : [];
+        for (const p of pays) {
+          const to = String((p && p.to) || '');
+          const amt = Number((p && p.amount) || 0);
+          if (to && amt > 0) {
+            if (s1Addr && to === s1Addr) s1Pay += amt;
+            if (s2Addr && to === s2Addr) s2Pay += amt;
+          }
+        }
+      }
+
+      const headers = ['app_id','date_app_first_registered','date_subjects_added','E1','E2','m','s','r','S1 Total Pay','S2 Total Pay','S1 Address','S2 Address','create_txid','setpair_txid','invest_appcall_txid','invest_payment_txid','return_txid','sweep_txid','delete_txid'];
+      const row = [String(id), firstRegistered, subjectsAdded, String(E1v), String(E2v), String(mv), String(sv), String(rVal), String(s1Pay), String(s2Pay), s1Addr, s2Addr, createTx, setPairTx, investAppTx, investPayTx, returnTx, sweepTx, deleteTx];
+      const esc = (v: any) => '"' + String(v).replace(/"/g,'""') + '"';
+      const csv = headers.join(',') + '\n' + row.map(esc).join(',') + '\n';
+      const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `experiment-${id ?? 'session'}.csv`;
+      a.download = 'experiment-' + id + '.csv';
       document.body.appendChild(a);
       a.click();
-      setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
-    } catch {}
+      setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 0);
+    } catch (e) {
+      // no-op for now
+    }
   }
 
   // helper to sanitize numeric text and update string+number states
