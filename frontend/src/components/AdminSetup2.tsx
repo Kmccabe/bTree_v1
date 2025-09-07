@@ -191,31 +191,31 @@ export default function AdminSetup2() {
       <div className="text-xs text-neutral-700 mb-1">&nbsp;</div>
       {/* Deploy controls */}
       <div className="grid grid-cols-1 gap-3">
-        <label className="flex flex-col">
-          <span className="text-sm">E1 (S1 off-chain)</span>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label className="text-sm">E1 (S1 off-chain)</label>
           <input type="number" min={0} step={UNIT || 1} value={E1}
             onChange={(e)=>setE1(Number(e.target.value))} className="border rounded p-2" />
-        </label>
-        <label className="flex flex-col">
-          <span className="text-sm">E2 (S2 at Return)</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label className="text-sm">E2 (S2 at Return)</label>
           <input type="number" min={0} step={UNIT || 1} value={E2}
             onChange={(e)=>setE2(Number(e.target.value))} className="border rounded p-2" />
-        </label>
-        <label className="flex flex-col">
-          <span className="text-sm">Multiplier m</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label className="text-sm">Multiplier m</label>
           <input type="number" min={1} step={1} value={m}
             onChange={(e)=>setM(Number(e.target.value))} className="border rounded p-2" />
-        </label>
-        <label className="flex flex-col">
-          <span className="text-sm">UNIT (microAlgos step)</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label className="text-sm">UNIT (microAlgos step)</label>
           <input type="number" min={1} step={1} value={UNIT}
             onChange={(e)=>setUNIT(Number(e.target.value))} className="border rounded p-2" />
-        </label>
-        <label className="flex flex-col">
-          <span className="text-sm">n_needed (subjects)</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label className="text-sm">n_needed (subjects)</label>
           <input type="number" min={2} step={1} value={nNeeded}
             onChange={(e)=>setNNeeded(Number(e.target.value))} className="border rounded p-2" />
-        </label>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
