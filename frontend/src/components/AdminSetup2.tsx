@@ -246,6 +246,23 @@ export default function AdminSetup2() {
         {appId && <div className="text-sm">App ID: <code>{appId}</code>{' '}</div>}
       </div>
       {appId && (<div style={{ height: 12 }} />)}
+      {/* Show App Address directly after App ID */}
+      {addr && (
+        <div className="text-sm">
+          <div className="flex items-center gap-2">
+            <span>App Address:</span>
+            <code className="break-all">{addr}</code>
+            <button onClick={() => navigator.clipboard.writeText(addr)} className="text-xs underline" title="Copy to clipboard">Copy</button>
+            <button onClick={() => setShowQr(v => !v)} className="text-xs underline">{showQr ? 'Hide QR' : 'Show QR'}</button>
+            <a className="text-xs underline" href={`https://lora.algokit.io/testnet/account/${addr}`} target="_blank" rel="noreferrer">View</a>
+          </div>
+          {showQr && (
+            <div className="mt-2">
+              <QRCodeCanvas value={addr} size={128} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Step 2 — Register Subjects (always visible; capture only; no on-chain) */}
       <div className="mt-4 rounded-xl border p-3 space-y-2">
@@ -303,6 +320,8 @@ export default function AdminSetup2() {
         </div>
         <div className="h-4" />
       </div>
+      {/* extra spacer after add-subjects card */}
+      <div style={{ height: 12 }} />
 
       {/* Manage existing pair */}
       {!appId && (
@@ -323,18 +342,6 @@ export default function AdminSetup2() {
       {/* App address + funding */}
       {addr && (
         <div className="space-y-2">
-          <div className="text-sm flex items-center gap-2">
-            <span>App Address:</span>
-            <code className="break-all">{addr}</code>
-            <button onClick={() => navigator.clipboard.writeText(addr)} className="text-xs underline" title="Copy to clipboard">Copy</button>
-            <button onClick={() => setShowQr(v => !v)} className="text-xs underline">{showQr ? 'Hide QR' : 'Show QR'}</button>
-            <a className="text-xs underline" href={`https://lora.algokit.io/testnet/account/${addr}`} target="_blank" rel="noreferrer">View</a>
-          </div>
-          {showQr && (
-            <div className="mt-2">
-              <QRCodeCanvas value={addr} size={128} />
-            </div>
-          )}
           <div className="flex items-center gap-2">
             <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check funding</button>
             <div className="text-xs text-neutral-700">Required pool (est): <span className="font-semibold">{nf(required)}</span> microAlgos</div>
