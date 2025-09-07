@@ -263,9 +263,11 @@ export default function AdminSetup2() {
           )}
         </div>
       )}
+      {/* explicit blank line before Register Subjects */}
+      <div style={{ height: 14 }} />
 
       {/* Step 2 — Register Subjects (always visible; capture only; no on-chain) */}
-      <div className="mt-4 rounded-xl border p-3 space-y-2">
+      <div className="rounded-xl border p-3 space-y-2" style={{ marginTop: 12 }}>
         <div className="font-bold">Register Subjects</div>
         <div className="mt-2 space-y-2">
           <div className="grid grid-cols-2 gap-3 text-sm">
