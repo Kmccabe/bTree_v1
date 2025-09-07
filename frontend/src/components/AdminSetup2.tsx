@@ -354,6 +354,44 @@ export default function AdminSetup2() {
                 </div>
                 <div style={{ height: 12 }} />
                 <div className="text-sm font-semibold">Start Experiment</div>
+                <div className="mt-2">
+                  {(() => {
+                    const capturedOk = isAddr(s1Input) && isAddr(s2Input);
+                    const fundedOk = !!fund?.ok;
+                    const disabled = !!busy || !activeAddress || !capturedOk || !fundedOk;
+                    const title = !activeAddress
+                      ? 'Connect the experimenter wallet'
+                      : (!capturedOk
+                        ? 'Capture valid S1 and S2 first'
+                        : (!fundedOk
+                          ? 'Fund the app to at least the Required pool estimate'
+                          : ''));
+                    return (
+                      <button
+                        className="rounded px-3 py-2 border"
+                        disabled={disabled}
+                        title={title}
+                        onClick={async () => {
+                          setErr(null);
+                          setBusy('start');
+                          try {
+                            const id = resolveAppId();
+                            if (!activeAddress) throw new Error('Connect the experimenter wallet');
+                            await setPhase({ sender: activeAddress, appId: id, phase: 2, sign: signer, wait: true });
+                            setCurrentPhase(2);
+                          } catch (e: any) {
+                            setErr(e?.message || String(e));
+                          } finally {
+                            setBusy(null);
+                          }
+                        }}
+                      >
+                        START
+                      </button>
+                    );
+                  })()}
+                </div>
+                <div style={{ height: 12 }} />
               </>
             )}
           </div>
