@@ -321,6 +321,11 @@ function SubjectActionsInner() {
       setE(Number(g?.E1 ?? 100000));
       setE2(Number(g?.E2 ?? 0));
       setPair(prev => ({ ...prev, loading: false, error: null, globals: g, local: prev.local ?? null }));
+      // Capture creator if provided by API (used for experimenter gating)
+      try {
+        const cr = j?.creator || j?.params?.creator || j?.application?.params?.creator;
+        if (typeof cr === 'string' && cr.length >= 58) setCreatorAddr(cr);
+      } catch {}
 
       // also refresh subject local to keep Invest gating accurate
       try {
@@ -1036,7 +1041,7 @@ function SubjectActionsInner() {
                       } catch(e:any) { setErr(e?.message || String(e)); }
                     }}
                   >
-                    Start Return
+                    Invest Done
                   </button>
                 );
               })()}
