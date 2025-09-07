@@ -608,11 +608,7 @@ function SubjectActionsInner() {
         toast.show({ kind: 'error', title: 'Invest rejected', description: reason });
         setInlineStatus({ phase: 'rejected', text: `Invest rejected: ${reason}` });
         setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'rejected', reason } : e));
-        // If it's the known repeat-invest gate, set done=1 locally to keep button disabled
-        if (pc === 209 || /Already invested/.test(reason)) {
-          setPair(prev => ({ ...prev, local: { ...(prev.local ?? {}), done: 1 } }));
-          setLocalDone(1);
-        }
+        // No local gating in no-opt-in flow
         return;
       }
       let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
@@ -640,17 +636,14 @@ function SubjectActionsInner() {
         else copy.unshift({ id: Math.random().toString(36).slice(2), ts: Date.now(), status: 'rejected', reason } as ActivityEntry);
         return copy.slice(0, 5);
       });
-      if (pc === 209 || /Already invested/.test(reason)) {
-        setPair(prev => ({ ...prev, local: { ...(prev.local ?? {}), done: 1 } }));
-        setLocalDone(1);
-      }
+      // No local gating in no-opt-in flow
       setErr(msg);
     } finally {
       setBusy(null);
     }
   }
 
-  const alreadyInvested = localDone === 1;
+  const alreadyInvested = false; // no local gating in no-opt-in flow
   const investDisabled =
     !!busy || !activeAddress || !hasResolvedAppId ||
     alreadyInvested ||
@@ -925,15 +918,7 @@ function SubjectActionsInner() {
         <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>
           Load globals
         </button>
-        <button className="text-xs underline" onClick={doOptIn} disabled={!!busy || !activeAddress || !hasResolvedAppId}>
-          {busy === "optin" ? "Opting in…" : "Opt-In"}
-        </button>
-        <button className="text-xs underline" onClick={checkFunds} disabled={!!busy || !hasResolvedAppId || funds.checking}>
-          {funds.checking ? "Checking…" : "Check funds"}
-        </button>
-        <button className="text-xs underline" onClick={readPairStates} disabled={pair.loading || !hasResolvedAppId}>
-          {pair.loading ? "Reading…" : "Read pair states"}
-        </button>
+        {/* Opt-In not used in no-opt-in flow; hide extra diagnostic buttons */}
       </div>
 
       {/* Inline status */}
@@ -1158,9 +1143,7 @@ function SubjectActionsInner() {
           disabled={investDisabled}>
           {busy==="invest" ? "Investing…" : "Invest"}
         </button>
-        {alreadyInvested ? (
-          <span className="text-xs text-amber-600">Already invested (done == 1).</span>
-        ) : (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
+        {(typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
           <span className="text-xs text-amber-600">App balance low; needs {'>'}= 0.20 ALGO</span>
         )}
       </div>
@@ -1181,7 +1164,7 @@ function SubjectActionsInner() {
         <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '-'} microAlgos (m x s, m=3)</div>
         <div className="text-xs text-neutral-700">Constants: UNIT={unit}, E1={E.toLocaleString()}, E2={E2.toLocaleString()}</div>
         {!s1Valid && (
-          <div className="text-xs text-amber-700">S1 (investor) not found yet. Ensure Invest confirmed and click Read pair states.</div>
+          <div className="text-xs text-amber-700">S1 (investor) not found yet. Ensure Invest confirmed and click Load globals.</div>
         )}
         {s2FromGlobals && activeAddress && (s2FromGlobals !== activeAddress) && (
           <div className="text-xs text-amber-700">Connected wallet is not S2; Return will be rejected by the contract.</div>
@@ -1226,7 +1209,7 @@ function SubjectActionsInner() {
       {/* Quick Demo (single account) */}
       <div className="mt-6 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Quick Demo (single account)</h4>
-        <div className="text-xs text-neutral-700">Runs: [Phase 2 if creator] → Opt-In → Invest → Read Pair States → Return</div>
+        <div className="text-xs text-neutral-700">Runs: [Phase 2 if creator] → Invest → Return</div>
         <div className="flex items-center gap-3 text-sm flex-wrap">
           <label className="flex items-center gap-2">
             <span>s (microAlgos)</span>

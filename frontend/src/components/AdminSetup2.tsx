@@ -388,40 +388,7 @@ export default function AdminSetup2() {
       </div>
       {err && <div className="text-sm text-red-600">{err}</div>}
 
-      {/* Register Subjects Wizard Modal */}
-      {showRegister && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg border shadow p-4 w-[560px] max-w-[96vw] space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="font-semibold">Register Subjects</div>
-              <button className="text-neutral-600" onClick={()=> setShowRegister(false)}>x</button>
-            </div>
-            <div className="text-xs text-neutral-700">Step A: Connect S1 wallet and click “Use connected”. Step B: Connect S2 wallet and click “Use connected”. This does not write on-chain.</div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <label className="flex flex-col">
-                <span>S1 address</span>
-                <div className="flex items-center gap-2">
-                  <input className="border rounded px-2 py-1 flex-1" placeholder="S1 Algorand address" value={s1Temp} onChange={(e)=> setS1Temp(e.target.value.trim())} />
-                  <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS1Temp(activeAddress)}>Use connected</button>
-                </div>
-                {!!s1Temp && !isAddr(s1Temp) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
-              </label>
-              <label className="flex flex-col">
-                <span>S2 address</span>
-                <div className="flex items-center gap-2">
-                  <input className="border rounded px-2 py-1 flex-1" placeholder="S2 Algorand address" value={s2Temp} onChange={(e)=> setS2Temp(e.target.value.trim())} />
-                  <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS2Temp(activeAddress)}>Use connected</button>
-                </div>
-                {!!s2Temp && !isAddr(s2Temp) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
-              </label>
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <button className="text-xs underline" onClick={()=> setShowRegister(false)}>Cancel</button>
-              <button className="text-xs underline" onClick={()=>{ setS1Input(s1Temp); setS2Input(s2Temp); setShowRegister(false); }} disabled={!isAddr(s1Temp) || !isAddr(s2Temp)} title="Capture S1 and S2">Done</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* (Overlay removed; inline capture above) */}
     </div>
   );
 }
