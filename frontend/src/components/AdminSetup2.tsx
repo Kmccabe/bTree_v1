@@ -253,7 +253,6 @@ export default function AdminSetup2() {
             <span>App Address:</span>
             <code className="break-all">{addr}</code>
             <button onClick={() => navigator.clipboard.writeText(addr)} className="text-xs underline" title="Copy to clipboard">Copy</button>
-            <button onClick={() => setShowQr(v => !v)} className="text-xs underline">{showQr ? 'Hide QR' : 'Show QR'}</button>
             <a className="text-xs underline" href={`https://lora.algokit.io/testnet/account/${addr}`} target="_blank" rel="noreferrer">View</a>
           </div>
           {showQr && (
@@ -348,6 +347,7 @@ export default function AdminSetup2() {
           <div style={{ height: 12 }} />
           <div className="text-sm font-semibold">Fund Experiment</div>
           <div className="flex items-center gap-2">
+            <button onClick={() => setShowQr(v => !v)} className="text-xs underline">{showQr ? 'Hide Fund Session' : 'Fund Session'}</button>
             <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check funding</button>
             <div className="text-xs text-neutral-700">Required pool (est): <span className="font-semibold">{nf(required)}</span> microAlgos</div>
             {fund && (
