@@ -7,7 +7,7 @@ import { getParamsNormalized } from "../chain/params";
 import { str, u64 } from "../chain/enc";
 import { resolveAppId, setSelectedAppId, getSelectedAppId, clearSelectedAppId } from "../state/appId";
 import { getAccountBalanceMicroAlgos } from "../chain/balance";
-import { QRCodeCanvas } from "qrcode.react";
+// QR code not used in Subject UI anymore
 
 // ---------------------- Tiny local toast system (no deps) ----------------------
 type ToastKind = "info" | "success" | "error";
@@ -916,26 +916,56 @@ function SubjectActionsInner() {
 
   return (
     <div className="rounded-2xl border p-4 space-y-3" style={{ position: "relative" }}>
+      {/* Activity first */}
+      {activity.length > 0 && (
+        <div className="text-xs text-neutral-700">
+          <div className="font-semibold">Activity</div>
+          <ul className="mt-1">
+            {activity.slice(0, 5).map((e) => {
+              const isReturn = e.op === 'return';
+              const tStr = typeof e.tAmount === 'number' ? e.tAmount.toLocaleString() : undefined;
+              const rStr = typeof e.rAmount === 'number' ? e.rAmount.toLocaleString() : undefined;
+              const remStr = (typeof e.tAmount === 'number' && typeof e.rAmount === 'number') ? Math.max(0, e.tAmount - e.rAmount).toLocaleString() : undefined;
+              return (
+                <li key={e.id} className="mt-1">
+                  <span className="text-neutral-500">{new Date(e.ts).toLocaleTimeString()}</span>
+                  {' '}
+                  {e.status === 'submitted' && (
+                    isReturn ? (
+                      <span>Return submitted…{(rStr && tStr) ? ` (r: ${rStr}, t: ${tStr})` : ''}</span>
+                    ) : (
+                      <span>Invest submitted…</span>
+                    )
+                  )}
+                  {e.status === 'confirmed' && (
+                    isReturn ? (
+                      <span className="text-green-700">Return confirmed in round {e.round}{(rStr && remStr) ? ` - S1 gets ${rStr}, S2 gets ${remStr}` : ''}</span>
+                    ) : (
+                      <span className="text-green-700">Invest confirmed in round {e.round}</span>
+                    )
+                  )}
+                  {e.status === 'rejected' && (
+                    isReturn ? (
+                      <span className="text-red-600">Return rejected{e.reason ? `: ${e.reason}` : ''}</span>
+                    ) : (
+                      <span className="text-red-600">Invest rejected{e.reason ? `: ${e.reason}` : ''}</span>
+                    )
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       <h3 className="text-lg font-semibold">Subject - Invest</h3>
-      {/* Inline phase control (creator convenience) */}
-      <div className="flex items-center gap-2 text-xs text-neutral-700 mb-1">
-        <span>Set phase:</span>
-        <select className="border rounded px-2 py-1" value={phaseSelLocal} onChange={(e)=> setPhaseSelLocal(Number(e.target.value))}>
-          <option value={0}>0 (Registration)</option>
-          <option value={1}>1 (Setup)</option>
-          <option value={2}>2 (Invest)</option>
-          <option value={3}>3 (Return/Done)</option>
-        </select>
-        <button className="text-xs underline" onClick={async ()=>{
-          try { const id = resolveAppId(); await setPhase({ sender: activeAddress!, appId: id, phase: phaseSelLocal, sign: (u)=>signTransactions(u), wait: true }); await loadGlobals(); } catch(e:any){ setErr(e?.message||String(e)); }
-        }} disabled={!!busy || !activeAddress}>Apply</button>
-      </div>
       <div className="flex items-center gap-2 text-xs text-neutral-700">
+        <span>Connect Subject 1:</span>
         {!activeAddress ? (
           <button className="text-xs underline" onClick={handleConnect}>Connect wallet</button>
         ) : (
           <>
-            <span>Connected: <code>{shortAddr(activeAddress)}</code></span>
+            <span><code>{shortAddr(activeAddress)}</code></span>
             <button className="text-xs underline" onClick={handleDisconnect}>Disconnect</button>
           </>
         )}
@@ -994,76 +1024,9 @@ function SubjectActionsInner() {
         </div>
       )}
 
-      {/* Activity log (last 3-5) */}
-      {activity.length > 0 && (
-        <div className="text-xs text-neutral-700">
-          <div className="font-semibold">Activity</div>
-          <ul className="mt-1">
-            {activity.slice(0, 5).map((e) => {
-              const isReturn = e.op === 'return';
-              const tStr = typeof e.tAmount === 'number' ? e.tAmount.toLocaleString() : undefined;
-              const rStr = typeof e.rAmount === 'number' ? e.rAmount.toLocaleString() : undefined;
-              const remStr = (typeof e.tAmount === 'number' && typeof e.rAmount === 'number') ? Math.max(0, e.tAmount - e.rAmount).toLocaleString() : undefined;
-              return (
-                <li key={e.id} className="mt-1">
-                  <span className="text-neutral-500">{new Date(e.ts).toLocaleTimeString()}</span>
-                  {' '}
-                  {e.status === 'submitted' && (
-                    isReturn ? (
-                      <span>Return submitted…{(rStr && tStr) ? ` (r: ${rStr}, t: ${tStr})` : ''}</span>
-                    ) : (
-                      <span>Invest submitted…</span>
-                    )
-                  )}
-                  {e.status === 'confirmed' && (
-                    isReturn ? (
-                      <span className="text-green-700">Return confirmed in round {e.round}{(rStr && remStr) ? ` - S1 gets ${rStr}, S2 gets ${remStr}` : ''}</span>
-                    ) : (
-                      <span className="text-green-700">Invest confirmed in round {e.round}</span>
-                    )
-                  )}
-                  {e.status === 'rejected' && (
-                    isReturn ? (
-                      <span className="text-red-600">Return rejected{e.reason ? `: ${e.reason}` : ''}</span>
-                    ) : (
-                      <span className="text-red-600">Invest rejected{e.reason ? `: ${e.reason}` : ''}</span>
-                    )
-                  )}
-                  {' '}
-                  {(() => {
-                    const links: { label: string; href: string }[] = [];
-                    if (e.appCallTxId) links.push({ label: 'AppCall', href: loraTxUrl(e.appCallTxId) });
-                    if (e.paymentTxId) links.push({ label: 'Payment', href: loraTxUrl(e.paymentTxId) });
-                    if (links.length === 0 && e.txId) links.push({ label: 'View', href: loraTxUrl(e.txId) });
-                    return links.length ? (
-                      <>
-                        {links.map((l, i) => (
-                          <a key={i} href={l.href} target="_blank" rel="noreferrer" className="underline text-blue-700 ml-1">{l.label}</a>
-                        ))}
-                      </>
-                    ) : null;
-                  })()}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      {/* Activity block moved above */}
 
-      {/* App account (always visible when resolvable) */}
-      {appAccountAddr && (
-        <div className="text-xs text-neutral-700">
-          <div className="font-semibold mb-1">App account</div>
-          <div className="flex items-center gap-2">
-            <code className="break-all">{appAccountAddr}</code>
-            <button className="text-xs underline" onClick={() => navigator.clipboard.writeText(appAccountAddr)}>Copy</button>
-            <a className="text-xs underline" href={`https://lora.algokit.io/testnet/account/${appAccountAddr}`} target="_blank" rel="noreferrer">Open in LoRA (TestNet)</a>
-          </div>
-          <div className="mt-2">
-            <QRCodeCanvas value={appAccountAddr} size={128} />
-          </div>
-        </div>
-      )}
+      {/* App account QR/section removed */}
 
       {/* Connected + derived app address */}
       <div className="text-xs text-neutral-600">
@@ -1072,7 +1035,7 @@ function SubjectActionsInner() {
         <span className="ml-2">UNIT: {unit} · E: {E}</span>
       </div>
 
-      {/* Funds status */}
+      {/* Funds status (QR removed) */}
       {(typeof funds.balance === 'number' || funds.error) && (
         <div className="text-xs text-neutral-700">
           {typeof funds.balance === 'number' ? (
@@ -1089,17 +1052,7 @@ function SubjectActionsInner() {
                       App underfunded. Needs {'>'}= {tVal.toLocaleString()} microAlgos before Subject 2 can return. Use the QR below to fund.
                     </div>
                   )}
-                  {((!ok) || needsFunding) && appAddrPreview && (
-                    <div className="mt-1">
-                      <div className="flex items-center gap-2">
-                        <code className="break-all">{appAddrPreview}</code>
-                        <button className="text-xs underline" onClick={() => navigator.clipboard.writeText(appAddrPreview)}>Copy</button>
-                      </div>
-                      <div className="mt-2">
-                        <QRCodeCanvas value={appAddrPreview} size={128} />
-                      </div>
-                    </div>
-                  )}
+                  {/* QR and address block removed for simplicity */}
                 </div>
               );
             })()
@@ -1109,65 +1062,7 @@ function SubjectActionsInner() {
         </div>
       )}
 
-      {/* Pair state panel */}
-      {(pair.globals || pair.local || pair.error) && (
-        <div className="text-xs text-neutral-700">
-          <div className="font-semibold mb-1 flex items-center gap-2">
-            <span>Pair state</span>
-            <button className="text-xs underline" onClick={refreshLocal} disabled={localLoading || !hasResolvedAppId}>
-              {localLoading ? 'Refreshing…' : 'Refresh local'}
-            </button>
-          </div>
-          {pair.error && <div className="text-red-600">{pair.error}</div>}
-          {pair.globals && (
-            <div className="mb-1">
-              Globals: {" "}
-              <span>
-                {(() => {
-                  const g = pair.globals as any;
-                  const parts: string[] = [];
-                  if (g?.E != null) parts.push(`E: ${g.E}`);
-                  if (g?.m != null) parts.push(`m: ${g.m}`);
-                  if (g?.UNIT != null) parts.push(`UNIT: ${g.UNIT}`);
-                  if (g?.phase != null) parts.push(`phase: ${g.phase}`);
-                  return parts.length ? parts.join(" · ") : JSON.stringify(g);
-                })()}
-              </span>
-            </div>
-          )}
-          {(creatorAddr || (pair.globals as any)?.creator) && (
-            <div className="mb-1">
-              Experimenter: <code className="break-all">{(pair.globals as any)?.creator || creatorAddr}</code>
-              {((pair.globals as any)?.creator || creatorAddr) && (
-                <button className="text-xs underline ml-2" onClick={() => navigator.clipboard.writeText(((pair.globals as any)?.creator || creatorAddr) as string)}>Copy</button>
-              )}
-            </div>
-          )}
-          {pair.local && (
-            <div>
-              Local (subject): s = {pair.local.s ?? 0}, done = {pair.local.done ?? 0}
-            </div>
-          )}
-          <div className="mt-1">
-            {(() => {
-              const g:any = pair.globals as any;
-              const tVal = g && typeof g.t === 'number' ? Number(g.t) : 0;
-              // Display investor address derived from globals.s1 (bytes b64)
-              const s1 = s1FromGlobals;
-              return (
-                <div className="space-y-1">
-                  <div>Available for Subject 2: {tVal > 0 ? tVal.toLocaleString() : '-'} microAlgos (3 x s)</div>
-                  {s1 && (
-                    <div>
-                      S1 (investor): <code className="break-all">{s1}</code>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
+      {/* Pair state / Globals panel removed */}
 
       {/* s input + invest */}
       <div className="flex items-center gap-2 text-sm">
