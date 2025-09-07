@@ -967,16 +967,6 @@ function SubjectActionsInner() {
             })}
           </ul>
         </div>
-        {returnStatus?.phase === 'confirmed' && (
-          <div className="mt-2">
-            <button
-              className="rounded px-2 py-1 border"
-              onClick={async ()=>{ try { await handleDisconnect(); } catch {} }}
-            >
-              Return Done
-            </button>
-          </div>
-        )}
       )}
 
       <h3 className="text-lg font-semibold">Subject 1's Decision</h3>
@@ -1162,6 +1152,16 @@ function SubjectActionsInner() {
             {busy === 'return' ? 'Returning…' : 'Return'}
           </button>
         </div>
+        {(returnStatus?.phase === 'submitted' || returnStatus?.phase === 'confirmed') && (
+          <div className="mt-2">
+            <button
+              className="rounded px-2 py-1 border"
+              onClick={async () => { try { await handleDisconnect(); } catch {} }}
+            >
+              Return Done
+            </button>
+          </div>
+        )}
         {/* Hide verbose blockers; keep UI simple */}
         {globalsTVal <= 0 && <div className="text-xs text-amber-700">Nothing available to return (t == 0).</div>}
         {(!rValid && globalsTVal > 0) && <div className="text-xs text-amber-700">Enter r between 0 and {globalsTVal}.</div>}
