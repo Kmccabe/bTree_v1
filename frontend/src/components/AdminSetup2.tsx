@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import algosdk from "algosdk";
 import { useWallet } from "@txnlab/use-wallet";
 import { deployTrustGame } from "../deploy";
@@ -9,7 +9,7 @@ import { QRCodeCanvas } from "qrcode.react";
 const nf = (n: number) => Intl.NumberFormat().format(n);
 
 export default function AdminSetup2() {
-  const { activeAddress, signTransactions } = useWallet();
+  const { activeAddress, signTransactions, providers, clients } = useWallet();
 
   // Deploy inputs
   const [E1, setE1] = useState<number>(100_000);
@@ -80,6 +80,22 @@ export default function AdminSetup2() {
   const isAddr = (a: string) => {
     try { return !!a && (algosdk as any).isValidAddress?.(a) === true; } catch { return false; }
   };
+
+  // Simple experimenter connect / disconnect (Pera)
+  const connectExperimenter = useCallback(async () => {
+    try {
+      const p = providers?.find(p => p.metadata.id === (window as any).PROVIDER_ID?.PERA || 'pera');
+      const pera = providers?.find(p => p.metadata.id === 'pera');
+      const target = p || pera || providers?.[0];
+      if (!target) return;
+      await target.connect();
+      if (!target.isActive) target.setActiveProvider();
+    } catch {}
+  }, [providers]);
+  const disconnectExperimenter = useCallback(async () => {
+    try { await providers?.[0]?.disconnect(); } catch {}
+    try { await clients?.pera?.disconnect?.(); } catch {}
+  }, [providers, clients]);
 
   // helper to sanitize numeric text and update string+number states
   function handleNumInput(raw: string, setStr: (s: string) => void, setNum: (n: number) => void) {
@@ -361,7 +377,7 @@ export default function AdminSetup2() {
                 </div>
                 <div style={{ height: 12 }} />
                 <div className="text-sm font-semibold">Start Experiment</div>
-                <div className="mt-2">
+                <div className="mt-2 flex items-center gap-3">
                   {(() => {
                     const capturedOk = isAddr(s1Input) && isAddr(s2Input);
                     const fundedOk = !!fund?.ok;
@@ -397,8 +413,10 @@ export default function AdminSetup2() {
                       </button>
                     );
                   })()}
+                  <button className="text-xs underline" onClick={onLoadHistory} disabled={!!busy}>View history</button>
                 </div>
                 <div style={{ height: 12 }} />
+                <div className="text-sm font-semibold">Process Experiment</div>
               </>
             )}
           </div>
@@ -410,38 +428,54 @@ export default function AdminSetup2() {
         </div>
       )}
 
-      {/* Phase controls */}
-      <div className="flex items-center gap-2 text-sm">
-        <span>Set phase:</span>
-        <select className="border rounded px-2 py-1" value={phaseSel} onChange={(e)=> setPhaseSel(Number(e.target.value))}>
-          <option value={0}>0 (Registration)</option>
-          <option value={1}>1 (Setup)</option>
-          <option value={2}>2 (Invest)</option>
-          <option value={3}>3 (Return/Done)</option>
-        </select>
-        <button className="text-xs underline" onClick={()=>onApplyPhase(phaseSel)} disabled={!!busy || !activeAddress}>Apply</button>
-        <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy}>Read pair state</button>
-        {Number.isFinite(currentPhase as any) && (
-          <span className="text-xs text-neutral-600">Current phase: <code>{currentPhase}</code></span>
-        )}
-        {/* Hard-gate Sweep until phase === 3 and experimenter wallet is connected */}
-        <button
-          className="text-xs underline"
-          onClick={onSweep}
-          disabled={!!busy || !activeAddress || currentPhase !== 3 || !isCreator}
-          title={currentPhase !== 3 ? 'Enabled only in Done (3)' : (!isCreator ? 'Experimenter only' : '')}
-        >
-          Sweep
-        </button>
-        <button className="text-xs underline" onClick={onLoadHistory} disabled={!!busy}>View history</button>
-        <button
-          className="text-xs underline text-red-700"
-          onClick={onDelete}
-          disabled={!!busy || !activeAddress || currentPhase !== 3}
-          title={currentPhase === 3 ? 'Delete application (experimenter only). Sweep first to reclaim liquid.' : 'Enabled only in Done (3). Use Sweep first, then Delete.'}
-        >
-          Delete app
-        </button>
+      {/* End Experiment */}
+      <div className="mt-4 rounded-xl border p-3 space-y-2">
+        <div className="text-sm font-semibold">End Experiment</div>
+        <div className="flex items-center gap-2 text-xs text-neutral-700">
+          <span>Connect Experimenter:</span>
+          {!activeAddress ? (
+            <button className="text-xs underline" onClick={connectExperimenter}>Connect</button>
+          ) : (
+            <>
+              <code className="break-all">{activeAddress}</code>
+              <button className="text-xs underline" onClick={disconnectExperimenter}>Disconnect</button>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            className="rounded px-3 py-2 border"
+            onClick={async ()=>{
+              setErr(null);
+              try {
+                const id = resolveAppId();
+                if (!isCreator) throw new Error('Experimenter only');
+                await setPhase({ sender: activeAddress!, appId: id, phase: 3, sign: signer, wait: true });
+                setCurrentPhase(3);
+              } catch(e:any){ setErr(e?.message||String(e)); }
+            }}
+            disabled={!activeAddress || !isCreator}
+            title={!activeAddress ? 'Connect experimenter wallet' : (!isCreator ? 'Experimenter only' : '')}
+          >
+            Finish Experiment
+          </button>
+          <button
+            className="text-xs underline"
+            onClick={onSweep}
+            disabled={!!busy || !activeAddress || currentPhase !== 3 || !isCreator}
+            title={currentPhase !== 3 ? 'Enabled only in Done (3)' : (!isCreator ? 'Experimenter only' : '')}
+          >
+            Sweep
+          </button>
+          <button
+            className="text-xs underline text-red-700"
+            onClick={onDelete}
+            disabled={!!busy || !activeAddress || currentPhase !== 3 || !isCreator}
+            title={currentPhase === 3 ? 'Delete application (experimenter only). Sweep first to reclaim liquid.' : 'Enabled only in Done (3). Use Sweep first, then Delete.'}
+          >
+            Delete app
+          </button>
+        </div>
       </div>
 
       {/* History viewer */}
@@ -487,47 +521,7 @@ export default function AdminSetup2() {
         </div>
       )}
 
-      <div className="text-xs text-neutral-600">
-        Deploy sets globals E1, E2, m, UNIT and phase = 0 (Registration). Use Set phase to advance to 1 (Invest), then 2 (Return), then 3 (Done).
-        Funding guide:
-        
-        
-        - Before Invest: app liquid ≥ (E1 − s) to refund S1’s leftover endowment.
-        - Before Return: app liquid ≥ (t + E2) where t = m × s.
-        - App must always keep ≥ 0.1 ALGO minimum; Sweep transfers only liquid = balance − min.
-      </div>
-
-      {lastTx && (
-        <div className="text-xs">Last tx: <code>{lastTx.id}</code>{lastTx.round ? ` (round ${lastTx.round})` : ``}</div>
-      )}
-
-      {/* (Removed duplicate Step 2 button block; form is always visible above) */}
-
-      {/* Step 3 — Add Subjects to Experiment (experimenter-only on-chain, duplicate block) */}
-      <div className="rounded-xl border p-3 space-y-2">
-        <div className="h-4" />
-        {/* label removed per request; keep a blank line */}
-        <div className="flex items-center gap-2">
-          <button className="text-xs underline"
-            onClick={async ()=>{
-              setErr(null);
-              try {
-                const id = resolveAppId();
-                if (!isCreator) throw new Error('Connect the experimenter wallet');
-                if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Capture S1 and S2 first');
-                const r = await setPair({ sender: activeAddress!, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
-                setLastTx({ id: r.txId, round: r.confirmedRound });
-              } catch (e: any) { setErr(e?.message || String(e)); }
-            }}
-            disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
-            title={!isCreator ? 'Experimenter only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
-          >Add Subjects to Experiment</button>
-        </div>
-        <div className="h-4" />
-      </div>
       {err && <div className="text-sm text-red-600">{err}</div>}
-
-      {/* (Overlay removed; inline capture above) */}
     </div>
   );
 }
