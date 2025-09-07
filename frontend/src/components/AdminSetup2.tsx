@@ -74,6 +74,7 @@ export default function AdminSetup2() {
   const [showRegister, setShowRegister] = useState<boolean>(true);
   const [s1Temp, setS1Temp] = useState<string>("5LHXG4QJZDSFSX35HOIDG4WEQ43NWIVDTGAKYCUNGJZYNWW4JNBESWYD5U");
   const [s2Temp, setS2Temp] = useState<string>("Z6CHJQ2KVHUPRM2AEDT27XS3CHK4UWFNDBWASXMDJ4CJQB6EYR4CJEE7UU");
+  const [captureDone, setCaptureDone] = useState<boolean>(false);
   // Recruit Subjects (S1/S2)
   const [s1Input, setS1Input] = useState<string>("");
   const [s2Input, setS2Input] = useState<string>("");
@@ -96,6 +97,21 @@ export default function AdminSetup2() {
     try { await providers?.[0]?.disconnect(); } catch {}
     try { await clients?.pera?.disconnect?.(); } catch {}
   }, [providers, clients]);
+
+  // Placeholder: Download CSV (to be implemented next)
+  function onDownloadCsv() {
+    try {
+      const id = (()=>{ try { return resolveAppId(); } catch { return null; } })();
+      const blob = new Blob([`appId,round,event\n${id ?? ''},,`], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `experiment-${id ?? 'session'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+    } catch {}
+  }
 
   // helper to sanitize numeric text and update string+number states
   function handleNumInput(raw: string, setStr: (s: string) => void, setNum: (n: number) => void) {
@@ -278,9 +294,9 @@ export default function AdminSetup2() {
       {/* explicit blank line before Register Subjects */}
       <div style={{ height: 14 }} />
 
-      {/* Step 2 — Register Subjects (always visible; capture only; no on-chain) */}
+      {/* Step 2 — Add Subjects to Experiment (always visible; capture only; no on-chain) */}
       <div className="rounded-xl border p-3 space-y-2" style={{ marginTop: 12 }}>
-        <div className="font-bold">Register Subjects</div>
+        <div className="font-bold">Add Subjects to Experiment</div>
         <div className="mt-2 space-y-2">
           <div className="grid grid-cols-2 gap-3 text-sm">
             <label className="flex flex-col">
@@ -301,8 +317,8 @@ export default function AdminSetup2() {
             </label>
           </div>
           <div className="flex items-center justify-end gap-2">
-            <button className="text-xs underline" onClick={()=>{ setS1Temp(""); setS2Temp(""); }}>Clear</button>
-            <button className="text-xs underline" onClick={()=>{ setS1Input(s1Temp); setS2Input(s2Temp); }} disabled={!isAddr(s1Temp) || !isAddr(s2Temp)} title="Capture S1 and S2">Done</button>
+            <button className="text-xs underline" onClick={()=>{ setS1Temp(""); setS2Temp(""); setCaptureDone(false); }}>Clear</button>
+            <button className="text-xs underline" onClick={()=>{ setS1Input(s1Temp); setS2Input(s2Temp); setCaptureDone(true); }} disabled={captureDone || !isAddr(s1Temp) || !isAddr(s2Temp)} title="Capture S1 and S2">{captureDone ? 'DONE' : 'Done'}</button>
           </div>
           {(s1Input || s2Input) && (
             <div className="text-xs text-neutral-700">
@@ -324,13 +340,15 @@ export default function AdminSetup2() {
                 const id = resolveAppId();
                 if (!isCreator) throw new Error('Connect the experimenter wallet');
                 if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Capture S1 and S2 first');
+                setBusy('addsubjects');
                 const r = await setPair({ sender: activeAddress!, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
                 setLastTx({ id: r.txId, round: r.confirmedRound });
               } catch (e: any) { setErr(e?.message || String(e)); }
+              finally { setBusy(null); }
             }}
-            disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
+            disabled={!!busy || !isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
             title={!isCreator ? 'Experimenter only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
-          >Add Subjects to Experiment</button>
+          >{busy === 'addsubjects' ? 'Adding Subjects' : 'Add Subjects to Experiment'}</button>
         </div>
         <div className="h-4" />
       </div>
@@ -368,7 +386,7 @@ export default function AdminSetup2() {
           <div className="text-sm font-semibold">Fund Experiment</div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowFundQr(v => !v)} className="text-xs underline">{showFundQr ? 'Hide Fund Session' : 'Fund Session'}</button>
-            <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check funding</button>
+            <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check Funding</button>
             <div className="text-xs text-neutral-700">Required pool (est): <span className="font-semibold">{nf(required)}</span> microAlgos</div>
             {fund && (
               <>
@@ -411,11 +429,11 @@ export default function AdminSetup2() {
                           }
                         }}
                       >
-                        START
+                        Start
                       </button>
                     );
                   })()}
-                  <button className="text-xs underline" onClick={onLoadHistory} disabled={!!busy}>View history</button>
+                  <button className="text-xs underline" onClick={onLoadHistory} disabled={!!busy}>View History</button>
                 </div>
                 <div style={{ height: 12 }} />
                 <div className="text-sm font-semibold">Process Experiment</div>
@@ -460,6 +478,7 @@ export default function AdminSetup2() {
           >
             Finish Experiment
           </button>
+          <button className="text-xs underline" onClick={onDownloadCsv} disabled={!addr}>Download</button>
           <button
             className="text-xs underline"
             onClick={onSweep}

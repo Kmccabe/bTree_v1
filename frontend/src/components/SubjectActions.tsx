@@ -1095,6 +1095,7 @@ function SubjectActionsInner() {
                     const id = resolveAppId();
                     if (!isCreatorWallet) {
                       toast.show({ kind: 'error', title: 'Experimenter only', description: 'Connect the experimenter wallet to advance to Return.' });
+                      try { await handleDisconnect(); } catch {}
                       return;
                     }
                     const r = await setPhase({ sender: activeAddress!, appId: id, phase: 3, sign: (u)=>signTransactions(u), wait: true });
