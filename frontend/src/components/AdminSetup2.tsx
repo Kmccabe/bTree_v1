@@ -333,7 +333,14 @@ export default function AdminSetup2() {
           <button className="text-xs underline" onClick={()=>onApplyPhase(1)} disabled={!!busy || !activeAddress}>Phase: 1 (Setup)</button>
           <button className="text-xs underline" onClick={()=>onApplyPhase(2)} disabled={!!busy || !activeAddress}>Phase: 2 (Invest)</button>
           <button className="text-xs underline" onClick={()=>onApplyPhase(3)} disabled={!!busy || !activeAddress}>Phase: 3 (Return/Done)</button>
-          <button className="text-xs underline" onClick={onSweep} disabled={!!busy || !activeAddress}>Sweep</button>
+          <button
+            className="text-xs underline"
+            onClick={onSweep}
+            disabled={!!busy || !activeAddress || currentPhase !== 3 || !isCreator}
+            title={currentPhase !== 3 ? 'Enabled only in Done (3)' : (!isCreator ? 'Experimenter only' : '')}
+          >
+            Sweep
+          </button>
         </div>
       )}
 
@@ -417,8 +424,15 @@ export default function AdminSetup2() {
         {Number.isFinite(currentPhase as any) && (
           <span className="text-xs text-neutral-600">Current phase: <code>{currentPhase}</code></span>
         )}
-        {/* Always show Sweep here so it's available even when appId is set */}
-        <button className="text-xs underline" onClick={onSweep} disabled={!!busy || !activeAddress}>Sweep</button>
+        {/* Hard-gate Sweep until phase === 3 and experimenter wallet is connected */}
+        <button
+          className="text-xs underline"
+          onClick={onSweep}
+          disabled={!!busy || !activeAddress || currentPhase !== 3 || !isCreator}
+          title={currentPhase !== 3 ? 'Enabled only in Done (3)' : (!isCreator ? 'Experimenter only' : '')}
+        >
+          Sweep
+        </button>
         <button className="text-xs underline" onClick={onLoadHistory} disabled={!!busy}>View history</button>
         <button
           className="text-xs underline text-red-700"
