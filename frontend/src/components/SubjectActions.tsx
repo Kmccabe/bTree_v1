@@ -969,7 +969,7 @@ function SubjectActionsInner() {
         </div>
       )}
 
-      <h3 className="text-lg font-semibold">Subject - Invest</h3>
+      <h3 className="text-lg font-semibold">Subject 1's Decision</h3>
       <div className="flex items-center gap-2 text-xs text-neutral-700">
         <span>Connect Subject 1:</span>
         {!activeAddress ? (
@@ -1017,38 +1017,7 @@ function SubjectActionsInner() {
           {inlineStatus.phase === 'rejected' && (
             <span className="text-red-600">{inlineStatus.text}</span>
           )}
-          {inlineStatus.phase === 'confirmed' && (
-            <div className="mt-2">
-              {(() => {
-                const creatorGlobal = (pair.globals as any)?.creator || creatorAddr;
-                const isCreatorWallet = !!activeAddress && !!creatorGlobal && activeAddress === creatorGlobal;
-                const disabled = !!busy || !activeAddress; // allow click for non-creator, show toast
-                const title = !activeAddress ? 'Connect wallet' : '';
-                return (
-                  <button
-                    className="rounded px-2 py-1 border"
-                    disabled={disabled}
-                    title={title}
-                    onClick={async () => {
-                      try {
-                        const id = resolveAppId();
-                        if (!isCreatorWallet) {
-                          toast.show({ kind: 'error', title: 'Experimenter only', description: 'Connect the experimenter wallet to advance to Return.' });
-                          return;
-                        }
-                        const r = await setPhase({ sender: activeAddress!, appId: id, phase: 3, sign: (u)=>signTransactions(u), wait: true });
-                        const actions = r?.txId ? [{ label: 'View on LoRA', href: loraTxUrl(r.txId) }] : undefined;
-                        toast.show({ kind: 'success', title: 'Phase set to 3 (Return)', description: r?.confirmedRound ? `Round ${r.confirmedRound}` : undefined, actions });
-                        await loadGlobals();
-                      } catch(e:any) { setErr(e?.message || String(e)); }
-                    }}
-                  >
-                    Invest Done
-                  </button>
-                );
-              })()}
-            </div>
-          )}
+          {/* No action button here; see dedicated button below Invest line */}
         </div>
       )}
 
@@ -1108,9 +1077,43 @@ function SubjectActionsInner() {
         )}
       </div>
 
+      {/* Invest Done button placed directly below Invest controls */}
+      {inlineStatus?.phase === 'confirmed' && (
+        <div>
+          {(() => {
+            const creatorGlobal = (pair.globals as any)?.creator || creatorAddr;
+            const isCreatorWallet = !!activeAddress && !!creatorGlobal && activeAddress === creatorGlobal;
+            const disabled = !!busy || !activeAddress; // allow click for non-creator, show toast
+            const title = !activeAddress ? 'Connect wallet' : '';
+            return (
+              <button
+                className="rounded px-2 py-1 border"
+                disabled={disabled}
+                title={title}
+                onClick={async () => {
+                  try {
+                    const id = resolveAppId();
+                    if (!isCreatorWallet) {
+                      toast.show({ kind: 'error', title: 'Experimenter only', description: 'Connect the experimenter wallet to advance to Return.' });
+                      return;
+                    }
+                    const r = await setPhase({ sender: activeAddress!, appId: id, phase: 3, sign: (u)=>signTransactions(u), wait: true });
+                    const actions = r?.txId ? [{ label: 'View on LoRA', href: loraTxUrl(r.txId) }] : undefined;
+                    toast.show({ kind: 'success', title: 'Phase set to 3 (Return)', description: r?.confirmedRound ? `Round ${r.confirmedRound}` : undefined, actions });
+                    await loadGlobals();
+                  } catch(e:any) { setErr(e?.message || String(e)); }
+                }}
+              >
+                Invest Done
+              </button>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Subject - Return */}
       <div className="mt-4 rounded-xl border p-3 space-y-2">
-        <h4 className="text-md font-semibold">Subject - Return</h4>
+        <h4 className="text-md font-semibold">Subject 2's Decision</h4>
         <div className="flex items-center gap-2 text-xs text-neutral-700">
           <span>Connect Subject 2:</span>
           {!activeAddress ? (
@@ -1149,10 +1152,7 @@ function SubjectActionsInner() {
             {busy === 'return' ? 'Returning…' : 'Return'}
           </button>
         </div>
-        {returnDisabled && returnBlockers.length > 0 && (
-          <div className="text-xs text-amber-700">Cannot return: {returnBlockers.join(' · ')}</div>
-        )}
-        {globalsRet === 1 && <div className="text-xs text-amber-700">Already returned.</div>}
+        {/* Hide verbose blockers; keep UI simple */}
         {globalsTVal <= 0 && <div className="text-xs text-amber-700">Nothing available to return (t == 0).</div>}
         {(!rValid && globalsTVal > 0) && <div className="text-xs text-amber-700">Enter r between 0 and {globalsTVal}.</div>}
         {underfundedForReturn && <div className="text-xs text-amber-700">Underfunded: needs {'>'}= {(globalsTVal + (E2||0)).toLocaleString()} microAlgos in app.</div>}
