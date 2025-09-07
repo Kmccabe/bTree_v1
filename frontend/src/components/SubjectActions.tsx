@@ -618,10 +618,8 @@ function SubjectActionsInner() {
         toast.show({ kind: 'success', title: 'Invest confirmed', description: `Round ${confirmedRound}`, actions: successActions });
         setInlineStatus({ phase: 'confirmed', text: `Invest confirmed in round ${confirmedRound}`, round: confirmedRound, txId: singleTxId, appCallTxId, paymentTxId });
         setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'confirmed', round: confirmedRound } : e));
-        // Immediately reflect local state so the Invest button disables without manual refresh
-        setPair(prev => ({ ...prev, local: { s, done: 1 } }));
-        setLocalS(s);
-        setLocalDone(1);
+        // Refresh globals so Return panel sees updated t, phase and addresses
+        try { await loadGlobals(); } catch {}
       }
     } catch (e: any) {
       console.error("[SubjectActions] invest failed", e);
@@ -1154,12 +1152,7 @@ function SubjectActionsInner() {
         <div className="flex items-center gap-2 text-xs text-neutral-700">
           <span>App ID:</span>
           <code>{(() => { try { return resolveAppId(); } catch { return '(unset)'; } })()}</code>
-          <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>
-            Load globals
-          </button>
-          <button className="text-xs underline" onClick={doOptIn} disabled={!!busy || !activeAddress || !hasResolvedAppId}>
-            {busy === 'optin' ? 'Opting in…' : 'Opt-In'}
-          </button>
+          <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>Load globals</button>
         </div>
         <div className="text-xs text-neutral-700">Available: {globalsTVal > 0 ? globalsTVal.toLocaleString() : '-'} microAlgos (m x s, m=3)</div>
         <div className="text-xs text-neutral-700">Constants: UNIT={unit}, E1={E.toLocaleString()}, E2={E2.toLocaleString()}</div>
