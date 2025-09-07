@@ -239,13 +239,13 @@ export default function AdminSetup2() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mt-2">
+      <div className="flex items-center gap-3 mt-2" style={{ marginBottom: 12 }}>
         <button disabled={!!busy || !activeAddress} onClick={onDeploy} className="rounded-xl px-3 py-2 border">
           {busy === "deploy" ? "Deploying…" : "Deploy"}
         </button>
         {appId && <div className="text-sm">App ID: <code>{appId}</code>{' '}</div>}
       </div>
-      {appId && (<div className="h-4" />)}
+      {appId && (<div style={{ height: 12 }} />)}
 
       {/* Step 2 — Register Subjects (always visible; capture only; no on-chain) */}
       <div className="mt-4 rounded-xl border p-3 space-y-2">
