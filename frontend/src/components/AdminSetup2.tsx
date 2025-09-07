@@ -205,7 +205,7 @@ export default function AdminSetup2() {
       {/* Step 0 — Set Experimental Parameters */}
       <div className="text-sm font-bold">Set Experimental Parameters</div>
       <div className="text-xs text-neutral-700 mb-1">&nbsp;</div>
-      {/* Deploy controls */
+      {/* Deploy controls */}
       <div className="grid grid-cols-1 gap-3">
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <label className="text-sm">S1 Endowment (e1)</label>
@@ -276,7 +276,7 @@ export default function AdminSetup2() {
         </div>
       </div>
 
-      {/* Step 3 — Finish & Set Pair (creator-only on-chain) */}
+      {/* Step 3 — Finish & Set Pair (experimenter-only on-chain) */}
       <div className="rounded-xl border p-3 space-y-2">
         <div className="font-semibold">Finish & Set Pair</div>
         <div className="text-xs text-neutral-700">Switch back to the experimenter wallet and write S1/S2 on-chain for the selected App ID.</div>
