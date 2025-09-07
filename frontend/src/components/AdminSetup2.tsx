@@ -40,7 +40,8 @@ export default function AdminSetup2() {
 
   // Admin controls
   const [phaseSel, setPhaseSel] = useState<number>(1);
-  const [showQr, setShowQr] = useState<boolean>(false);
+  const [showQr, setShowQr] = useState<boolean>(false); // legacy (no longer used for display)
+  const [showFundQr, setShowFundQr] = useState<boolean>(false);
 
   // Compute conservative funding needed for Return: t + E2, where t = m*s and s ≤ E1
   const required = useMemo(() => (m - 1) * E1 + E2 + 50_000, [m, E1, E2]);
@@ -255,11 +256,7 @@ export default function AdminSetup2() {
             <button onClick={() => navigator.clipboard.writeText(addr)} className="text-xs underline" title="Copy to clipboard">Copy</button>
             <a className="text-xs underline" href={`https://lora.algokit.io/testnet/account/${addr}`} target="_blank" rel="noreferrer">View</a>
           </div>
-          {showQr && (
-            <div className="mt-2">
-              <QRCodeCanvas value={addr} size={128} />
-            </div>
-          )}
+          {/* QR code moved to funding section below */}
         </div>
       )}
       {/* explicit blank line before Register Subjects */}
@@ -347,7 +344,7 @@ export default function AdminSetup2() {
           <div style={{ height: 12 }} />
           <div className="text-sm font-semibold">Fund Experiment</div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowQr(v => !v)} className="text-xs underline">{showQr ? 'Hide Fund Session' : 'Fund Session'}</button>
+            <button onClick={() => setShowFundQr(v => !v)} className="text-xs underline">{showFundQr ? 'Hide Fund Session' : 'Fund Session'}</button>
             <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check funding</button>
             <div className="text-xs text-neutral-700">Required pool (est): <span className="font-semibold">{nf(required)}</span> microAlgos</div>
             {fund && (
@@ -356,6 +353,11 @@ export default function AdminSetup2() {
               </div>
             )}
           </div>
+          {showFundQr && (
+            <div className="mt-2">
+              <QRCodeCanvas value={addr!} size={128} />
+            </div>
+          )}
         </div>
       )}
 
