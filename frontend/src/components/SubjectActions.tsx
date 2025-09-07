@@ -1022,10 +1022,8 @@ function SubjectActionsInner() {
               {(() => {
                 const creatorGlobal = (pair.globals as any)?.creator || creatorAddr;
                 const isCreatorWallet = !!activeAddress && !!creatorGlobal && activeAddress === creatorGlobal;
-                const disabled = !!busy || !activeAddress || !isCreatorWallet;
-                const title = !activeAddress
-                  ? 'Connect wallet'
-                  : (!isCreatorWallet ? 'Experimenter only' : '');
+                const disabled = !!busy || !activeAddress; // allow click for non-creator, show toast
+                const title = !activeAddress ? 'Connect wallet' : '';
                 return (
                   <button
                     className="rounded px-2 py-1 border"
@@ -1034,6 +1032,10 @@ function SubjectActionsInner() {
                     onClick={async () => {
                       try {
                         const id = resolveAppId();
+                        if (!isCreatorWallet) {
+                          toast.show({ kind: 'error', title: 'Experimenter only', description: 'Connect the experimenter wallet to advance to Return.' });
+                          return;
+                        }
                         const r = await setPhase({ sender: activeAddress!, appId: id, phase: 3, sign: (u)=>signTransactions(u), wait: true });
                         const actions = r?.txId ? [{ label: 'View on LoRA', href: loraTxUrl(r.txId) }] : undefined;
                         toast.show({ kind: 'success', title: 'Phase set to 3 (Return)', description: r?.confirmedRound ? `Round ${r.confirmedRound}` : undefined, actions });
