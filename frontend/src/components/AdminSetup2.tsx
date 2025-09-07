@@ -275,16 +275,16 @@ export default function AdminSetup2() {
           </div>
           {(s1Input || s2Input) && (
             <div className="text-xs text-neutral-700">
-              Captured — S1: <code>{s1Input || '(not set)'}</code> · S2: <code>{s2Input || '(not set)'}</code>
+              Added — S1: <code>{s1Input || '(not set)'}</code> · S2: <code>{s2Input || '(not set)'}</code>
             </div>
           )}
         </div>
       </div>
 
-      {/* Step 3 — Finish & Set Pair (experimenter-only on-chain) */}
+      {/* Step 3 — Add Subjects to Experiment (experimenter-only on-chain) */}
       <div className="rounded-xl border p-3 space-y-2">
-        <div className="font-semibold">Finish & Set Pair</div>
-        {/* Removed instructional line to reduce clutter */}
+        <div className="h-4" />
+        {/* label removed per request; keep a blank line */}
         <div className="flex items-center gap-2">
           <button className="text-xs underline"
             onClick={async ()=>{
@@ -299,8 +299,9 @@ export default function AdminSetup2() {
             }}
             disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
             title={!isCreator ? 'Experimenter only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
-          >Finish & Set Pair</button>
+          >Add Subjects to Experiment</button>
         </div>
+        <div className="h-4" />
       </div>
 
       {/* Manage existing pair */}
@@ -432,10 +433,10 @@ export default function AdminSetup2() {
 
       {/* (Removed duplicate Step 2 button block; form is always visible above) */}
 
-      {/* Step 3 — Finalize Subjects (experimenter-only on-chain) */}
+      {/* Step 3 — Add Subjects to Experiment (experimenter-only on-chain, duplicate block) */}
       <div className="rounded-xl border p-3 space-y-2">
-        <div className="font-semibold">Finish & Set Pair</div>
-        {/* Removed instructional line to reduce clutter */}
+        <div className="h-4" />
+        {/* label removed per request; keep a blank line */}
         <div className="flex items-center gap-2">
           <button className="text-xs underline"
             onClick={async ()=>{
@@ -450,8 +451,9 @@ export default function AdminSetup2() {
             }}
             disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
             title={!isCreator ? 'Experimenter only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
-          >Finish & Set Pair</button>
+          >Add Subjects to Experiment</button>
         </div>
+        <div className="h-4" />
       </div>
       {err && <div className="text-sm text-red-600">{err}</div>}
 
