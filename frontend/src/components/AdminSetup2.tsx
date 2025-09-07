@@ -40,6 +40,14 @@ export default function AdminSetup2() {
   const signer = (u: Uint8Array[]) => signTransactions(u);
   const [currentPhase, setCurrentPhase] = useState<number | null>(null);
   const [history, setHistory] = useState<null | { loading: boolean; error?: string; items?: Array<{ round: number; time: number; txid: string; sender: string; event: string; details?: any; innerPayments?: Array<{ to: string; amount: number }> }> }>(null);
+  // Creator/session guidance
+  const creatorEnv = (import.meta as any)?.env?.VITE_CREATOR_ADDRESS as string | undefined;
+  const isCreator = !!activeAddress && !!creatorEnv && activeAddress === creatorEnv;
+  const [sessionStarted, setSessionStarted] = useState<boolean>(false);
+  // Register Subjects modal
+  const [showRegister, setShowRegister] = useState<boolean>(false);
+  const [s1Temp, setS1Temp] = useState<string>("");
+  const [s2Temp, setS2Temp] = useState<string>("");
   // Recruit Subjects (S1/S2)
   const [s1Input, setS1Input] = useState<string>("");
   const [s2Input, setS2Input] = useState<string>("");
@@ -60,14 +68,7 @@ export default function AdminSetup2() {
       setAddr(r.appAddress);
       setSelectedAppId(r.appId);
       setFund(null);
-      // If S1/S2 captured, setPair immediately
-      try {
-        if (isAddr(s1Input) && isAddr(s2Input)) {
-          await setPair({ sender: activeAddress, appId: r.appId, s1: s1Input, s2: s2Input, sign: signer, wait: true });
-        }
-      } catch (e: any) {
-        setErr(`Deploy ok, setPair failed: ${e?.message || e}`);
-      }
+      // Explicit: do not auto-setPair; use Finish & Set Pair button so flow is obvious
     } catch (e: any) {
       setErr(e?.message || String(e));
     } finally { setBusy(null); }
@@ -166,40 +167,57 @@ export default function AdminSetup2() {
     <div className="rounded-2xl border p-4 space-y-4">
       <h3 className="text-lg font-semibold">Admin - Deploy & Manage Pair</h3>
 
-      {/* Recruit Subjects (creator-only pre-deploy) */}
-      <div className="rounded-xl border p-3 space-y-2">
-        <div className="font-semibold">Recruit Subjects</div>
-        <div className="text-xs text-neutral-700">Capture S1/S2 addresses (no opt-in). You can paste addresses or use the connected wallet.</div>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <label className="flex flex-col">
-            <span>S1 address</span>
-            <div className="flex items-center gap-2">
-              <input className="border rounded px-2 py-1 flex-1" placeholder="S1 Algorand address" value={s1Input} onChange={(e)=> setS1Input(e.target.value.trim())} />
-              <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS1Input(activeAddress)}>Use connected</button>
-            </div>
-            {!!s1Input && !isAddr(s1Input) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
-          </label>
-          <label className="flex flex-col">
-            <span>S2 address</span>
-            <div className="flex items-center gap-2">
-              <input className="border rounded px-2 py-1 flex-1" placeholder="S2 Algorand address" value={s2Input} onChange={(e)=> setS2Input(e.target.value.trim())} />
-              <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS2Input(activeAddress)}>Use connected</button>
-            </div>
-            {!!s2Input && !isAddr(s2Input) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
-          </label>
+      {/* Step 1 — Creator Sign-In */}
+      <div className="rounded-xl border p-3 flex items-center justify-between">
+        <div className="text-sm">
+          <div className="font-semibold">Start Session (Creator)</div>
+          <div className="text-xs text-neutral-700">Connect the creator wallet to enable admin actions.</div>
+          <div className="text-xs mt-1">Creator env: <code>{creatorEnv || '(unset)'}</code></div>
+          <div className="text-xs">Connected: <code>{activeAddress || '(none)'}</code></div>
         </div>
-        <div className="text-xs text-neutral-700">You can replace S1/S2 before deploy. After deploy, call Set Pair (or it will be set automatically).</div>
+        <button
+          className={`text-xs underline ${(!isCreator ? 'opacity-50 cursor-not-allowed' : '')}`}
+          onClick={()=> isCreator && setSessionStarted(true)}
+          disabled={!isCreator}
+          title={!creatorEnv ? 'Set VITE_CREATOR_ADDRESS' : (!activeAddress ? 'Connect wallet' : (!isCreator ? 'Connect the creator wallet' : ''))}
+        >
+          {sessionStarted ? 'Session started' : 'Start Session'}
+        </button>
+      </div>
+
+      {/* Step 2 — Register Subjects (capture only) */}
+      <div className="rounded-xl border p-3 space-y-2">
+        <div className="font-semibold">Register Subjects</div>
+        <div className="text-xs text-neutral-700">Capture S1 and S2 by connecting each wallet and clicking “Use connected”. No on-chain action yet.</div>
         <div className="flex items-center gap-2">
-          <button className="text-xs underline" onClick={async ()=>{
-            setErr(null);
-            try {
-              const id = resolveAppId();
-              if (!activeAddress) throw new Error('Connect creator wallet');
-              if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Enter valid S1/S2 addresses');
-              const r = await setPair({ sender: activeAddress, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
-              setLastTx({ id: r.txId, round: r.confirmedRound });
-            } catch (e: any) { setErr(e?.message || String(e)); }
-          }} disabled={!activeAddress || !isAddr(s1Input) || !isAddr(s2Input)} title="Set S1/S2 on selected App ID">Set Pair (existing App)</button>
+          <button
+            className={`text-xs underline ${(!sessionStarted ? 'opacity-50 cursor-not-allowed' : '')}`}
+            onClick={()=> sessionStarted && setShowRegister(true)}
+            disabled={!sessionStarted}
+          >Open wizard</button>
+          <div className="text-xs text-neutral-700">S1: <code>{s1Input || '(not set)'}</code> · S2: <code>{s2Input || '(not set)'}</code></div>
+        </div>
+      </div>
+
+      {/* Step 3 — Finalize Subjects (creator-only on-chain) */}
+      <div className="rounded-xl border p-3 space-y-2">
+        <div className="font-semibold">Finish & Set Pair</div>
+        <div className="text-xs text-neutral-700">Switch back to the creator wallet and set S1/S2 on-chain for the selected App ID.</div>
+        <div className="flex items-center gap-2">
+          <button className="text-xs underline"
+            onClick={async ()=>{
+              setErr(null);
+              try {
+                const id = resolveAppId();
+                if (!isCreator) throw new Error('Connect the creator wallet');
+                if (!isAddr(s1Input) || !isAddr(s2Input)) throw new Error('Capture S1 and S2 first');
+                const r = await setPair({ sender: activeAddress!, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
+                setLastTx({ id: r.txId, round: r.confirmedRound });
+              } catch (e: any) { setErr(e?.message || String(e)); }
+            }}
+            disabled={!isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
+            title={!isCreator ? 'Creator only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
+          >Finish & Set Pair</button>
         </div>
       </div>
 
@@ -242,10 +260,10 @@ export default function AdminSetup2() {
             onChange={(e)=>{ setManualAppId(e.target.value); const n = Number(e.target.value); if (Number.isFinite(n) && n > 0) setSelectedAppId(n); }}
             className="border rounded px-2 py-1 w-40" placeholder="e.g., 745000000" />
           <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy || !manualAppId}>Read pair state</button>
-          <button className="text-xs underline" onClick={()=>onApplyPhase(0)} disabled={!!busy || !activeAddress}>Phase: Registration(0)</button>
-          <button className="text-xs underline" onClick={()=>onApplyPhase(1)} disabled={!!busy || !activeAddress}>Phase: Invest(1)</button>
-          <button className="text-xs underline" onClick={()=>onApplyPhase(2)} disabled={!!busy || !activeAddress}>Phase: Return(2)</button>
-          <button className="text-xs underline" onClick={()=>onApplyPhase(3)} disabled={!!busy || !activeAddress}>Phase: Done(3)</button>
+          <button className="text-xs underline" onClick={()=>onApplyPhase(0)} disabled={!!busy || !activeAddress}>Phase: 0 (Registration)</button>
+          <button className="text-xs underline" onClick={()=>onApplyPhase(1)} disabled={!!busy || !activeAddress}>Phase: 1 (Setup)</button>
+          <button className="text-xs underline" onClick={()=>onApplyPhase(2)} disabled={!!busy || !activeAddress}>Phase: 2 (Invest)</button>
+          <button className="text-xs underline" onClick={()=>onApplyPhase(3)} disabled={!!busy || !activeAddress}>Phase: 3 (Return/Done)</button>
           <button className="text-xs underline" onClick={onSweep} disabled={!!busy || !activeAddress}>Sweep</button>
         </div>
       )}
@@ -282,9 +300,9 @@ export default function AdminSetup2() {
         <span>Set phase:</span>
         <select className="border rounded px-2 py-1" value={phaseSel} onChange={(e)=> setPhaseSel(Number(e.target.value))}>
           <option value={0}>0 (Registration)</option>
-          <option value={1}>1 (Invest)</option>
-          <option value={2}>2 (Return)</option>
-          <option value={3}>3 (Done)</option>
+          <option value={1}>1 (Setup)</option>
+          <option value={2}>2 (Invest)</option>
+          <option value={3}>3 (Return/Done)</option>
         </select>
         <button className="text-xs underline" onClick={()=>onApplyPhase(phaseSel)} disabled={!!busy || !activeAddress}>Apply</button>
         <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy}>Read pair state</button>
@@ -361,6 +379,41 @@ export default function AdminSetup2() {
         <div className="text-xs">Last tx: <code>{lastTx.id}</code>{lastTx.round ? ` (round ${lastTx.round})` : ``}</div>
       )}
       {err && <div className="text-sm text-red-600">{err}</div>}
+
+      {/* Register Subjects Wizard Modal */}
+      {showRegister && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg border shadow p-4 w-[560px] max-w-[96vw] space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="font-semibold">Register Subjects</div>
+              <button className="text-neutral-600" onClick={()=> setShowRegister(false)}>x</button>
+            </div>
+            <div className="text-xs text-neutral-700">Step A: Connect S1 wallet and click “Use connected”. Step B: Connect S2 wallet and click “Use connected”. This does not write on-chain.</div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <label className="flex flex-col">
+                <span>S1 address</span>
+                <div className="flex items-center gap-2">
+                  <input className="border rounded px-2 py-1 flex-1" placeholder="S1 Algorand address" value={s1Temp} onChange={(e)=> setS1Temp(e.target.value.trim())} />
+                  <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS1Temp(activeAddress)}>Use connected</button>
+                </div>
+                {!!s1Temp && !isAddr(s1Temp) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
+              </label>
+              <label className="flex flex-col">
+                <span>S2 address</span>
+                <div className="flex items-center gap-2">
+                  <input className="border rounded px-2 py-1 flex-1" placeholder="S2 Algorand address" value={s2Temp} onChange={(e)=> setS2Temp(e.target.value.trim())} />
+                  <button type="button" className="text-xs underline" onClick={()=> activeAddress && setS2Temp(activeAddress)}>Use connected</button>
+                </div>
+                {!!s2Temp && !isAddr(s2Temp) && (<span className="text-[11px] text-red-600">Invalid address</span>)}
+              </label>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button className="text-xs underline" onClick={()=> setShowRegister(false)}>Cancel</button>
+              <button className="text-xs underline" onClick={()=>{ setS1Input(s1Temp); setS2Input(s2Temp); setShowRegister(false); }} disabled={!isAddr(s1Temp) || !isAddr(s2Temp)} title="Capture S1 and S2">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
