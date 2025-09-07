@@ -597,8 +597,7 @@ function SubjectActionsInner() {
       const id = resolveAppId();
       console.info("[appId] resolved =", id);
       console.debug("[SubjectActions] invest submit", { sender: activeAddress, appId: id, s });
-      // Toast: submitted (pending)
-      toast.show({ kind: 'info', title: 'Invest submitted', description: 'Pending confirmation…' });
+      // Toasts removed for cleaner subject UX
 
       const r: any = await investFlow({
         sender: activeAddress,
@@ -622,8 +621,7 @@ function SubjectActionsInner() {
         if (arr.length === 0 && singleTxId) arr.push({ label: 'View on LoRA', href: loraTxUrl(singleTxId) });
         return arr;
       })();
-      // Toast: submitted with links
-      toast.show({ kind: 'info', title: 'Invest submitted', description: 'Awaiting on-chain confirmation…', actions });
+      // Toasts removed
 
       // Now wait for confirmation ourselves so we can toast success.
       const pendR = await fetch(`/api/pending?txid=${encodeURIComponent(singleTxId)}`);
@@ -631,7 +629,7 @@ function SubjectActionsInner() {
       console.info('[SubjectActions] /api/pending', pendR.status, pendText);
       if (!pendR.ok) {
         const { reason, pc } = parseLogicError(pendText);
-        toast.show({ kind: 'error', title: 'Invest rejected', description: reason });
+        // no toast
         setInlineStatus({ phase: 'rejected', text: `Invest rejected: ${reason}` });
         setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'rejected', reason } : e));
         // No local gating in no-opt-in flow
@@ -641,12 +639,12 @@ function SubjectActionsInner() {
       const confirmedRound: number | undefined = pend?.["confirmed-round"] ?? pend?.confirmedRound;
       const successActions = actions.length ? actions : (singleTxId ? [{ label: 'View on LoRA', href: loraTxUrl(singleTxId) }] : []);
       if (confirmedRound && Number.isFinite(confirmedRound)) {
-        toast.show({ kind: 'success', title: 'Invest confirmed', description: `Round ${confirmedRound}`, actions: successActions });
+        // no toast
         setInlineStatus({ phase: 'confirmed', text: `Invest confirmed in round ${confirmedRound}`, round: confirmedRound, txId: singleTxId, appCallTxId, paymentTxId });
         setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'confirmed', round: confirmedRound } : e));
       } else {
         // Fallback: pending endpoint returned 200 but no round; still mark as confirmed for UX
-        toast.show({ kind: 'success', title: 'Invest confirmed', actions: successActions });
+        // no toast
         setInlineStatus({ phase: 'confirmed', text: 'Invest confirmed', txId: singleTxId, appCallTxId, paymentTxId });
         setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'confirmed' } : e));
       }
@@ -656,7 +654,7 @@ function SubjectActionsInner() {
       console.error("[SubjectActions] invest failed", e);
       const msg = e?.message || String(e);
       const { reason, pc } = parseLogicError(msg);
-      toast.show({ kind: 'error', title: 'Invest rejected', description: reason });
+      // no toast
       setInlineStatus({ phase: 'rejected', text: `Invest rejected: ${reason}` });
       setActivity(prev => {
         const copy: ActivityEntry[] = [...prev];
@@ -752,11 +750,11 @@ function SubjectActionsInner() {
     try {
       const id = resolveAppId();
       const { senderResolved } = resolveSender();
-      // Toast + status
+      // Status only (toasts removed)
       setReturnStatus({ phase: 'submitted', text: 'Return submitted… (waiting for confirmation)' });
       const activityId = Math.random().toString(36).slice(2);
       setActivity(prev => [{ id: activityId, ts: Date.now(), status: 'submitted' as const, op: 'return', rAmount: r, tAmount: t } as ActivityEntry, ...prev].slice(0, 5));
-      toast.show({ kind: 'info', title: 'Return submitted', description: 'Pending confirmation…' });
+      // no toast
 
       const sp: any = await getParamsNormalized();
       const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
@@ -788,15 +786,14 @@ function SubjectActionsInner() {
       const pendText = await pendR.text();
       if (!pendR.ok) {
         const { reason } = parseLogicError(pendText);
-        toast.show({ kind: 'error', title: 'Return rejected', description: reason });
+        // no toast
         setReturnStatus({ phase: 'rejected', text: `Return rejected: ${reason}` });
         setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'rejected', reason } : e));
         return;
       }
       let pend: any; try { pend = JSON.parse(pendText); } catch { pend = {}; }
       const confirmedRound: number | undefined = pend?.['confirmed-round'] ?? pend?.confirmedRound;
-      // Success
-      toast.show({ kind: 'success', title: 'Return confirmed', description: confirmedRound ? `Round ${confirmedRound}` : undefined, actions: txId ? [{ label: 'View on LoRA', href: loraTxUrl(txId) }] : undefined });
+      // Success (no toast)
       setReturnStatus({ phase: 'confirmed', text: confirmedRound ? `Return confirmed in round ${confirmedRound}` : 'Return confirmed', round: confirmedRound, txId });
       setActivity(prev => prev.map(e => e.id === activityId ? { ...e, status: 'confirmed', round: confirmedRound } : e));
       // reflect ret=1 immediately
@@ -805,7 +802,7 @@ function SubjectActionsInner() {
       console.error('[SubjectActions] return failed', e);
       const msg = e?.message || String(e);
       const { reason } = parseLogicError(msg);
-      toast.show({ kind: 'error', title: 'Return rejected', description: reason });
+      // no toast
       setReturnStatus({ phase: 'rejected', text: `Return rejected: ${reason}` });
       setErr(msg);
     } finally {
@@ -1178,11 +1175,10 @@ function SubjectActionsInner() {
 
       {/* Removed TxID line for a cleaner UI */}
       {err && <div className="text-sm text-red-600">{err}</div>}
-      <p className="text-xs text-neutral-500">
-        Invest: phase 1 or 0 (when both subjects set), 2-txn group, s multiple of UNIT, 0 {'<='} s {'<='} E1. Return: phase 2, r multiple of UNIT, balance {'>='} t + E2.
-      </p>
+      {/* Guidance line removed for cleaner UI */}
 
-      {/* Quick Demo (single account) */}
+      {/* Quick Demo removed */}
+      {false && (
       <div className="mt-6 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Quick Demo (single account)</h4>
         <div className="text-xs text-neutral-700">Runs: [Phase 2 if experimenter] → Invest → Return</div>
@@ -1214,8 +1210,9 @@ function SubjectActionsInner() {
           </div>
         )}
       </div>
+      )}
 
-      <ToastHost />
+      {/* Toast host removed from UI */}
     </div>
   );
 }

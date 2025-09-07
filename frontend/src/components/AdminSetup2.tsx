@@ -75,6 +75,7 @@ export default function AdminSetup2() {
   const [s1Temp, setS1Temp] = useState<string>("5LHXG4QJZDSFSX35HOIDG4WEQ43NWIVDTGAKYCUNGJZYNWW4JNBESWYD5U");
   const [s2Temp, setS2Temp] = useState<string>("Z6CHJQ2KVHUPRM2AEDT27XS3CHK4UWFNDBWASXMDJ4CJQB6EYR4CJEE7UU");
   const [captureDone, setCaptureDone] = useState<boolean>(false);
+  const [subjectsAdded, setSubjectsAdded] = useState<boolean>(false);
   // Recruit Subjects (S1/S2)
   const [s1Input, setS1Input] = useState<string>("");
   const [s2Input, setS2Input] = useState<string>("");
@@ -343,12 +344,13 @@ export default function AdminSetup2() {
                 setBusy('addsubjects');
                 const r = await setPair({ sender: activeAddress!, appId: id, s1: s1Input, s2: s2Input, sign: signer, wait: true });
                 setLastTx({ id: r.txId, round: r.confirmedRound });
+                setSubjectsAdded(true);
               } catch (e: any) { setErr(e?.message || String(e)); }
               finally { setBusy(null); }
             }}
-            disabled={!!busy || !isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
+            disabled={!!busy || subjectsAdded || !isCreator || !isAddr(s1Input) || !isAddr(s2Input)}
             title={!isCreator ? 'Experimenter only' : (!isAddr(s1Input) || !isAddr(s2Input)) ? 'Capture S1/S2 first' : ''}
-          >{busy === 'addsubjects' ? 'Adding Subjects' : 'Add Subjects to Experiment'}</button>
+          >{busy === 'addsubjects' ? 'Adding Subjects' : (subjectsAdded ? 'Subjects Added' : 'Add Subjects to Experiment')}</button>
         </div>
         <div className="h-4" />
       </div>
@@ -386,7 +388,7 @@ export default function AdminSetup2() {
           <div className="text-sm font-semibold">Fund Experiment</div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowFundQr(v => !v)} className="text-xs underline">{showFundQr ? 'Hide Fund Session' : 'Fund Session'}</button>
-            <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check Funding</button>
+            <button onClick={checkFunding} disabled={!!busy} className="text-xs underline">Check Funding to Start</button>
             <div className="text-xs text-neutral-700">Required pool (est): <span className="font-semibold">{nf(required)}</span> microAlgos</div>
             {fund && (
               <>
