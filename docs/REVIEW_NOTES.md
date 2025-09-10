@@ -18,3 +18,6 @@
 
 - docs/README.md
 
+## Done in this step
+
+- Added Index and Glossary to docs/README.md; verified code fence language tags.

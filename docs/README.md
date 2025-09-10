@@ -2,6 +2,25 @@
 
 Welcome to the comprehensive documentation for the Trust Game application. This hub provides organized access to all technical documentation, guides, and reference materials.
 
+## Index
+
+- [README](README.md): Documentation hub and navigation.
+- [API Reference](API_REFERENCE.md): Endpoints, request/response shapes, env vars.
+- [Troubleshooting](TROUBLESHOOTING.md): Common issues and practical fixes.
+- [Data Export](DATA_EXPORT.md): CSV schema and export workflow.
+- [Integrity Verification](INTEGRITY.md): On-chain verification and proofs.
+
+## Glossary
+
+- UNIT: Minimum step size in µAlgos (e.g., 100000 = 0.1 ALGO).
+- m: Multiplier applied to s (integer).
+- s: Amount invested by S1 (Phase 1).
+- t: Total available to S2; t = m × s.
+- E1: Investor endowment (multiple of UNIT).
+- E2: Trustee endowment (multiple of UNIT).
+- r: Amount returned by S2 (Phase 2).
+- Phases 0–3: 0 Registration; 1 Invest; 2 Return; 3 Done.
+
 ## 🚀 Quick Start
 
 **New to the project?** Start here:
@@ -138,23 +157,6 @@ npm run dev                 # Terminal 2: React app
 1. Check [Troubleshooting Guide](TROUBLESHOOTING.md)
 2. Use browser developer tools
 3. Verify transactions on [LoRA Explorer](https://lora.algokit.io/testnet)
-
-## 📘 Glossary
-
-- S1: Investor (first mover).
-- S2: Trustee (second mover).
-- E1: Investor endowment (µAlgos, multiple of `UNIT`).
-- E2: Trustee endowment (µAlgos, multiple of `UNIT`).
-- UNIT: Minimum step size in µAlgos (e.g., 100000 = 0.1 ALGO).
-- m: Multiplier applied to `s` (integer, e.g., 3).
-- s: Amount invested by S1 in Phase 1.
-- t: Total available to S2 after invest, `t = m × s`.
-- r: Amount returned by S2 in Phase 2.
-- Phases:
-  - 0 Registration: Wallets opt-in and register.
-  - 1 Invest: S1 chooses `s`; contract refunds `E1 − s` to S1.
-  - 2 Return: S2 chooses `r`; contract pays `r` → S1 and `(t − r + E2)` → S2.
-  - 3 Done: Read-only; optional sweep and export.
 
 ## 📞 Support & Contributing
 
