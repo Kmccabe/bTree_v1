@@ -36,3 +36,17 @@
 Actions taken:
 - No term replacements required within docs/; all occurrences already canonical.
 - If future edits introduce non-canonical terms, align to: phases 0–3; `E1`, `E2`, `s`, `t = m × s`, `r`, `UNIT`, `m`.
+
+## API diffs (first 3)
+
+- Endpoints checked (top to bottom):
+  1) GET /api/health → exists at `frontend/api/health.ts`
+  2) GET /api/params → exists at `frontend/api/params.ts`
+  3) POST /api/compile → exists at `frontend/api/compile.ts`
+
+- Observations vs docs:
+  - health: Implementation does not enforce method; docs list GET. Behavior still matches (200 with `{ ok, message }`).
+  - params: Implementation does not enforce method; docs list GET. Success returns Algod params JSON; 500 on failure → matches.
+  - compile: Implementation enforces POST (405 for others), requires JSON body `{ source: string }`, forwards Algod JSON with 200 on ok, 400 otherwise; 500 on exceptions → matches docs.
+
+- Action: No doc changes required for these three; recorded non-enforced method note for health/params.
