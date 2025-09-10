@@ -66,4 +66,14 @@ Actions taken:
   - submit: Returns 400 for Algod non-ok responses in addition to missing input → doc updated to note forwarded Algod errors at 400.
   - pair: Forwards Algod non-200 status; returns 502 when Algod returns non-JSON → doc updated to include proxy forwarding and 502 case.
   - local: Forwards Algod non-200 status; returns 502 when Algod returns non-JSON → doc updated similarly.
-  - pending/account/history/export: Docs already aligned with implementation (methods, queries, responses, examples); no changes needed.
+- pending/account/history/export: Docs already aligned with implementation (methods, queries, responses, examples); no changes needed.
+
+## Docs lint tooling (suggested)
+
+- Suggested scripts (docs-only; do not add to package.json yet):
+  - markdownlint: `npx markdownlint "docs/**/*.md"`
+  - cspell: `npx cspell --no-progress "docs/**/*.md"`
+- Configs added in repo root:
+  - `.markdownlint.json`: line length 120, no trailing spaces (hard breaks allowed), first-line heading relaxed.
+  - `cspell.json`: added domain words (Algorand, LoRA, microAlgos, appId, etc.).
+- Notes: Optionally extend the commands to include `tests/**/*.md` once docs pass cleanly.
