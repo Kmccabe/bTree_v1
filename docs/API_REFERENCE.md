@@ -1,330 +1,223 @@
 # API Reference
 
-This document describes all serverless API endpoints available in the Trust Game application. All endpoints are proxied through Vercel serverless functions to provide secure access to Algorand TestNet.
+This document describes all serverless API endpoints available in the Trust Game application. Endpoints are implemented as Vercel serverless functions and proxy to Algorand TestNet.
 
 ## Base URL
 
-**Local Development:** `http://localhost:3000/api/`  
-**Production:** `https://your-app.vercel.app/api/`
+- Local: `http://localhost:3000/api/`
+- Production: `https://<your-app>.vercel.app/api/`
 
 ## Authentication
 
-No authentication required. All endpoints proxy to Algorand TestNet using server-side credentials configured via environment variables.
+- None. Endpoints rely on server-side env vars to reach Algod/Indexer.
 
 ## Environment Variables
 
-**Server-side (Required):**
 - `TESTNET_ALGOD_URL`: Algorand node URL (e.g., `https://testnet-api.algonode.cloud`)
-- `TESTNET_ALGOD_TOKEN`: Algorand node token (optional for some providers)
-- `TESTNET_INDEXER_URL`: Algorand indexer URL (optional)
-- `TESTNET_INDEXER_TOKEN`: Algorand indexer token (optional)
+- `TESTNET_ALGOD_TOKEN`: Algorand node token (optional; some providers use X-API-Key)
+- `TESTNET_INDEXER_URL`: Indexer URL (default: `https://testnet-idx.algonode.cloud`)
+- `TESTNET_INDEXER_TOKEN`: Indexer token (optional)
 
 ---
 
-## Core Endpoints
+## Endpoints Overview (10)
 
-### GET /api/health
-Basic health check endpoint.
+- `GET /api/health`
+- `GET /api/params`
+- `POST /api/compile`
+- `POST /api/submit`
+- `GET /api/pending?txid=...`
+- `GET /api/account?addr=...`
+- `GET /api/pair?id=...`
+- `GET /api/local?addr=...&id=...`
+- `GET /api/history?id=...&limit=...`
+- `GET /api/export?appId=...`
 
-**Response:**
+---
+
+## `GET /api/health`
+Basic health check.
+
+- Status: 200 always when function is reachable
+- Response:
 ```json
-{
-  "status": "ok",
-  "timestamp": "2024-09-10T10:00:00.000Z"
-}
+{ "ok": true, "message": "Vercel is alive" }
+```
+- Example:
+```bash
+curl -s http://localhost:3000/api/health
 ```
 
 ---
 
-### GET /api/params
-Get suggested transaction parameters from Algorand node.
+## `GET /api/params`
+Fetch SuggestedParams from Algod.
 
-**Parameters:** None
-
-**Response:**
-```json
-{
-  "consensus-version": "https://github.com/algorandfoundation/specs/tree/bc36005dbd776e6d1eaf0c560619bb183215645c",
-  "fee": 1000,
-  "genesis-hash": "SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=",
-  "genesis-id": "testnet-v1.0",
-  "last-round": 42985503,
-  "min-fee": 1000
-}
+- Query: none
+- Success 200: Algod params JSON
+- Error 500: `{ "error": "params failed" }`
+- Example:
+```bash
+curl -s http://localhost:3000/api/params | jq .
 ```
-
-**Usage:**
-- Required for building Algorand transactions
-- Provides current network parameters
 
 ---
 
-### POST /api/compile
-Compile TEAL source code to bytecode.
+## `POST /api/compile`
+Compile TEAL source to bytecode via Algod.
 
-**Parameters:**
+- Body (JSON):
 ```json
-{
-  "teal": "string" // TEAL source code
-}
+{ "source": "#pragma version 9\nint 1" }
 ```
-
-**Response:**
-```json
-{
-  "hash": "BYTECODE_HASH",
-  "result": "BASE64_ENCODED_BYTECODE"
-}
+- Success 200: Algod compile JSON (`hash`, `result`)
+- Client error 400: `{ "error": "missing 'source' (TEAL)" }` or Algod error
+- Server error 500: `{ "error": "compile failed" }`
+- Example:
+```bash
+curl -sX POST http://localhost:3000/api/compile \
+  -H 'content-type: application/json' \
+  -d '{"source":"#pragma version 9\nint 1"}'
 ```
-
-**Usage:**
-- Compile smart contract code before deployment
-- Returns bytecode for app creation transactions
 
 ---
 
-### POST /api/submit
-Submit signed transaction(s) to the Algorand network.
+## `POST /api/submit`
+Submit signed transaction(s) to the network.
 
-**Parameters:**
+- Body (JSON): one of
 ```json
-{
-  "txns": ["BASE64_ENCODED_SIGNED_TRANSACTION", ...]
-}
+{ "signedTxnBase64": "..." }
 ```
-
-**Response:**
+or
 ```json
-{
-  "txId": "TRANSACTION_ID"
-}
+{ "stxns": ["...", "..."] }
 ```
-
-**Usage:**
-- Submit transactions signed by wallet
-- Supports both single transactions and groups
+- Success 200: Algod JSON (e.g., `{ "txId": "..." }`)
+- Client error 400: `{ "error": "missing 'signedTxnBase64' or 'stxns'" }`
+- Server error 500: `{ "error": "submit failed" }`
+- Example (group upload):
+```bash
+curl -sX POST http://localhost:3000/api/submit \
+  -H 'content-type: application/json' \
+  -d '{"stxns":["BASE64_TXN_1","BASE64_TXN_2"]}'
+```
 
 ---
 
-### GET /api/pending
-Check transaction confirmation status.
+## `GET /api/pending`
+Check pending transaction status.
 
-**Parameters:**
-- `txid` (query): Transaction ID to check
-
-**Example:** `/api/pending?txid=ABC123...`
-
-**Response:**
-```json
-{
-  "confirmed-round": 42985504,
-  "pool-error": "",
-  "txn": {
-    // Transaction details
-  }
-}
+- Query: `txid` (required)
+- Success 200: Algod pending info JSON
+- Client error 400: `{ "error": "missing txid" }`
+- Server error 500: `{ "error": "pending failed" }`
+- Example:
+```bash
+curl -s 'http://localhost:3000/api/pending?txid=ABC...'
 ```
-
-**Usage:**
-- Poll for transaction confirmation
-- Returns confirmation round when complete
 
 ---
 
-## Account & Application Endpoints
+## `GET /api/account`
+Get simplified account info.
 
-### GET /api/account
-Get account information including balance and application state.
-
-**Parameters:**
-- `addr` (query): Account address to query
-
-**Example:** `/api/account?addr=ABC123...`
-
-**Response:**
+- Query: `addr` (required)
+- Success 200:
 ```json
-{
-  "address": "ABC123...",
-  "amount": 1000000,
-  "apps-local-state": [
-    {
-      "id": 12345,
-      "key-value": [
-        {
-          "key": "BASE64_KEY",
-          "value": {
-            "type": 2,
-            "uint": 100000
-          }
-        }
-      ]
-    }
-  ]
-}
+{ "address": "...", "amount": 1000000, "min-balance": 100000, "apps-local-state": 1 }
 ```
-
-**Usage:**
-- Check account balance before transactions
-- Read local application state for participants
+- Client error 400: `{ "error": "addr required" }`
+- Proxy errors: non-200 from Algod are forwarded with `status` and `{ error }`
+- Example:
+```bash
+curl -s 'http://localhost:3000/api/account?addr=ADDR'
+```
 
 ---
 
-### GET /api/pair
-Get Trust Game application state and globals.
+## `GET /api/pair`
+Get application globals and decoded metadata.
 
-**Parameters:**
-- `id` (query): Application ID
-
-**Example:** `/api/pair?id=12345`
-
-**Response:**
+- Query: `id` (required, integer App ID)
+- Success 200:
 ```json
-{
-  "id": 12345,
-  "params": {
-    "global-state": [
-      {
-        "key": "BASE64_KEY",
-        "value": {
-          "type": 2,
-          "uint": 3000000
-        }
-      }
-    ]
-  }
-}
+{ "id": 12345, "creator": "...", "globalSchema": {"ints": 6, "bytes": 4},
+  "globals": { "E1": 2000000, "E2": 500000, "m": 3, "UNIT": 100000, "phase": 2 },
+  "globalsRaw": [ { "key": "E1", "type": "uint", "uint": 2000000 } ] }
 ```
-
-**Usage:**
-- Read game parameters (E1, E2, m, UNIT, phase)
-- Check current game state
-- Monitor phase transitions
+- Client error 400: `{ "error": "id (positive integer) required" }`
+- Server error 500: `{ "error": "server error" }`
+- Example:
+```bash
+curl -s 'http://localhost:3000/api/pair?id=12345' | jq .
+```
 
 ---
 
-### GET /api/local
-Get local application state for a specific account.
+## `GET /api/local`
+Get local state for an address and app.
 
-**Parameters:**
-- `addr` (query): Account address
-- `appId` (query): Application ID
-
-**Example:** `/api/local?addr=ABC123...&appId=12345`
-
-**Response:**
+- Query: `addr` (required), `id` (required App ID)
+- Success 200:
 ```json
-{
-  "apps-local-state": [
-    {
-      "id": 12345,
-      "key-value": [
-        {
-          "key": "cw==", // "s" in base64
-          "value": {
-            "type": 2,
-            "uint": 1000000
-          }
-        }
-      ]
-    }
-  ]
-}
+{ "id": 12345, "address": "ADDR", "local": { "s": 100000, "done": 1 } }
 ```
-
-**Usage:**
-- Read participant's local state (s, done, etc.)
-- Check opt-in status
+- Client error 400: `{ "error": "addr required" }` or `{ "error": "id required" }`
+- Example:
+```bash
+curl -s 'http://localhost:3000/api/local?addr=ADDR&id=12345'
+```
 
 ---
 
-## Data Export Endpoints
+## `GET /api/history`
+List recent app-call transactions with decoded args and inner payments.
 
-### GET /api/history
-Get transaction history for a Trust Game application.
-
-**Parameters:**
-- `id` (query): Application ID
-- `limit` (query, optional): Number of transactions to return (default: 100)
-
-**Example:** `/api/history?id=12345&limit=50`
-
-**Response:**
+- Query: `id` or `appId` (required), `limit` (default 100, max 1000)
+- Success 200:
 ```json
-{
-  "transactions": [
-    {
-      "id": "TRANSACTION_ID",
-      "round-time": 1694358000,
-      "sender": "ADDRESS",
-      "application-transaction": {
-        "application-id": 12345,
-        "application-args": ["BASE64_ARG"],
-        "inner-txns": [
-          {
-            "payment-transaction": {
-              "amount": 1000000,
-              "receiver": "ADDRESS"
-            }
-          }
-        ]
-      }
-    }
-  ]
-}
+{ "id": 12345, "count": 2,
+  "txns": [
+    { "round": 1, "time": 1694358000, "txid": "...", "sender": "...",
+      "event": "invest", "details": { "s": 100000 }, "innerPayments": [] }
+  ] }
 ```
-
-**Usage:**
-- View complete game transaction history
-- Track investments and returns
-- Export data for analysis
+- Client/Proxy errors: forwarded as `{ error }` with appropriate status
+- Example:
+```bash
+curl -s 'http://localhost:3000/api/history?id=12345&limit=5' | jq .
+```
 
 ---
 
-### GET /api/export
-Export Trust Game data as CSV format.
+## `GET /api/export`
+Export CSV of app-call events suitable for offline analysis.
 
-**Parameters:**
-- `appId` (query): Application ID to export
-
-**Example:** `/api/export?appId=12345`
-
-**Response:** CSV file with headers:
+- Query: `appId` (required), optional: `minRound`, `maxRound`
+- Success 200: `text/csv` with header:
+```text
+round,round_time,txid,sender,event,details_json
 ```
-app_id,s1_addr,s2_addr,id_s1,id_s2,E1,E2,m,UNIT,s,r,t,payout_s1,payout_s2,tx_invest,round_invest,tx_return,round_return,ended_at
+- Server error 500: `{ "error": "..." }`
+- Example:
+```bash
+curl -s 'http://localhost:3000/api/export?appId=12345' -o btree_export_app_12345.csv
 ```
-
-**Usage:**
-- Export complete game data for research
-- Generate reports and analytics
-- Data integrity verification
 
 ---
 
 ## Error Handling
 
-All endpoints return appropriate HTTP status codes:
+- 200: Successful proxy
+- 400: Missing/invalid parameters or Algod error
+- 405: Method not allowed (e.g., `POST /compile` only)
+- 500: Server error (network/config failures)
 
-- `200`: Success
-- `400`: Bad Request (invalid parameters)
-- `404`: Not Found (account/app doesn't exist)
-- `500`: Internal Server Error (network issues, invalid configuration)
-
-**Error Response Format:**
+Errors are returned as JSON:
 ```json
-{
-  "error": "Error description",
-  "details": "Additional error details (if available)"
-}
+{ "error": "message" }
 ```
-
----
-
-## Rate Limiting
-
-No explicit rate limiting is enforced, but endpoints are subject to:
-- Algorand node rate limits
-- Vercel serverless function limits
-- Network timeout constraints (120 seconds default)
 
 ---
 
@@ -332,11 +225,12 @@ No explicit rate limiting is enforced, but endpoints are subject to:
 
 ### Local Testing
 ```bash
-# Start serverless functions
+# Start serverless functions alongside the app
+cd frontend
 npx vercel dev
 
-# Test endpoint
-curl http://localhost:3000/api/health
+# Test an endpoint
+curl -s http://localhost:3000/api/health
 ```
 
 ### Environment Setup
@@ -345,22 +239,23 @@ Create `frontend/.env.local`:
 TESTNET_ALGOD_URL=https://testnet-api.algonode.cloud
 TESTNET_ALGOD_TOKEN=
 TESTNET_INDEXER_URL=https://testnet-idx.algonode.cloud
+TESTNET_INDEXER_TOKEN=
 ```
 
 ### Common Patterns
 
-**Transaction Submission Flow:**
-1. `GET /api/params` - Get transaction parameters
-2. Build transaction client-side
-3. Sign with wallet
-4. `POST /api/submit` - Submit to network
-5. `GET /api/pending` - Wait for confirmation
+Transaction submission flow:
+1. `GET /api/params` → SuggestedParams
+2. Build unsigned txns with `algosdk`
+3. Sign via wallet
+4. `POST /api/submit` with `signedTxnBase64` or `stxns`
+5. `GET /api/pending` until confirmed
 
-**Game State Reading:**
-1. `GET /api/pair?id=APP_ID` - Read global state
-2. `GET /api/local?addr=ADDR&appId=APP_ID` - Read participant state
-3. `GET /api/account?addr=APP_ADDRESS` - Check app funding
+State reading:
+1. `GET /api/pair?id=APP_ID` → globals
+2. `GET /api/local?addr=ADDR&id=APP_ID` → local
+3. `GET /api/account?addr=APP_ADDRESS` → funding check
 
 ---
 
-For implementation details, see the source code in `frontend/api/` directory.
+Implementation sources live in `frontend/api/`.

@@ -48,7 +48,7 @@ npm run typecheck
 ```
 
 **Issue: Vercel deployment fails**
-```bash
+```json
 # Check deployment logs in Vercel dashboard
 # Common causes:
 # - Missing environment variables
@@ -133,6 +133,37 @@ curl "https://testnet-api.algonode.cloud/v2/applications/APP_ID"
 
 # Check if app was deleted
 # Apps must be created fresh if deleted
+```
+
+### Algorand assert failures (logic eval)
+
+Errors like `logic eval error: assert failed pc=331` indicate a TEAL assertion failed. Common causes and checks:
+
+1) Wrong phase for operation
+```bash
+curl -s 'http://localhost:3000/api/pair?id=APP_ID' | jq '.globals.phase'
+# Expect: 1 for Invest (S1), 2 for Return (S2)
+```
+
+2) Amount not a multiple of UNIT
+```bash
+curl -s 'http://localhost:3000/api/pair?id=APP_ID' | jq '.globals.UNIT'
+# Ensure s and r satisfy (value % UNIT == 0)
+```
+
+3) Underfunded app account
+```bash
+# For Return, app must have at least t + E2, where t = m × s
+curl -s 'http://localhost:3000/api/account?addr=APP_ADDRESS'
+# Compare amount vs required; include min-balance slack.
+```
+
+4) Sender / accounts ordering
+- Invest must be sent by S1; Return by S2 with `accounts[1] = S1`.
+- Verify local state and addresses via:
+```bash
+curl -s 'http://localhost:3000/api/local?addr=S1_ADDR&id=APP_ID' | jq .
+curl -s 'http://localhost:3000/api/local?addr=S2_ADDR&id=APP_ID' | jq .
 ```
 
 ### Investment Phase Issues
@@ -242,14 +273,14 @@ curl "https://testnet-api.algonode.cloud/health"
 # Check indexer status
 curl "https://testnet-idx.algonode.cloud/health"
 
-# Indexer may lag behind node by several rounds
-# Wait a few minutes and retry
+"#" Indexer may lag behind node by several rounds
+"#" Retry with backoff (200ms → 500ms → 1s → 2s) up to ~2 minutes
 ```
 
 **Issue: "Application not found in indexer"**
-- Indexer updates can lag 1-2 minutes behind node
-- New applications may not appear immediately
-- Use direct node queries for real-time data
+- Indexer updates can lag 1–2 minutes behind node
+- New apps may not appear immediately
+- Use direct node queries for real-time data; add a retry loop in the UI
 
 ---
 
@@ -370,3 +401,11 @@ For additional help, check:
 - [API Reference](API_REFERENCE.md) for endpoint details
 - [Game Rules](../frontend/docs/trust-game-design.md) for business logic
 - [Testing Guide](../tests/manual/SMOKE.md) for step-by-step validation
+
+---
+
+## WalletConnect/Pera specific pitfalls
+
+- Mobile Pera with WalletConnect can silently drop sessions if the phone sleeps. Reconnect from the app UI.
+- Ensure only one tab/site has an active WalletConnect session to avoid race conditions.
+- Minimum balance: keep ≥ 0.1 ALGO on all accounts (and ≥ 0.1 ALGO on the app account after sweeps).
