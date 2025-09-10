@@ -21,3 +21,6 @@
 ## Done in this step
 
 - Added Index and Glossary to docs/README.md; verified code fence language tags.
+- Fixed intra-docs links: converted plain reference to [INTEGRITY](INTEGRITY.md) and added link to [REVIEW_NOTES](REVIEW_NOTES.md) in DATA_EXPORT.md.
+- Verified anchors exist: API_REFERENCE.md#environment-variables, TROUBLESHOOTING.md#network-and-api-issues, TROUBLESHOOTING.md#getting-help.
+- Left external links as-is (not in docs/): ../README.md, ../frontend/docs/*, ../tests/*.

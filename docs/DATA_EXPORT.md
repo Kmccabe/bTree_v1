@@ -42,4 +42,6 @@ When sharing datasets, you may hash addresses (e.g., SHA-256 of `addr + study_sa
 
 ## Integrity
 
-See `docs/INTEGRITY.md` for how to verify that a dataset corresponds to on-chain activity (via LoRA links and/or an on-chain finalize digest).
+See [INTEGRITY](INTEGRITY.md) for how to verify that a dataset corresponds to on-chain activity (via LoRA links and/or an on-chain finalize digest).
+
+See also [REVIEW_NOTES](REVIEW_NOTES.md) for current gaps and proposed export improvements.
