@@ -2,6 +2,41 @@
 
 This guide covers common issues you may encounter while developing, deploying, or using the Trust Game application.
 
+## Troubleshooting Skeleton
+
+### Wallet connection issues (Pera/WalletConnect, network mismatch)
+- Ensure wallet is unlocked and only one active tab/session.
+- Verify TestNet mode in Pera; match `VITE_NETWORK=TESTNET`.
+- Reconnect WalletConnect; clear stale sessions if needed.
+- Disable popup blockers; allow wallet popups.
+
+### Indexer lag after write (symptoms, retry/backoff)
+- Symptom: recent tx/app not visible in history/export or explorer.
+- Cause: Indexer can lag 1–2 minutes behind Algod.
+- Workaround: retry with backoff (200ms → 500ms → 1s → 2s) up to ~2 minutes.
+- For immediate checks, query Algod directly (params, account, pending).
+
+### Contract assert failures (generic)
+- Wrong phase or sender; participant not opted-in.
+- Amount constraints: `s` ≤ `E1`, `r` ≤ `t`, and `t = m × s`.
+- UNIT constraints: amounts must be multiples of `UNIT`.
+- App underfunded for required payouts/refunds.
+
+### UNIT multiple violations (validation)
+- Investment `s` and return `r` must be multiples of `UNIT`.
+- Validate in UI and API inputs; round or reject invalid values.
+
+### App underfunded vs t = m × s (funding checks)
+- Invest: app must cover refund `E1 − s` to S1.
+- Return: app must cover total `t + E2` for both payouts.
+- Fund the app address before submitting transactions.
+
+### How to report
+- Include: environment (local/staging/prod), browser + versions.
+- Wallet: Pera version and network setting; addresses (or hashed).
+- App ID, txid(s), steps to reproduce, and error messages.
+- Logs: browser console, network responses, and any server logs.
+
 ## 🔧 Development Issues
 
 ### Local Development Setup
