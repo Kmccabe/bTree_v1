@@ -27,7 +27,8 @@
   "homepage": "https://github.com/Kmccabe/bTree_v1#readme",
   "dependencies": {
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
     "@types/react": "^19.1.12",
