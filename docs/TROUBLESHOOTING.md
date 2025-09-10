@@ -10,6 +10,30 @@ This guide covers common issues you may encounter while developing, deploying, o
 - Reconnect WalletConnect; clear stale sessions if needed.
 - Disable popup blockers; allow wallet popups.
 
+Step-by-step checks:
+1) Wallet installed and unlocked
+- Desktop: Pera browser extension visible and unlocked
+- Mobile: Pera app installed and opened
+2) Account connected to this site
+- In app UI: Connect button should show an address (not “Connect”)
+- In console:
+```javascript
+// Expect an array with at least one address
+console.log(wallet?.accounts)
+```
+3) Network matches the app
+- App env: `VITE_NETWORK=TESTNET` (see `.env.local`)
+- Wallet network: TestNet (Pera settings)
+- Optional console check:
+```javascript
+console.log(wallet?.activeNetwork) // expect 'TESTNET' or equivalent
+```
+4) Reset session / cache if stuck
+- In Pera: remove this site from Connected apps
+- Clear site data: browser devtools → Application → Clear storage
+- For WalletConnect: end the session in Pera, then reconnect from app
+- Reload the page and connect again
+
 ### Indexer lag after write (symptoms, retry/backoff)
 - Symptom: recent tx/app not visible in history/export or explorer.
 - Cause: Indexer can lag 1–2 minutes behind Algod.
@@ -21,6 +45,45 @@ This guide covers common issues you may encounter while developing, deploying, o
 - Amount constraints: `s` ≤ `E1`, `r` ≤ `t`, and `t = m × s`.
 - UNIT constraints: amounts must be multiples of `UNIT`.
 - App underfunded for required payouts/refunds.
+
+Sample error message:
+```text
+logic eval error: assert failed pc=331
+```
+
+Checklist and where to verify:
+- Correct phase
+  - UI: Phase indicator shows 1 (Invest) or 2 (Return)
+  - API:
+```bash
+curl -s 'http://localhost:3000/api/pair?id=APP_ID' | jq '.globals.phase'
+# Expect: 1 for Invest, 2 for Return
+```
+- S1/S2 sender matches action
+  - Invest must be sent by S1; Return by S2
+  - API (local state presence):
+```bash
+curl -s 'http://localhost:3000/api/local?addr=S1_ADDR&id=APP_ID' | jq .
+curl -s 'http://localhost:3000/api/local?addr=S2_ADDR&id=APP_ID' | jq .
+```
+- UNIT multiple respected
+  - Get UNIT and check `value % UNIT == 0`
+```bash
+UNIT=$(curl -s 'http://localhost:3000/api/pair?id=APP_ID' | jq -r '.globals.UNIT')
+# ensure s % UNIT == 0 and r % UNIT == 0
+```
+- r is within [0, t]
+  - Compute `t = m × s`; ensure `0 ≤ r ≤ t`
+```bash
+curl -s 'http://localhost:3000/api/pair?id=APP_ID' | jq '{m:.globals.m}'
+# using your chosen s, compute t=m*s and compare with r
+```
+- App funded sufficiently
+  - Invest requires refund capacity `E1 - s`; Return requires total `t + E2`
+  - API (app account balance):
+```bash
+curl -s 'https://testnet-api.algonode.cloud/v2/accounts/APP_ADDRESS' | jq '.amount'
+```
 
 ### UNIT multiple violations (validation)
 - Investment `s` and return `r` must be multiples of `UNIT`.
