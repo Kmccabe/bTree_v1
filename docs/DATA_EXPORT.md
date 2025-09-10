@@ -1,6 +1,45 @@
 # DATA_EXPORT
 
-Goal: produce a CSV that is verifiably derived from on-chain events, matching what `/api/export` returns today, with a path to a richer research schema.
+Canonical CSV schema for research exports. Concise, deterministic, and easy to audit.
+
+## Canonical CSV Schema
+
+Columns (in order):
+- session_id: Study/session identifier (string).
+- appId: Algorand application ID (integer).
+- timestamp_utc: ISO-8601 UTC timestamp of the event.
+- role: One of S1 | S2 | Admin.
+- action: One of opt_in | invest | return | phase | sweep | delete.
+- s: Amount invested by S1 (µAlgos; integer; empty if not applicable).
+- t: Multiplied amount available to S2 (µAlgos; integer; t = m × s; empty if N/A).
+- r: Amount returned by S2 (µAlgos; integer; empty if not applicable).
+- payout_s1: Net payout to S1 for this event (µAlgos; integer or 0).
+- payout_s2: Net payout to S2 for this event (µAlgos; integer or 0).
+- txId: Transaction ID (string).
+- phase_before: Phase at event start (0|1|2|3).
+- phase_after: Phase after event completes (0|1|2|3).
+- address_s1: Registered S1 address (Algorand address string or hashed, see below).
+- address_s2: Registered S2 address (Algorand address string or hashed, see below).
+
+Notes:
+- Monetary fields are in µAlgos to avoid rounding.
+- Empty means not applicable for that action (e.g., r during invest).
+- t is derived; store the computed value for reproducibility.
+
+## Example (3 rows)
+
+```csv
+session_id,appId,timestamp_utc,role,action,s,t,r,payout_s1,payout_s2,txId,phase_before,phase_after,address_s1,address_s2
+tg-001,12345,2024-09-01T12:00:00Z,Admin,phase,,, ,0,0,TXID_PHASE_SET,0,1,ADDR_S1,ADDR_S2
+tg-001,12345,2024-09-01T12:05:10Z,S1,invest,1000000,3000000,,0,0,TXID_INVEST,1,2,ADDR_S1,ADDR_S2
+tg-001,12345,2024-09-01T12:08:42Z,S2,return,,3000000,1000000,1000000,2500000,TXID_RETURN,2,3,ADDR_S1,ADDR_S2
+```
+
+## Config: hash addresses in export
+
+- Option: Hash `address_s1` and `address_s2` using salted SHA-256: `hex(sha256(addr + study_salt))`.
+- Keep the salt private and constant per study to allow joins across rows in the same dataset.
+- When enabled, replace the address fields’ values with the hashes; column names remain the same.
 
 ## Current CSV (as implemented)
 
