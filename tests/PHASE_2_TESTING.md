@@ -24,32 +24,36 @@ This guide walks you through verifying the current Trust Game app in Phase 2 (In
 ## Connect Wallet
 
 2) Connect your TestNet wallet in the app.
-   - Expected (UI): shows `Connected: <your-address> · App Address: <derived-app-address> · UNIT: ... · E: ...`.
+   - Expected (UI): shows `Connected: <your-address>` and account info.
    - See: also browser console logs tagged `[appId]` and `[SubjectActions]` when you take actions.
 
 ## Set App ID and Load Globals
 
-3) Enter your App ID (if not already populated from env) and click `Load globals`.
-   - Expected (UI): `Globals: E: ... · m: ... · UNIT: ... · phase: ...`.
+3) Enter your App ID (if not already populated from env) and click `Load globals` (button label: exactly "Load globals").
+   - Expected (UI): globals available to the Subject panel; phase visible in Admin panel.
    - See: console `[SubjectActions] /api/pair 200 {...}`.
 
 ## Confirm App Account and Funding
 
-4) In the `App account` box, click `Open in LoRA (TestNet)` to view the app account. Use `Check funds`/funds status.
-   - Expected (UI): balance line; optional underfunded warning for Return if balance < `t`.
-   - See: LoRA account page renders with the derived app address.
+4) Confirm app funding as Subject (or via Admin panel).
+   - Subject: use the inline balance/funding hints when present; otherwise proceed and observe underfunding warnings.
+   - Admin: "Fund Experiment" section shows Required pool and "Check Funding to Start".
+   - Expected (UI): underfunded warnings if balance < required; hints clear once funded.
 
-## Subject Opt-In
+## UI controls (current build)
 
-5) In `Subject - Return`, click `Opt-In`.
-   - Expected: wallet prompt, then toast `submitted`; pending is polled.
-   - See: console `optIn submit ...`, `/api/submit 200 { txId }`, `/api/pending ...` after confirmation; LoRA shows the tx under your account.
+- Subject 1 (Invest): label "Invest s (microAlgos):" with input and button "Invest"; after confirmation, an "Invest Done" button appears (creator only) to advance the phase.
+- Subject 2 (Return): label "r (microAlgos):" with input and button "Return"; also a "Load globals" button.
+- Wallet connect: Subject panels show a "Connect wallet" link button when not connected; "Disconnect" when connected.
+- Admin: phase buttons labeled "Phase: 0 (Registration)", "Phase: 1 (Setup)", "Phase: 2 (Invest)", "Phase: 3 (Return/Done)", and a "Sweep" button in Done.
 
-## Read Pair States
+## Preconditions for Return
 
-6) Click `Read pair states` (or `Load globals`).
-   - Expected (UI): `Local (subject): s = <value>, done = <0/1>` and `Available for Subject 2: <t> microAlgos (3 x s)`.
-   - See: console `[pair/local] <address> { s, done }`.
+6) Ensure the following before testing Return:
+   - S1 Invest confirmed (inline status shows "Invest confirmed…" and Activity lists the invest).
+   - App funded ≥ `t + E2` (Subject panel may show "Underfunded"; Admin shows Required pool).
+   - S1 detected in globals (if missing, click "Load globals").
+   - Phase label in Admin is "Phase: 3 (Return/Done)" after Invest (creator can click "Invest Done").
 
 ## Invest (Subject)
 
@@ -59,23 +63,18 @@ This guide walks you through verifying the current Trust Game app in Phase 2 (In
    - See (console): `invest submit ...`, `/api/submit 200`, `/api/pending 200 { confirmed-round }`.
    - See (LoRA): the group appears; payment + app call.
 
-## Enable Return
+## Return input validation
 
-8) Click `Load globals` and `Read pair states` again.
-   - Expected: Return button enabled when all hold:
-     - `t > 0` and `ret == 0`
-     - Subject opted-in (`done == 1`)
-     - App balance >= `t`
-     - `r` in `0..t` and multiple of `UNIT`
-   - See (UI): if blocked, yellow helper text shows exact blocker; otherwise the button is enabled.
+8) In the Subject 2 panel, enter `r` in the "r (microAlgos):" input.
+   - Validation: integer; `0 ≤ r ≤ t`; multiples of `UNIT`.
+   - Expected (UI): if invalid, inline yellow helper: "Enter r between 0 and <t>" or "Underfunded..."; Return button disabled until valid.
 
 ## Return (Subject)
 
-9) Enter `r` (e.g., `60000` if `t=120000`) and click `Return`.
-   - Expected: wallet signs app call; toasts `Return submitted` then `Return confirmed`.
-   - See (UI): status under the form shows submitted → confirmed; Activity shows Return with round and amounts; globals set `ret = 1`.
-   - See (console): `Return submit`, `/api/submit 200 { txId }`, `/api/pending 200 { confirmed-round }`.
-   - See (LoRA): outer app call with 2 inner payments: `r` to S1 and `t - r` to S2.
+9) Enter `r` (e.g., `60000` if `t=120000`) and click "Return".
+   - Expected (UI receipts): inline status shows "Return submitted… (waiting for confirmation)" then "Return confirmed…"; ret=1 reflected in globals after refresh.
+   - See (console): Return submit → `/api/submit 200` → `/api/pending 200 { confirmed-round }`.
+   - See (LoRA): outer app call with 2 inner payments: `r` → S1 and `t - r` → S2.
 
 ## Underfunded Path (Optional)
 
