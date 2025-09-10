@@ -12,18 +12,15 @@
   - Shows: t (available), constants, r input (microAlgos), S1 after reading pair states.
 
 ## Quick Checklist (TL;DR)
-- Admin → Deploy & Manage Pair: click "Deploy"; note App ID (phase = 0).
-- Admin: click "Check funding" (optional).
-- Before Invest, fund app so liquid ≥ E1 − s (worst-case, fund E1 up-front).
-- Subject - Invest: click "Opt-In" as S1 (latches s1).
-- Subject - Return: click "Opt-In" as S2 (latches s2).
-- Admin: set phase with buttons (e.g., "Phase: Invest(1)") if needed.
-- Subject - Invest: enter s, click "Invest" (must be multiple of UNIT and ≤ E1).
-- Subject - Return: click "Load globals" then "Read pair states"; ensure S1 shows.
-- After Invest, fund app so liquid ≥ t + E2, where t = m × s.
-- Subject - Return: enter r and click "Return" (0 ≤ r ≤ t, multiple of UNIT).
-- Verify: phase → 3 (Done), ret = 1; payouts r → S1 and (t − r + E2) → S2.
-- Optional: Admin: click "Sweep" (phase 3) to send leftover to creator.
+1) Deploy → note App ID (phase 0)
+2) Seed funds (optional) → ensure pre‑invest refund solvency (≥ E1 − s)
+3) Phase 1 (Admin) → enable Invest
+4) S1: "Invest s (microAlgos)" → Invest (s % UNIT == 0; s ≤ E1)
+5) Fund app ≥ t + E2 (t = m × s)
+6) Phase 3 (Return/Done) → after Invest, creator clicks "Invest Done" or Admin sets phase
+7) S2: "r (microAlgos)" → Return (0 ≤ r ≤ t; r % UNIT == 0)
+8) Phase 3 → Sweep (optional)
+9) Export CSV (optional)
 
 **Network:** Algorand TestNet  
 **Wallets:** S1 = Investor, S2 = Trustee, Exp = Admin  
@@ -48,6 +45,13 @@
 
 ## ✅ Test Steps
 
+### Tx IDs to record (fill during run)
+
+```csv
+app_id,deploy_txid,invest_appcall_txid,invest_payment_txid,return_txid,sweep_txid
+,,,
+```
+
 ### 0. Compile & Deploy
 - [ ] Admin → Deploy & Manage Pair → click "Deploy".
   - Inputs: `E1=2.0`, `E2=0.5`, `m=3`, `UNIT=0.1`.
@@ -57,10 +61,8 @@
   - Expected: `UNIT=0.1`, `m=3`, `E1=2.0`, `E2=0.5`.
 - [ ] Phase = **0 (Registration)** (Admin shows current phase; phase buttons available).
 
-### 1. Registration
-- [ ] Subject - Invest panel: enter App ID if needed, click "Opt-In" as S1 → `s1` latched.
-- [ ] Subject - Return panel: enter App ID if needed, click "Opt-In" as S2 → `s2` latched.
-- [ ] Admin: if still phase 0, click "Phase: Invest(1)" (or select phase 1 and "Apply").
+### 1. Registration / Setup
+- [ ] Admin: if phase 0, click "Phase: 1 (Setup)" (or your build’s Invest‑enabling control).
 
 ### 2. Seed Funding (Pre-Invest)
 - [ ] Admin: click "Check funding" (optional) to see current balance.
@@ -70,7 +72,7 @@
   - Keep ≥ 0.1 ALGO minimum in account at all times.
 
 ### 3. Invest
-- [ ] Subject - Invest: set `s = 1.2 ALGO` (enter microAlgos) and click "Invest".
+- [ ] Subject - Invest: set `s = 1.2 ALGO` in "Invest s (microAlgos):" and click "Invest".
   - Grouped tx auto-built:
     - Tx0: Payment **1.2 ALGO** → app.
     - Tx1: AppCall `"invest"` with arg `s=1.2`.
@@ -81,9 +83,9 @@
   - Payment matches amount/receiver
 - [ ] Inner payment at Invest:
   - **E1 − s = 0.8 ALGO → S1** (refund of S1’s endowment)
-- [ ] Post-state (click "Read pair states"):
-  - `s=1.2`, `t=3.6`, `invested=1`
-  - Phase = **2 (Return)**
+- [ ] Post-state:
+  - `s=1.2`, `t=3.6` (UI shows availability for S2)
+  - Phase advances to Return (label may be "Phase: 3 (Return/Done)" in current build)
 - [ ] App balance now reflects: +s (payment) − (E1 − s) (refund) + prior seed − fees.
 
 ### 4. Top-Up (Pre-Return)
@@ -92,8 +94,8 @@
 - [ ] (Optional buffer for fees; Sweep later will transfer leftover liquid except 0.1 ALGO min.)
 
 ### 5. Return
-- [ ] Subject - Return: click "Load globals" then "Read pair states" to surface S1.
-- [ ] Enter `r = 1.0 ALGO` (microAlgos) and click "Return".
+- [ ] Subject - Return: click "Load globals" to surface S1.
+- [ ] Enter `r = 1.0 ALGO` (microAlgos) in "r (microAlgos):" and click "Return".
 - [ ] Contract checks:
   - Sender = S2
   - Phase = 2
@@ -114,11 +116,7 @@
 ## 🔎 Verification Checklist
 - [ ] Return fails if attempted **before** top-up (balance too low).
 - [ ] `s` or `r` not multiples of UNIT are rejected.
-- [ ] Third opt-in rejected.
-- [ ] Fees:
-  - S1 ~0.003 ALGO (Opt-In + Invest)
-  - S2 ~0.002 ALGO (Opt-In + Return)
-  - Admin ~0.001 ALGO per deploy/funding/sweep
+- [ ] Fees: expect small network fees on each operation (deploy/funding/invest/return/sweep)
 - [ ] LoRA explorer shows inner txns:
   - 1.0 ALGO → S1
   - 3.1 ALGO → S2
