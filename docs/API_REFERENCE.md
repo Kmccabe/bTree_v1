@@ -94,7 +94,7 @@ or
 { "stxns": ["...", "..."] }
 ```
 - Success 200: Algod JSON (e.g., `{ "txId": "..." }`)
-- Client error 400: `{ "error": "missing 'signedTxnBase64' or 'stxns'" }`
+- Client error 400: `{ "error": "missing 'signedTxnBase64' or 'stxns'" }` or forwarded Algod error
 - Server error 500: `{ "error": "submit failed" }`
 - Example (group upload):
 ```bash
@@ -147,7 +147,8 @@ Get application globals and decoded metadata.
   "globalsRaw": [ { "key": "E1", "type": "uint", "uint": 2000000 } ] }
 ```
 - Client error 400: `{ "error": "id (positive integer) required" }`
-- Server error 500: `{ "error": "server error" }`
+- Proxy errors: non-200 from Algod are forwarded with status and `{ error }`
+- Bad gateway 502: `{ "error": "algod returned non-JSON response" }`
 - Example:
 ```bash
 curl -s 'http://localhost:3000/api/pair?id=12345' | jq .
@@ -164,6 +165,8 @@ Get local state for an address and app.
 { "id": 12345, "address": "ADDR", "local": { "s": 100000, "done": 1 } }
 ```
 - Client error 400: `{ "error": "addr required" }` or `{ "error": "id required" }`
+- Proxy errors: non-200 from Algod are forwarded with status and `{ error }`
+- Bad gateway 502: `{ "error": "algod returned non-JSON response" }`
 - Example:
 ```bash
 curl -s 'http://localhost:3000/api/local?addr=ADDR&id=12345'

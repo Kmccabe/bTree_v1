@@ -50,3 +50,20 @@ Actions taken:
   - compile: Implementation enforces POST (405 for others), requires JSON body `{ source: string }`, forwards Algod JSON with 200 on ok, 400 otherwise; 500 on exceptions → matches docs.
 
 - Action: No doc changes required for these three; recorded non-enforced method note for health/params.
+
+## API diffs (remaining)
+
+- Endpoints checked:
+  4) POST /api/submit → `frontend/api/submit.ts`
+  5) GET /api/pending → `frontend/api/pending.ts`
+  6) GET /api/account → `frontend/api/account.ts`
+  7) GET /api/pair → `frontend/api/pair.ts`
+  8) GET /api/local → `frontend/api/local.ts`
+  9) GET /api/history → `frontend/api/history.ts`
+ 10) GET /api/export → `frontend/api/export.ts`
+
+- Differences and updates:
+  - submit: Returns 400 for Algod non-ok responses in addition to missing input → doc updated to note forwarded Algod errors at 400.
+  - pair: Forwards Algod non-200 status; returns 502 when Algod returns non-JSON → doc updated to include proxy forwarding and 502 case.
+  - local: Forwards Algod non-200 status; returns 502 when Algod returns non-JSON → doc updated similarly.
+  - pending/account/history/export: Docs already aligned with implementation (methods, queries, responses, examples); no changes needed.
