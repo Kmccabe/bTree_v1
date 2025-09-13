@@ -1,11 +1,10 @@
-import React from "react";
+import React from 'react';
 
 export default function Subject(): JSX.Element {
   return (
-    <main>
+    <main style={{ padding: '2rem' }}>
       <h1>Subject</h1>
-      {/* TODO: Subject flows */}
+      <p>TODO: session list + join-by-code.</p>
     </main>
   );
 }
-
