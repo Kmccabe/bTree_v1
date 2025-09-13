@@ -18,10 +18,7 @@
     "process": "^0.11.10",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.26.1",
-    "@txnlab/use-wallet-react": "latest",
-    "@walletconnect/sign-client": "latest",
-    "@walletconnect/modal": "latest"
+    "react-router-dom": "^6.26.1"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

@@ -1,6 +1,5 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import ConnectButton from '../wallet/ConnectButton';
 
 const linkStyle: React.CSSProperties = { padding: '0.5rem 0.75rem', textDecoration: 'none' };
 const active: React.CSSProperties = { fontWeight: 700, textDecoration: 'underline' };
@@ -32,9 +31,15 @@ export default function HeaderBar(): JSX.Element {
           </nav>
         </div>
         <div>
-          <ConnectButton />
+          <button type="button" style={{
+            padding: '0.4rem 0.75rem', border: '1px solid #d1d5db',
+            borderRadius: 6, background: '#f9fafb', cursor: 'pointer'
+          }}>
+            Connect wallet
+          </button>
         </div>
       </div>
     </header>
   );
 }
+
