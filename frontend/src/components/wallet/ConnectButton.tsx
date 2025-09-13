@@ -1,5 +1,5 @@
 import React from 'react';
-import { useWallet, Wallet } from '@txnlab/use-wallet-react';
+import { useWallet } from '@txnlab/use-wallet-react';
 
 function truncate(addr: string, left = 6, right = 4): string {
   if (!addr) return '';
@@ -7,29 +7,19 @@ function truncate(addr: string, left = 6, right = 4): string {
 }
 
 export default function ConnectButton(): JSX.Element {
-  const { wallets, activeAddress, isReady, isConnected, connect, disconnect } = useWallet();
-
-  // Simple dropdown state (no external UI libs)
+  const { wallets, activeAddress, connect, disconnect } = useWallet();
   const [open, setOpen] = React.useState(false);
 
-  if (!isReady) {
-    return (
-      <button type="button" disabled style={btnStyle}>
-        Initializing…
-      </button>
-    );
-  }
-
-  if (!isConnected || !activeAddress) {
-    // Show a list of available wallets to connect
+  // Disconnected: show "Connect wallet" and a simple wallet picker menu
+  if (!activeAddress) {
     return (
       <div style={{ position: 'relative' }}>
-        <button type="button" onClick={() => setOpen((v) => !v)} style={btnStyle}>
+        <button type="button" onClick={() => setOpen(v => !v)} style={btnStyle}>
           Connect wallet
         </button>
         {open && (
           <div style={menuStyle}>
-            {wallets.map((w: Wallet) => (
+            {(wallets as any[]).map((w: any) => (
               <button
                 key={w.id}
                 type="button"
@@ -37,14 +27,14 @@ export default function ConnectButton(): JSX.Element {
                 onClick={async () => {
                   try {
                     await connect(w.id);
-                    setOpen(false);
                   } catch (e) {
                     console.error('wallet connect error', e);
+                  } finally {
                     setOpen(false);
                   }
                 }}
               >
-                {w.metadata.name}
+                {w?.metadata?.name ?? String(w.id)}
               </button>
             ))}
           </div>
@@ -53,10 +43,10 @@ export default function ConnectButton(): JSX.Element {
     );
   }
 
-  // Connected — show truncated address with Disconnect
+  // Connected: show truncated address with a Disconnect action
   return (
     <div style={{ position: 'relative' }}>
-      <button type="button" onClick={() => setOpen((v) => !v)} style={btnStyle}>
+      <button type="button" onClick={() => setOpen(v => !v)} style={btnStyle}>
         {truncate(activeAddress)}
       </button>
       {open && (
@@ -111,4 +101,3 @@ const menuItemStyle: React.CSSProperties = {
   border: 'none',
   cursor: 'pointer'
 };
-
