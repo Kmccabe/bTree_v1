@@ -1,10 +1,12 @@
-import React from 'react';
+﻿import React from 'react';
 import { NavLink } from 'react-router-dom';
 
 const linkStyle: React.CSSProperties = { padding: '0.5rem 0.75rem', textDecoration: 'none' };
 const active: React.CSSProperties = { fontWeight: 700, textDecoration: 'underline' };
 
 export default function HeaderBar(): JSX.Element {
+  const classicUrl = (import.meta as any).env?.VITE_CLASSIC_URL as string | undefined;
+
   return (
     <header style={{
       borderBottom: '1px solid #e5e7eb',
@@ -31,15 +33,26 @@ export default function HeaderBar(): JSX.Element {
           </nav>
         </div>
         <div>
-          <button type="button" style={{
-            padding: '0.4rem 0.75rem', border: '1px solid #d1d5db',
-            borderRadius: 6, background: '#f9fafb', cursor: 'pointer'
-          }}>
-            Connect wallet
-          </button>
+          {classicUrl ? (
+            <a
+              href={classicUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                padding: '0.4rem 0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                background: '#f9fafb',
+                textDecoration: 'none'
+              }}
+            >
+              Open classic app (v1)
+            </a>
+          ) : (
+            <span style={{ color: '#6b7280' }}>(set VITE_CLASSIC_URL to enable v1 link)</span>
+          )}
         </div>
       </div>
     </header>
   );
 }
-
