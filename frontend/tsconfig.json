@@ -1,23 +1,22 @@
-{
+﻿{
   "compilerOptions": {
     "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": [
-      "ES2020",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "moduleResolution": "Bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    "types": ["node", "vite/client"],
     "resolveJsonModule": true,
+
+    "strict": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "skipLibCheck": true,
+    "useDefineForClassFields": true,
+    "composite": true
   },
-  "include": [
-    "src",
-    "src/types",
-    "api"
-  ]
+  "include": ["src", "src/types", "api", "vite.config.ts", "env.d.ts"],
+  "exclude": ["dist", "node_modules"]
 }

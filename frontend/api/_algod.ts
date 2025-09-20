@@ -1,13 +1,53 @@
-/// <reference types="node" />
-export function algodHeaders() {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const token = process.env.TESTNET_ALGOD_TOKEN || process.env.VITE_TESTNET_ALGOD_TOKEN || "";
-  if (token) headers["X-API-Key"] = token;
+﻿/// <reference types="node" />
+
+const DEFAULT_TOKEN_HEADER = "X-API-Key";
+
+function firstEnv(keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (typeof value === "string" && value.trim() !== "") {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+export function algodHeaders(extra?: Record<string, string>) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(extra ?? {})
+  };
+
+  const token = firstEnv([
+    "ALGOD_TOKEN",
+    "TESTNET_ALGOD_TOKEN",
+    "VITE_TESTNET_ALGOD_TOKEN"
+  ]);
+
+  const tokenHeader = firstEnv([
+    "ALGOD_TOKEN_HEADER",
+    "TESTNET_ALGOD_TOKEN_HEADER"
+  ]) || DEFAULT_TOKEN_HEADER;
+
+  if (token) headers[tokenHeader] = token;
   return headers;
 }
 
 export function algodUrl(path: string) {
-  const base = process.env.TESTNET_ALGOD_URL || process.env.VITE_TESTNET_ALGOD_URL;
-  if (!base) throw new Error("TESTNET_ALGOD_URL (or VITE_TESTNET_ALGOD_URL) env not set on server");
-  return base.replace(/\/$/, "") + path;
+  const base = firstEnv([
+    "ALGOD_URL",
+    "TESTNET_ALGOD_URL",
+    "VITE_TESTNET_ALGOD_URL"
+  ]);
+
+  if (!base) {
+    throw new Error(
+      "ALGOD_URL (or TESTNET_ALGOD_URL / VITE_TESTNET_ALGOD_URL) env not set on server"
+    );
+  }
+
+  const normalizedBase = base.replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
 }
