@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useMemo } from "react";
 import * as algosdk from "algosdk";
 import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
@@ -341,6 +340,19 @@ export default function App(): JSX.Element {
     }
   }, []);
 
+  const renderSmTxDetails = (txId: string | null) => {
+    if (!txId) {
+      return null;
+    }
+    return (
+      <div>
+        <div>txId: <code>{txId}</code></div>
+        {smConfirmedRound && <div>confirmed-round: {smConfirmedRound}</div>}
+        <div><a href={txUrl(txId)} target="_blank" rel="noreferrer">View in Lora</a></div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ fontFamily: "system-ui, Arial", padding: 24 }}>
       <h1 style={{ marginTop: 0 }}>bTree - Trust Game POC</h1>
@@ -413,13 +425,11 @@ export default function App(): JSX.Element {
             <div style={{ marginTop: 8 }}>
               <button onClick={handlePingParams}>Ping /api/params</button>
             </div>
-            {paramsInfo && (
-              <div style={{ marginTop: 6 }}>
-                <div>params.fee: {String(paramsInfo.fee)}</div>
-                <div>params.last-round: {String(paramsInfo.lastRound)}</div>
-                <div>params.genesis-id: {String(paramsInfo.genesisID)}</div>
-              </div>
-            )}
+            <div style={{ marginTop: 6 }}>
+              <div>params.fee: {String(paramsInfo?.fee ?? "\u2014")}</div>
+              <div>params.last-round: {String(paramsInfo?.lastRound ?? "\u2014")}</div>
+              <div>params.genesis-id: {String(paramsInfo?.genesisID ?? "\u2014")}</div>
+            </div>
             {paramsErr && (
               <div style={{ marginTop: 6, color: "#b00" }}>params error: {paramsErr}</div>
             )}
@@ -428,7 +438,7 @@ export default function App(): JSX.Element {
                 <div><strong>suggestedParams</strong></div>
                 <div>fee: {String((spInfo as any).fee)} (flatFee: {String((spInfo as any).flatFee)})</div>
                 <div>minFee: {String((spInfo as any).minFee)}</div>
-                <div>firstValid: {String((spInfo as any).firstValid)} → lastValid: {String((spInfo as any).lastValid)}</div>
+                <div>firstValid: {String((spInfo as any).firstValid)} {"\u2192"} lastValid: {String((spInfo as any).lastValid)}</div>
                 <div>genesisID: {String((spInfo as any).genesisID)}</div>
                 <div>
                   genesisHash: {
@@ -439,12 +449,10 @@ export default function App(): JSX.Element {
                 </div>
               </div>
             )}
-            {progLens && (
-              <div style={{ marginTop: 6 }}>
-                <div>approval length: {progLens.approvalLen}</div>
-                <div>clear length: {progLens.clearLen}</div>
-              </div>
-            )}
+            <div style={{ marginTop: 6 }}>
+              <div>approval length: {progLens?.approvalLen ?? "\u2014"}</div>
+              <div>clear length: {progLens?.clearLen ?? "\u2014"}</div>
+            </div>
             {/* On-Chain Smoke Test card */}
             <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 8, padding: 12, background: "#fff" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
@@ -472,13 +480,7 @@ export default function App(): JSX.Element {
               </div>
               {(smLastTxId || smError) && (
                 <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>
-                  {smLastTxId && (
-                    <div>
-                      <div>txId: <code>{smLastTxId}</code></div>
-                      {smConfirmedRound && <div>confirmed-round: {smConfirmedRound}</div>}
-                      <div><a href={txUrl(smLastTxId)} target="_blank" rel="noreferrer">View in Lora</a></div>
-                    </div>
-                  )}
+                  {renderSmTxDetails(smLastTxId)}
                   {smError && (
                     <div style={{ color: "#b00" }}>error: {smError}</div>
                   )}

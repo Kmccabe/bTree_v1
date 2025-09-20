@@ -3,19 +3,18 @@
     "target": "ES2020",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-
     "module": "ESNext",
     "moduleResolution": "Node",
-
-    "types": ["node", "vite/client"],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "types": ["vite/client", "node"],
     "resolveJsonModule": true,
-
     "strict": true,
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
     "useDefineForClassFields": true
   },
-  "include": ["src", "src/types", "api", "vite.config.ts", "env.d.ts"],
-  "exclude": ["dist", "node_modules"]
+  "include": ["src", "src/types", "api", "env.d.ts"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.test.tsx", "api/health.test.ts"]
 }

@@ -102,6 +102,7 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
     return { id };
   }, [remove, startTimer]);
 
+
   return (
     <ToastContext.Provider value={{ show, remove, pauseTimer, resumeTimer, toasts }}>
       {children}
@@ -921,6 +922,24 @@ function SubjectActionsInner() {
     }
   }
 
+  const renderDemoInvestLink = (txId: string | null) => {
+    if (!txId) {
+      return null;
+    }
+    return (
+      <span>Invest: <a className="underline" href={loraTxUrl(txId)} target="_blank" rel="noreferrer">View on LoRA</a></span>
+    );
+  };
+
+  const renderDemoReturnLink = (txId: string | null) => {
+    if (!txId) {
+      return null;
+    }
+    return (
+      <span>Return: <a className="underline" href={loraTxUrl(txId)} target="_blank" rel="noreferrer">View on LoRA</a></span>
+    );
+  };
+
   return (
     <div className="rounded-2xl border p-4 space-y-3" style={{ position: "relative" }}>
       {/* Activity first */}
@@ -1207,9 +1226,9 @@ function SubjectActionsInner() {
         </div>
         {(demoInvestTx || demoReturnTx) && (
           <div className="text-xs text-neutral-700">
-            {demoInvestTx && (<span>Invest: <a className="underline" href={loraTxUrl(demoInvestTx)} target="_blank" rel="noreferrer">View on LoRA</a></span>)}
-            {demoInvestTx && demoReturnTx && <span> Â· </span>}
-            {demoReturnTx && (<span>Return: <a className="underline" href={loraTxUrl(demoReturnTx)} target="_blank" rel="noreferrer">View on LoRA</a></span>)}
+            {renderDemoInvestLink(demoInvestTx)}
+            {demoInvestTx && demoReturnTx && <span>{"\u00B7"}</span>}
+            {renderDemoReturnLink(demoReturnTx)}
           </div>
         )}
       </div>
