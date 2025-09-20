@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev:vite": "vite",
-    "dev:api": "vercel dev --yes --port 3000",
+    "dev:api": "vercel dev --yes --listen 3000",
     "dev": "npm-run-all -p dev:api dev:vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview"

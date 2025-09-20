@@ -4,8 +4,8 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
 
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
 
     "types": ["node", "vite/client"],
     "resolveJsonModule": true,
@@ -14,8 +14,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "useDefineForClassFields": true,
-    "composite": true
+    "useDefineForClassFields": true
   },
   "include": ["src", "src/types", "api", "vite.config.ts", "env.d.ts"],
   "exclude": ["dist", "node_modules"]

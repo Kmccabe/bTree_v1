@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useContext, useCallback } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState, useContext, useCallback } from "react";
 import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
 import algosdk from "algosdk";
 import { Buffer } from "buffer";
@@ -191,7 +191,7 @@ function SubjectActionsInner() {
     try { await clients?.[PROVIDER_ID.PERA]?.disconnect(); } catch {}
   }, [providers, clients]);
   function shortAddr(addr?: string | null) {
-    return typeof addr === 'string' && addr.length > 12 ? `${addr.slice(0,6)}…${addr.slice(-6)}` : (addr || '');
+    return typeof addr === 'string' && addr.length > 12 ? `${addr.slice(0,6)}â€¦${addr.slice(-6)}` : (addr || '');
   }
   const toast = useToast();
 
@@ -231,7 +231,7 @@ function SubjectActionsInner() {
   };
   const [inlineStatus, setInlineStatus] = useState<{ phase: 'submitted' | 'confirmed' | 'rejected'; text: string; round?: number; txId?: string; appCallTxId?: string; paymentTxId?: string } | null>(null);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
-  // Subject — Return form/state
+  // Subject â€” Return form/state
   const [returnRInput, setReturnRInput] = useState<string>("");
   const [returnStatus, setReturnStatus] = useState<{ phase: 'submitted' | 'confirmed' | 'rejected'; text: string; round?: number; txId?: string } | null>(null);
   // Quick demo state
@@ -592,7 +592,7 @@ function SubjectActionsInner() {
     setBusy("invest");
     try {
       const activityId = Math.random().toString(36).slice(2);
-      setInlineStatus({ phase: 'submitted', text: 'Invest submitted… (waiting for confirmation)' });
+      setInlineStatus({ phase: 'submitted', text: 'Invest submittedâ€¦ (waiting for confirmation)' });
       setActivity(prev => [{ id: activityId, ts: Date.now(), status: 'submitted' as const, op: 'invest' } as ActivityEntry, ...prev].slice(0, 5));
       const id = resolveAppId();
       console.info("[appId] resolved =", id);
@@ -750,7 +750,7 @@ function SubjectActionsInner() {
       const id = resolveAppId();
       const { senderResolved } = resolveSender();
       // Status only (toasts removed)
-      setReturnStatus({ phase: 'submitted', text: 'Return submitted… (waiting for confirmation)' });
+      setReturnStatus({ phase: 'submitted', text: 'Return submittedâ€¦ (waiting for confirmation)' });
       const activityId = Math.random().toString(36).slice(2);
       setActivity(prev => [{ id: activityId, ts: Date.now(), status: 'submitted' as const, op: 'return', rAmount: r, tAmount: t } as ActivityEntry, ...prev].slice(0, 5));
       // no toast
@@ -767,7 +767,7 @@ function SubjectActionsInner() {
         appIndex: id,
         appArgs: [str('return'), u64(r)],
         accounts,
-        // Two inner payments → use higher flat fee
+        // Two inner payments â†’ use higher flat fee
         suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 4 },
       });
       const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
@@ -837,7 +837,7 @@ function SubjectActionsInner() {
       try {
         const creator = (pair.globals as any)?.creator || creatorAddr;
         if (creator && senderResolved === creator) {
-          toast.show({ kind: 'info', title: 'Setting phase', description: 'Attempting phase=2…' });
+          toast.show({ kind: 'info', title: 'Setting phase', description: 'Attempting phase=2â€¦' });
           await setPhase({ sender: senderResolved, appId: id, phase: 2, sign: (u)=>signTransactions(u), wait: true });
         }
       } catch {}
@@ -854,7 +854,7 @@ function SubjectActionsInner() {
       }
 
       // 3) Invest
-      toast.show({ kind: 'info', title: 'Invest submitted', description: 'Pending confirmation…' });
+      toast.show({ kind: 'info', title: 'Invest submitted', description: 'Pending confirmationâ€¦' });
       const inv = await investFlow({ sender: senderResolved, appId: id, s, sign: (u)=>signTransactions(u), wait: true });
       if (inv?.txId) setDemoInvestTx(inv.txId);
 
@@ -939,9 +939,9 @@ function SubjectActionsInner() {
                   {' '}
                   {e.status === 'submitted' && (
                     isReturn ? (
-                      <span>Return submitted…{(rStr && tStr) ? ` (r: ${rStr}, t: ${tStr})` : ''}</span>
+                      <span>Return submittedâ€¦{(rStr && tStr) ? ` (r: ${rStr}, t: ${tStr})` : ''}</span>
                     ) : (
-                      <span>Invest submitted…</span>
+                      <span>Invest submittedâ€¦</span>
                     )
                   )}
                   {e.status === 'confirmed' && (
@@ -989,7 +989,7 @@ function SubjectActionsInner() {
       {inlineStatus && (
         <div className="text-xs">
           {inlineStatus.phase === 'submitted' && (
-            <span className="text-neutral-700">Invest submitted… (waiting for confirmation)</span>
+            <span className="text-neutral-700">Invest submittedâ€¦ (waiting for confirmation)</span>
           )}
           {inlineStatus.phase === 'confirmed' && (
             <span className="text-green-700">
@@ -1002,9 +1002,9 @@ function SubjectActionsInner() {
                 if (links.length === 0 && inlineStatus.txId) links.push({ label: 'View on LoRA', href: loraTxUrl(inlineStatus.txId) });
                 return links.length ? (
                   <>
-                    · {links.map((l, i) => (
+                    Â· {links.map((l, i) => (
                       <a key={i} href={l.href} target="_blank" rel="noreferrer" className="underline text-blue-700">{l.label}</a>
-                    )).reduce((acc, el, i) => acc.length ? [...acc, <span key={`sep-${i}`}> · </span>, el] : [el], [] as any)}
+                    )).reduce((acc, el, i) => acc.length ? [...acc, <span key={`sep-${i}`}> Â· </span>, el] : [el], [] as any)}
                   </>
                 ) : null;
               })()}
@@ -1034,7 +1034,7 @@ function SubjectActionsInner() {
               const needsFunding = tVal > 0 && (funds.balance ?? 0) < tVal;
               return (
                 <div>
-                  App balance: {ok ? <span className="text-green-600">OK ({'>'}= 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs {'>'}= 0.20 ALGO)</span>} · {algo} ALGO
+                  App balance: {ok ? <span className="text-green-600">OK ({'>'}= 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs {'>'}= 0.20 ALGO)</span>} Â· {algo} ALGO
                   {needsFunding && (
                     <div className="mt-1 text-amber-700">
                       App underfunded. Needs {'>'}= {tVal.toLocaleString()} microAlgos before Subject 2 can return. Use the QR below to fund.
@@ -1066,7 +1066,7 @@ function SubjectActionsInner() {
         <button className="text-xs underline" 
           onClick={doInvest}
           disabled={investDisabled}>
-          {busy==="invest" ? "Investing…" : "Invest"}
+          {busy==="invest" ? "Investingâ€¦" : "Invest"}
         </button>
         {(typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
           <span className="text-xs text-amber-600">App balance low; needs {'>'}= 0.20 ALGO</span>
@@ -1094,7 +1094,11 @@ function SubjectActionsInner() {
                       try { await handleDisconnect(); } catch {}
                       return;
                     }
-                    const r = await setPhase({ sender: activeAddress!, appId: id, phase: 3, sign: (u)=>signTransactions(u), wait: true });
+                    if (!activeAddress) {
+                      setErr("Connect wallet as subject.");
+                      return;
+                    }
+                    const r = await setPhase({ sender: activeAddress, appId: id, phase: 3, sign: (u)=>signTransactions(u), wait: true });
                     const actions = r?.txId ? [{ label: 'View on LoRA', href: loraTxUrl(r.txId) }] : undefined;
                     toast.show({ kind: 'success', title: 'Phase set to 3 (Return)', description: r?.confirmedRound ? `Round ${r.confirmedRound}` : undefined, actions });
                     await loadGlobals();
@@ -1146,7 +1150,7 @@ function SubjectActionsInner() {
             placeholder={`0 <= r <= ${globalsTVal || 0}`}
           />
           <button className="text-xs underline" onClick={doReturn} disabled={returnDisabled}>
-            {busy === 'return' ? 'Returning…' : 'Return'}
+            {busy === 'return' ? 'Returningâ€¦' : 'Return'}
           </button>
         </div>
         {(returnStatus?.phase === 'submitted' || returnStatus?.phase === 'confirmed') && (
@@ -1165,7 +1169,7 @@ function SubjectActionsInner() {
         {underfundedForReturn && <div className="text-xs text-amber-700">Underfunded: needs {'>'}= {(globalsTVal + (E2||0)).toLocaleString()} microAlgos in app.</div>}
         {returnStatus && (
           <div className="text-xs">
-            {returnStatus.phase === 'submitted' && <span className="text-neutral-700">Return submitted… (waiting for confirmation)</span>}
+            {returnStatus.phase === 'submitted' && <span className="text-neutral-700">Return submittedâ€¦ (waiting for confirmation)</span>}
             {returnStatus.phase === 'confirmed' && <span className="text-green-700">{returnStatus.text}</span>}
             {returnStatus.phase === 'rejected' && <span className="text-red-600">{returnStatus.text}</span>}
           </div>
@@ -1180,7 +1184,7 @@ function SubjectActionsInner() {
       {false && (
       <div className="mt-6 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Quick Demo (single account)</h4>
-        <div className="text-xs text-neutral-700">Runs: [Phase 2 if experimenter] → Invest → Return</div>
+        <div className="text-xs text-neutral-700">Runs: [Phase 2 if experimenter] â†’ Invest â†’ Return</div>
         <div className="flex items-center gap-3 text-sm flex-wrap">
           <label className="flex items-center gap-2">
             <span>s (microAlgos)</span>
@@ -1194,17 +1198,17 @@ function SubjectActionsInner() {
           </label>
           <button className="text-xs underline" onClick={runDemo}
             disabled={!!busy || !!demoBusy || !activeAddress || !hasResolvedAppId || !/^\d+$/.test(sInput || '0') || (Number(sInput) % unit !== 0) || (Number(sInput) > E)}>
-            {demoBusy === 'demo' ? 'Running…' : 'Run Demo'}
+            {demoBusy === 'demo' ? 'Runningâ€¦' : 'Run Demo'}
           </button>
           <button className="text-xs underline" onClick={runReturnOnly}
             disabled={!!busy || !!demoBusy || !activeAddress || !hasResolvedAppId || !(globalsTVal > 0) || globalsRet === 1 || !rValid || underfundedForReturn}>
-            {demoBusy === 'return_only' ? 'Returning…' : 'Run Return only'}
+            {demoBusy === 'return_only' ? 'Returningâ€¦' : 'Run Return only'}
           </button>
         </div>
         {(demoInvestTx || demoReturnTx) && (
           <div className="text-xs text-neutral-700">
             {demoInvestTx && (<span>Invest: <a className="underline" href={loraTxUrl(demoInvestTx)} target="_blank" rel="noreferrer">View on LoRA</a></span>)}
-            {demoInvestTx && demoReturnTx && <span> · </span>}
+            {demoInvestTx && demoReturnTx && <span> Â· </span>}
             {demoReturnTx && (<span>Return: <a className="underline" href={loraTxUrl(demoReturnTx)} target="_blank" rel="noreferrer">View on LoRA</a></span>)}
           </div>
         )}
