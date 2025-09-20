@@ -38,7 +38,7 @@ Server env (functions): set in Vercel project
   - Build Command: `npm run build`
   - Output: `dist`
 
-## UI Overview
+## UI Overview 
 
 **Admin – Deploy & Manage Pair**
 - Deploy: compiles TEAL (`frontend/src/teal/*.teal`) and creates the app.
