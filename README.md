@@ -201,6 +201,25 @@ npm run typecheck # TypeScript checking
 - Wait a few rounds for transaction confirmation
 - Use "Load globals/Read pair state" to refresh data
 
+## Status & Alerts
+
+- Health summary lives at `/status` (UI) and `/api/health` (JSON).
+- Optional alerts via `/api/alert/health` + Vercel Cron (every 5 min).
+
+### Enable Telegram alerts
+
+1. Create a bot with **@BotFather** → `/newbot`, copy the **token**.
+2. Create a group/channel, add the bot, send one message.
+3. Visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` and note the `chat.id`.
+
+Set these in Vercel **(Preview + Production)**:
+HEALTH_ALERT_DEST=telegram
+TELEGRAM_BOT_TOKEN=<your token>
+TELEGRAM_CHAT_ID=<numeric chat id>
+HEALTH_ALERT_MIN_INTERVAL=15m
+
+
+
 ## 🔗 Resources
 
 - **Algorand Developer Docs**: https://developer.algorand.org/

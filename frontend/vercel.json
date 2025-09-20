@@ -4,5 +4,8 @@
   ],
   "installCommand": "npm install",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "crons": [
+    { "path": "/api/alert/health", "schedule": "*/5 * * * *" }
+  ]
 }
