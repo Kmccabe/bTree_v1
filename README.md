@@ -227,7 +227,7 @@ HEALTH_ALERT_MIN_INTERVAL=15m
 - **Pera Wallet**: https://perawallet.app/
 - **Vercel Documentation**: https://vercel.com/docs
 
-## 📚 Documentation
+## 📚 Documentation 
 
 - **Frontend Details**: [`frontend/README.md`](frontend/README.md)
 - **Game Design**: [`frontend/docs/trust-game-design.md`](frontend/docs/trust-game-design.md)  
