@@ -30,10 +30,10 @@ Server env (functions): set in Vercel project
 - `TESTNET_ALGOD_URL`, `TESTNET_ALGOD_TOKEN` (required)
 - `TESTNET_INDEXER_URL`, `TESTNET_INDEXER_TOKEN` (optional)
 
-## Build & Deploy
+## Build & Deploy ok
 
 - Build: `npm run build` → `frontend/dist`
-- Vercel settings
+- Vercel settings ok
   - Root Directory: `frontend/`
   - Build Command: `npm run build`
   - Output: `dist`
