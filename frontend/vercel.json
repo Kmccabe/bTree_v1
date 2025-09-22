@@ -6,6 +6,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "crons": [
-    { "path": "/api/alert/health", "schedule": "*/5 * * * *" }
+    { "path": "/api/alert/health", "schedule": "*@daily" }
   ]
 }
