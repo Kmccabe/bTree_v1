@@ -1,13 +1,10 @@
-// src/polyfills.ts
+// frontend/src/polyfills.ts
+// Makes Node-ish globals available in the browser bundle when needed.
+// Vite won't polyfill these by default.
+
 import { Buffer } from "buffer";
 import process from "process";
 
-if (typeof (window as any).global === "undefined") {
-  (window as any).global = window; // polyfill 'global'
-}
-if (typeof (window as any).Buffer === "undefined") {
-  (window as any).Buffer = Buffer; // polyfill 'Buffer'
-}
-if (typeof (window as any).process === "undefined") {
-  (window as any).process = process; // polyfill 'process'
-}
+// Attach only if missing to avoid double-defining in different environments.
+if (!(globalThis as any).Buffer) (globalThis as any).Buffer = Buffer;
+if (!(globalThis as any).process) (globalThis as any).process = process;
