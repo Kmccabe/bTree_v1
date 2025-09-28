@@ -26,3 +26,13 @@ build/
 *.tsbuildinfo
 
 .vercel
+
+# --- Frontend build artifacts / caches ---
+/frontend/.vite/
+/frontend/dist/
+/frontend/.output/
+/frontend/.next/
+
+# (optional) local debug endpoints – keep untracked if you recreate them
+/frontend/api/health_dbg.ts
+/frontend/api/ping.js
