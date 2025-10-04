@@ -22,6 +22,8 @@ import type { Transaction, SuggestedParams } from "algosdk";
 import { getParamsNormalized } from "./params";
 import { resolveAppId } from "../state/appId";
 import { str, u64 } from "./enc";
+import { appCallFee } from "./fees";
+
 
 /** Shape expected by /api/submit in this repo (single signed txn). */
 type SubmitRequest = { signedTxnBase64: string };
@@ -568,13 +570,18 @@ export async function investFlow(args: {
   let call: any;
   try {
     const mf = (sp as any).minFee ?? (sp as any).fee ?? 1000;
+
+    // NEW: scale AppCall fee by refund inner count
+    const investInnerCount = 1; // safe default: invest may emit one inner refund (E1 - s)
+
+
     call = (algosdk as any).makeApplicationNoOpTxnFromObject({
       sender: senderResolved,
       appIndex: appId,
       appArgs: [str("invest"), u64(s)],
       // Provide sender in foreign Accounts in case the TEAL reads it via txna Accounts
       accounts: [senderResolved],
-      suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 2 },
+      suggestedParams: { ...(sp as any), flatFee: true, fee: appCallFee(investInnerCount) },
     });
   } catch (e: any) {
     throw new Error(`${TAG} build AppCall failed (from=${short(senderResolved)} appId=${appId}): ${e?.message || e}`);
@@ -624,7 +631,7 @@ export async function sweepApp(args: {
     suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 2 },
   });
   const stxns = await sign([(algosdk as any).encodeUnsignedTransaction(call)]);
-  const payload = { stxns: stxns.map((b: Uint8Array) => toBase64(b)) };
+  const payload = { stxns: stxns.map((b) => toBase64(b)) };
   const sub = await fetch("/api/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   const text = await sub.text();
   if (!sub.ok) throw new Error(`${TAG} submit ${sub.status}: ${text}`);
