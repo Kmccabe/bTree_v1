@@ -244,8 +244,6 @@ function SubjectActionsInner() {
   // Inline phase control state (for creator convenience)
   const [phaseSelLocal, setPhaseSelLocal] = useState<number>(0);
 
-  const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
-
   // helpers
   const connected = activeAddress || "(not connected)";
   const appIdNum = Number(appIdIn);
@@ -674,10 +672,17 @@ function SubjectActionsInner() {
   }
 
 const alreadyInvested = false; // no local gating in no-opt-in flow
+// Compute required refund solvency: app must hold ≥ (E1 - s)
+const requiredForRefund = (() => {
+  const sNum = Number(sInput || "0");
+  if (!Number.isInteger(sNum) || sNum < 0 || sNum > E) return 0;
+  return Math.max(0, E - sNum);
+})();
+
 const investDisabled =
   !!busy || !activeAddress || !hasResolvedAppId ||
   alreadyInvested ||
-  (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) ||
+  (typeof funds.balance === 'number' && funds.balance < requiredForRefund) ||
   !/^\d+$/.test(sInput || "0") ||
   Number(sInput) % unit !== 0 ||
   Number(sInput) > E ||
@@ -1057,26 +1062,42 @@ const investDisabled =
       {(typeof funds.balance === 'number' || funds.error) && (
         <div className="text-xs text-neutral-700">
           {typeof funds.balance === 'number' ? (
-            (()=>{
-              const ok = funds.balance >= APP_FUND_THRESHOLD;
-              const algo = (funds.balance / 1_000_000).toFixed(6);
-              const tVal = (() => { const g:any = pair.globals as any; return (g && typeof g.t === 'number') ? g.t : 0; })();
-              const needsFunding = tVal > 0 && (funds.balance ?? 0) < tVal;
-              return (
-                <div>
-                  App balance: {ok ? <span className="text-green-600">OK ({'>'}= 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs {'>'}= 0.20 ALGO)</span>} Â· {algo} ALGO
-                  {needsFunding && (
-                    <div className="mt-1 text-amber-700">
-                      App underfunded. Needs {'>'}= {tVal.toLocaleString()} microAlgos before Subject 2 can return. Use the QR below to fund.
-                    </div>
-                  )}
-                  {/* QR and address block removed for simplicity */}
-                </div>
-              );
-            })()
-          ) : (
-            <span className="text-red-600">{funds.error}</span>
-          )}
+  (() => {
+    const algo = (funds.balance / 1_000_000).toFixed(6);
+    const tVal = (() => {
+      const g: any = pair.globals as any;
+      return (g && typeof g.t === 'number') ? g.t : 0;
+    })();
+
+    // Invest-side solvency (refund): needs ≥ (E1 - s)
+    const needsForInvest = requiredForRefund; // from earlier computation
+    const okInvest = funds.balance >= needsForInvest;
+
+    // Return-side solvency: needs ≥ t + E2 (only meaningful after invest)
+    const needsForReturn = (tVal || 0) + (E2 || 0);
+    const okReturn = funds.balance >= needsForReturn;
+
+    return (
+      <div>
+        App balance · {algo} ALGO
+        {!okInvest && (
+          <div className="mt-1 text-amber-700">
+            Underfunded for Invest refund: needs ≥ {needsForInvest.toLocaleString()} microAlgos.
+          </div>
+        )}
+        {tVal > 0 && !okReturn && (
+          <div className="mt-1 text-amber-700">
+            Underfunded for Return: needs ≥ {needsForReturn.toLocaleString()} microAlgos.
+          </div>
+        )}
+        {/* QR and address block removed for simplicity */}
+      </div>
+    );
+  })()
+) : (
+  <span className="text-red-600">{funds.error}</span>
+)}
+
         </div>
       )}
 
@@ -1098,8 +1119,11 @@ const investDisabled =
           disabled={investDisabled}>
           {busy==="invest" ? "Investingâ€¦" : "Invest"}
         </button>
-        {(typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
-          <span className="text-xs text-amber-600">App balance low; needs {'>'}= 0.20 ALGO</span>
+        {(typeof funds.balance === 'number' && funds.balance < requiredForRefund) && (
+          <span className="text-xs text-amber-600">
+            App underfunded; needs ≥ {requiredForRefund.toLocaleString()} microAlgos
+          </span>
+
         )}
       </div>
 
