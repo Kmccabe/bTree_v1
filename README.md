@@ -179,8 +179,33 @@ npm run preview  # Preview build
 npm run lint     # ESLint
 npm run typecheck # TypeScript checking
 ```
+## Branch status — `feature/v2-bridge-cleanup`
 
+This V2 bridge branch intentionally limits serverless APIs.
+
+- **Enabled API:** `/api/health` (Node runtime) — used by the Status page.
+- **Disabled APIs:** all other `/api/*` routes (moved under `frontend/api_disabled/`).  
+  UI features that call `/api/{pair,history,account,submit,pending}` will 404 on this branch.
+
+### Local dev health check
+
+- Start dev server:  
+  ```bash
+  cd frontend
+  npm run dev
+```
+Open Status page: http://localhost:5173/status
+ (Algod/Indexer probes)
+
+Why this branch?
+
+We’re cleaning up the V1↔V2 bridge, tightening guards, and keeping deploy size within hobby limits.
+Full APIs can be re-enabled later by moving files back from frontend/api_disabled/.
+
+<!-- Optional: show preflight CI badge if you have .github/workflows/preflight.yml --> <!-- Replace USER/REPO with yours --> <!-- [![Preflight](https://github.com/USER/REPO/actions/workflows/preflight.yml/badge.svg)](https://github.com/USER/REPO/actions/workflows/preflight.yml) -->
 ## 🐛 Troubleshooting
+
+
 
 ### Common Issues
 
