@@ -447,10 +447,10 @@ export default function AdminSetup2() {
             onChange={(e)=>{ setManualAppId(e.target.value); const n = Number(e.target.value); if (Number.isFinite(n) && n > 0) setSelectedAppId(n); }}
             className="border rounded px-2 py-1 w-40" placeholder="e.g., 745000000" />
           <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy || !manualAppId}>Read pair state</button>
-          <button className="text-xs underline" onClick={()=>onApplyPhase(0)} disabled={!!busy || !activeAddress}>Phase: 0 (Registration)</button>
-          <button className="text-xs underline" onClick={()=>onApplyPhase(1)} disabled={!!busy || !activeAddress}>Phase: 1 (Setup)</button>
-          <button className="text-xs underline" onClick={()=>onApplyPhase(2)} disabled={!!busy || !activeAddress}>Phase: 2 (Invest)</button>
-          <button className="text-xs underline" onClick={()=>onApplyPhase(3)} disabled={!!busy || !activeAddress}>Phase: 3 (Return/Done)</button>
+          <button className="text-xs underline" onClick={()=>onApplyPhase(0)} disabled={!!busy || !activeAddress || !isCreator}>Phase: 0 (Registration)</button>
+          <button className="text-xs underline" onClick={()=>onApplyPhase(1)} disabled={!!busy || !activeAddress || !isCreator}>Phase: 1 (Setup)</button>
+          <button className="text-xs underline" onClick={()=>onApplyPhase(2)} disabled={!!busy || !activeAddress || !isCreator}>Phase: 2 (Invest)</button>
+          <button className="text-xs underline" onClick={()=>onApplyPhase(3)} disabled={!!busy || !activeAddress || !isCreator}>Phase: 3 (Return/Done)</button>
           <button
             className="text-xs underline"
             onClick={onSweep}
@@ -483,14 +483,16 @@ export default function AdminSetup2() {
                   {(() => {
                     const capturedOk = isAddr(s1Input) && isAddr(s2Input);
                     const fundedOk = !!fund?.ok;
-                    const disabled = !!busy || !activeAddress || !capturedOk || !fundedOk;
+                    const disabled = !!busy || !activeAddress || !capturedOk || !fundedOk || !isCreator;
                     const title = !activeAddress
                       ? 'Connect the experimenter wallet'
-                      : (!capturedOk
-                        ? 'Capture valid S1 and S2 first'
-                        : (!fundedOk
-                          ? 'Fund the app to at least the Required pool estimate'
-                          : ''));
+                      : (!isCreator
+                        ? 'Experimenter only'
+                        : (!capturedOk
+                          ? 'Capture valid S1 and S2 first'
+                          : (!fundedOk
+                            ? 'Fund the app to at least the Required pool estimate'
+                            : '')));
                     return (
                       <button
                         className="rounded px-3 py-2 border"
@@ -502,10 +504,10 @@ export default function AdminSetup2() {
                           try {
                             const id = resolveAppId();
                             if (!activeAddress) throw new Error('Connect the experimenter wallet');
-                        await setPhase({ sender: activeAddress, appId: id, phase: 2, sign: signer, wait: true });
-                        setCurrentPhase(2);
-                        // Disconnect experimenter wallet after starting experiment
-                        try { await disconnectExperimenter(); } catch {}
+                            await setPhase({ sender: activeAddress, appId: id, phase: 2, sign: signer, wait: true });
+                            setCurrentPhase(2);
+                            // Disconnect experimenter wallet after starting experiment
+                            try { await disconnectExperimenter(); } catch {}
                           } catch (e: any) {
                             setErr(e?.message || String(e));
                           } finally {
@@ -629,4 +631,3 @@ export default function AdminSetup2() {
     </div>
   );
 }
-
