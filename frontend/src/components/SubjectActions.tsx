@@ -7,6 +7,8 @@ import { getParamsNormalized } from "../chain/params";
 import { str, u64 } from "../chain/enc";
 import { resolveAppId, setSelectedAppId, getSelectedAppId, clearSelectedAppId } from "../state/appId";
 import { getAccountBalanceMicroAlgos } from "../chain/balance";
+import { appCallFee } from "../chain/fees"; // <-- added
+
 // QR code not used in Subject UI anymore
 
 // ---------------------- Tiny local toast system (no deps) ----------------------
@@ -768,8 +770,8 @@ function SubjectActionsInner() {
         appIndex: id,
         appArgs: [str('return'), u64(r)],
         accounts,
-        // Two inner payments â†’ use higher flat fee
-        suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 4 },
+        // Two inner payments → compute exact fee
+        suggestedParams: { ...(sp as any), flatFee: true, fee: appCallFee(2) },
       });
       const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
       const payload = { stxns: stxns.map((b: Uint8Array) => Buffer.from(b).toString('base64')) };
@@ -902,7 +904,7 @@ function SubjectActionsInner() {
         appIndex: id,
         appArgs: [str('return'), u64(r)],
         accounts,
-        suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 4 },
+        suggestedParams: { ...(sp as any), flatFee: true, fee: appCallFee(2) },
       });
       const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
       const payload = { stxns: stxns.map((b: Uint8Array) => Buffer.from(b).toString('base64')) };
@@ -1049,7 +1051,7 @@ function SubjectActionsInner() {
             (()=>{
               const ok = funds.balance >= APP_FUND_THRESHOLD;
               const algo = (funds.balance / 1_000_000).toFixed(6);
-              const tVal = (() => { const g:any = pair.globals as any; return (g && typeof g.t === 'number') ? Number(g.t) : 0; })();
+              const tVal = (() => { const g:any = pair.globals as any; return (g && typeof g.t === 'number') ? g.t : 0; })();
               const needsFunding = tVal > 0 && (funds.balance ?? 0) < tVal;
               return (
                 <div>
@@ -1203,7 +1205,7 @@ function SubjectActionsInner() {
       {false && (
       <div className="mt-6 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Quick Demo (single account)</h4>
-        <div className="text-xs text-neutral-700">Runs: [Phase 2 if experimenter] â†’ Invest â†’ Return</div>
+        <div className="text-xs text-neutral-700">Runs: [Phase 2 if experimenter] → Invest → Return</div>
         <div className="flex items-center gap-3 text-sm flex-wrap">
           <label className="flex items-center gap-2">
             <span>s (microAlgos)</span>
