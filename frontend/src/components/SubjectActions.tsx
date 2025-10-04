@@ -673,15 +673,17 @@ function SubjectActionsInner() {
     }
   }
 
-  const alreadyInvested = false; // no local gating in no-opt-in flow
-  const investDisabled =
-    !!busy || !activeAddress || !hasResolvedAppId ||
-    alreadyInvested ||
-    (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) ||
-    !/^\d+$/.test(sInput || "0") ||
-    Number(sInput) % unit !== 0 ||
-    Number(sInput) > E ||
-    (inlineStatus?.phase === 'confirmed');
+const alreadyInvested = false; // no local gating in no-opt-in flow
+const investDisabled =
+  !!busy || !activeAddress || !hasResolvedAppId ||
+  alreadyInvested ||
+  (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) ||
+  !/^\d+$/.test(sInput || "0") ||
+  Number(sInput) % unit !== 0 ||
+  Number(sInput) > E ||
+  (inlineStatus?.phase === 'confirmed') ||
+  // Phase gate: Invest only in phase 2
+  ((pair.globals as any)?.phase !== 2);
 
   // ----- Return flow -----
   const globalsTVal: number = (() => { const g: any = pair.globals as any; const v = g && typeof g.t === 'number' ? Number(g.t) : 0; return Number.isFinite(v) ? v : 0; })();
@@ -722,8 +724,15 @@ function SubjectActionsInner() {
     } catch {}
     return '';
   })();
+  
   const s1Valid = !!s1FromGlobals && ((algosdk as any).isValidAddress ? (algosdk as any).isValidAddress(s1FromGlobals) : (s1FromGlobals.length === 58));
-  const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || /* allow t==0 */ globalsRet === 1 || !rValid || underfundedForReturn || !s1Valid;
+  const returnDisabled =
+  !!busy || !activeAddress || !hasResolvedAppId ||
+  /* allow t==0 */ globalsRet === 1 ||
+  !rValid || underfundedForReturn || !s1Valid ||
+  // Phase gate: Return only in phase 3
+  ((pair.globals as any)?.phase !== 3);
+
   const returnBlockers = useMemo(() => {
     const msgs: string[] = [];
     if (!hasResolvedAppId) msgs.push('App ID not set');
