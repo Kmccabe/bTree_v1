@@ -8,3 +8,4 @@ import process from "process";
 // Attach only if missing to avoid double-defining in different environments.
 if (!(globalThis as any).Buffer) (globalThis as any).Buffer = Buffer;
 if (!(globalThis as any).process) (globalThis as any).process = process;
+if (!(globalThis as any).global) (globalThis as any).global = globalThis;
