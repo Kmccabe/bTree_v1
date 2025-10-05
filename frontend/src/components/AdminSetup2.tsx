@@ -56,6 +56,9 @@ export default function AdminSetup2() {
   const isCreator = !!activeAddress && (
     (!!creatorEnv && activeAddress === creatorEnv) || (!!creatorOnChain && activeAddress === creatorOnChain)
   );
+  // Track freshness of phase read
+  const [phaseReadAt, setPhaseReadAt] = useState<number | null>(null);
+
   // Try to learn creator from on-chain app params when an App ID is selected
   useEffect(() => {
     (async () => {
@@ -265,6 +268,7 @@ export default function AdminSetup2() {
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
       const ph = Number(j?.globals?.phase);
       if (Number.isFinite(ph)) setCurrentPhase(ph);
+      setPhaseReadAt(Date.now());
       // No special UI here; this validates the app exists and backend network matches
     } catch (e: any) { setErr(e?.message || String(e)); }
   }
@@ -447,6 +451,9 @@ export default function AdminSetup2() {
             onChange={(e)=>{ setManualAppId(e.target.value); const n = Number(e.target.value); if (Number.isFinite(n) && n > 0) setSelectedAppId(n); }}
             className="border rounded px-2 py-1 w-40" placeholder="e.g., 745000000" />
           <button className="text-xs underline" onClick={onReadPairState} disabled={!!busy || !manualAppId}>Read pair state</button>
+          <span className="text-[11px] text-neutral-500">
+            {phaseReadAt ? `phase=${currentPhase ?? '—'} · ${Math.max(0, Math.floor((Date.now() - phaseReadAt)/1000))}s ago` : 'phase: (unknown)'}
+          </span>
           <button className="text-xs underline" onClick={()=>onApplyPhase(0)} disabled={!!busy || !activeAddress || !isCreator}>Phase: 0 (Registration)</button>
           <button className="text-xs underline" onClick={()=>onApplyPhase(1)} disabled={!!busy || !activeAddress || !isCreator}>Phase: 1 (Setup)</button>
           <button className="text-xs underline" onClick={()=>onApplyPhase(2)} disabled={!!busy || !activeAddress || !isCreator}>Phase: 2 (Invest)</button>
@@ -454,8 +461,22 @@ export default function AdminSetup2() {
           <button
             className="text-xs underline"
             onClick={onSweep}
-            disabled={!!busy || !activeAddress || currentPhase !== 3 || !isCreator}
-            title={currentPhase !== 3 ? 'Enabled only in Done (3)' : (!isCreator ? 'Experimenter only' : '')}
+            disabled={
+              !!busy ||
+              !activeAddress ||
+              currentPhase !== 3 ||
+              !isCreator ||
+              !phaseReadAt ||
+              (Date.now() - phaseReadAt > 20000)
+            }
+            title={
+              !activeAddress ? 'Connect experimenter wallet'
+              : !isCreator ? 'Experimenter only'
+              : !phaseReadAt ? 'Read pair state to refresh phase'
+              : (Date.now() - phaseReadAt > 20000) ? 'Phase info is stale; read again'
+              : (currentPhase !== 3) ? 'Enabled only in Done (3)'
+              : ''
+            }
           >
             Sweep
           </button>
@@ -568,16 +589,45 @@ export default function AdminSetup2() {
           <button
             className="text-xs underline"
             onClick={onSweep}
-            disabled={!!busy || !activeAddress || currentPhase !== 3 || !isCreator}
-            title={currentPhase !== 3 ? 'Enabled only in Done (3)' : (!isCreator ? 'Experimenter only' : '')}
+            disabled={
+              !!busy ||
+              !activeAddress ||
+              currentPhase !== 3 ||
+              !isCreator ||
+              !phaseReadAt ||
+              (Date.now() - phaseReadAt > 20000)
+            }
+            title={
+              !activeAddress ? 'Connect experimenter wallet'
+              : !isCreator ? 'Experimenter only'
+              : !phaseReadAt ? 'Read pair state to refresh phase'
+              : (Date.now() - phaseReadAt > 20000) ? 'Phase info is stale; read again'
+              : (currentPhase !== 3) ? 'Enabled only in Done (3)'
+              : ''
+            }
           >
             Sweep
           </button>
           <button
             className="text-xs underline text-red-700"
             onClick={onDelete}
-            disabled={!!busy || !activeAddress || currentPhase !== 3 || !isCreator}
-            title={currentPhase === 3 ? 'Delete application (experimenter only). Sweep first to reclaim liquid.' : 'Enabled only in Done (3). Use Sweep first, then Delete.'}
+            disabled={
+              !!busy ||
+              !activeAddress ||
+              currentPhase !== 3 ||
+              !isCreator ||
+              !phaseReadAt ||
+              (Date.now() - phaseReadAt > 20000)
+            }
+            title={
+              !activeAddress ? 'Connect experimenter wallet'
+              : !isCreator ? 'Experimenter only'
+              : !phaseReadAt ? 'Read pair state to refresh phase'
+              : (Date.now() - phaseReadAt > 20000) ? 'Phase info is stale; read again'
+              : (currentPhase !== 3)
+                ? 'Enabled only in Done (3). Use Sweep first, then Delete.'
+                : 'Delete application (experimenter only). Sweep first to reclaim liquid.'
+            }
           >
             Delete app
           </button>
