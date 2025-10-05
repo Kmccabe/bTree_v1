@@ -738,6 +738,19 @@ const investDisabled =
   // Phase gate: Return only in phase 3
   ((pair.globals as any)?.phase !== 3);
 
+  const returnDisableReason = (() => {
+  if (!hasResolvedAppId) return 'App ID not set';
+  if (!activeAddress) return 'Connect wallet';
+  if ((pair.globals as any)?.phase !== 3) return 'Return allowed only in phase 3';
+  if (globalsRet === 1) return 'Already returned';
+  if (!s1Valid) return 'S1 not found (Load globals after Invest)';
+  if (!rValid) return `Enter r between 0 and ${globalsTVal || 0}`;
+  if (hasFundsInfo && underfundedForReturn) return `Underfunded: needs ≥ ${(globalsTVal + (E2 || 0)).toLocaleString()} µAlgos`;
+  if (busy) return 'Busy';
+  return '';
+})();
+
+
   const returnBlockers = useMemo(() => {
     const msgs: string[] = [];
     if (!hasResolvedAppId) msgs.push('App ID not set');
@@ -1203,7 +1216,7 @@ const investDisabled =
             onChange={(e)=> setReturnRInput(e.target.value.replace(/[^\d]/g, ''))}
             placeholder={`0 <= r <= ${globalsTVal || 0}`}
           />
-          <button className="text-xs underline" onClick={doReturn} disabled={returnDisabled}>
+          <button className="text-xs underline" onClick={doReturn} disabled={returnDisabled} title={returnDisableReason}>
             {busy === 'return' ? 'Returningâ€¦' : 'Return'}
           </button>
         </div>
