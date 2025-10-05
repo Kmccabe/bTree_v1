@@ -1033,6 +1033,13 @@ const investDisabled =
         <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>Load globals</button>
       </div>
 
+      {/* API-disabled note for this branch */}
+      <div className="text-[11px] text-amber-700 mt-1">
+        Note: on <code>feature/v2-bridge-cleanup</code>, only <code>/api/health</code> is enabled. Calls to
+        <code> /api/pair</code>, <code> /api/history</code>, <code> /api/account</code>, <code> /api/submit</code>, and
+        <code> /api/pending</code> will 404 on this branch.
+      </div>  
+
       {/* Inline status */}
       {inlineStatus && (
         <div className="text-xs">
