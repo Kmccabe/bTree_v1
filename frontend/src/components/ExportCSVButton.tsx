@@ -3,6 +3,20 @@ import { resolveAppId } from "../state/appId";
 
 type Props = { appId?: string | number };
 
+// NEW: pick Indexer base by VITE_NETWORK with sensible defaults
+function getIndexerBaseFromEnv(): string {
+  const net = (((import.meta as any).env?.VITE_NETWORK as string) || "TESTNET").toUpperCase();
+  const env: any = (import.meta as any).env || {};
+  const main = (env.VITE_MAINNET_INDEXER_URL as string) || "https://mainnet-idx.algonode.cloud";
+  const test = (env.VITE_TESTNET_INDEXER_URL as string) || "https://testnet-idx.algonode.cloud";
+  const local = (env.VITE_LOCALNET_INDEXER_URL as string) || ""; // optional
+  const base =
+    net === "MAINNET" ? main :
+    net === "LOCALNET" ? (local || test) : // fallback to testnet if local not provided
+    test;
+  return base.replace(/\/$/, "");
+}
+
 export default function ExportCSVButton({ appId }: Props) {
   // Resolve app id from central resolver
   const resolvedAppId = useMemo(() => {
@@ -30,10 +44,8 @@ export default function ExportCSVButton({ appId }: Props) {
     if (!resolvedAppId) return;
     try {
       setBusy(true);
-      const idx =
-        (import.meta.env.VITE_TESTNET_INDEXER_URL as string) ||
-        "https://testnet-idx.algonode.cloud";
-      const r = await fetch(`${idx.replace(/\/$/, "")}/v2/applications/${resolvedAppId}`);
+      const indexerBase = getIndexerBaseFromEnv();
+      const r = await fetch(`${indexerBase}/v2/applications/${resolvedAppId}`);
       const j = await r.json();
       const created = j?.application?.["created-at-round"];
       if (created) setMinRound(String(created));

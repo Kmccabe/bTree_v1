@@ -7,6 +7,8 @@ import { getParamsNormalized } from "../chain/params";
 import { str, u64 } from "../chain/enc";
 import { resolveAppId, setSelectedAppId, getSelectedAppId, clearSelectedAppId } from "../state/appId";
 import { getAccountBalanceMicroAlgos } from "../chain/balance";
+import { appCallFee } from "../chain/fees"; // <-- added
+
 // QR code not used in Subject UI anymore
 
 // ---------------------- Tiny local toast system (no deps) ----------------------
@@ -241,8 +243,6 @@ function SubjectActionsInner() {
   const [demoReturnTx, setDemoReturnTx] = useState<string | null>(null);
   // Inline phase control state (for creator convenience)
   const [phaseSelLocal, setPhaseSelLocal] = useState<number>(0);
-
-  const APP_FUND_THRESHOLD = 200_000; // 0.20 ALGO
 
   // helpers
   const connected = activeAddress || "(not connected)";
@@ -671,15 +671,24 @@ function SubjectActionsInner() {
     }
   }
 
-  const alreadyInvested = false; // no local gating in no-opt-in flow
-  const investDisabled =
-    !!busy || !activeAddress || !hasResolvedAppId ||
-    alreadyInvested ||
-    (typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) ||
-    !/^\d+$/.test(sInput || "0") ||
-    Number(sInput) % unit !== 0 ||
-    Number(sInput) > E ||
-    (inlineStatus?.phase === 'confirmed');
+const alreadyInvested = false; // no local gating in no-opt-in flow
+// Compute required refund solvency: app must hold ≥ (E1 - s)
+const requiredForRefund = (() => {
+  const sNum = Number(sInput || "0");
+  if (!Number.isInteger(sNum) || sNum < 0 || sNum > E) return 0;
+  return Math.max(0, E - sNum);
+})();
+
+const investDisabled =
+  !!busy || !activeAddress || !hasResolvedAppId ||
+  alreadyInvested ||
+  (typeof funds.balance === 'number' && funds.balance < requiredForRefund) ||
+  !/^\d+$/.test(sInput || "0") ||
+  Number(sInput) % unit !== 0 ||
+  Number(sInput) > E ||
+  (inlineStatus?.phase === 'confirmed') ||
+  // Phase gate: Invest only in phase 2
+  ((pair.globals as any)?.phase !== 2);
 
   // ----- Return flow -----
   const globalsTVal: number = (() => { const g: any = pair.globals as any; const v = g && typeof g.t === 'number' ? Number(g.t) : 0; return Number.isFinite(v) ? v : 0; })();
@@ -720,8 +729,28 @@ function SubjectActionsInner() {
     } catch {}
     return '';
   })();
+  
   const s1Valid = !!s1FromGlobals && ((algosdk as any).isValidAddress ? (algosdk as any).isValidAddress(s1FromGlobals) : (s1FromGlobals.length === 58));
-  const returnDisabled = !!busy || !activeAddress || !hasResolvedAppId || /* allow t==0 */ globalsRet === 1 || !rValid || underfundedForReturn || !s1Valid;
+  const returnDisabled =
+  !!busy || !activeAddress || !hasResolvedAppId ||
+  /* allow t==0 */ globalsRet === 1 ||
+  !rValid || underfundedForReturn || !s1Valid ||
+  // Phase gate: Return only in phase 3
+  ((pair.globals as any)?.phase !== 3);
+
+  const returnDisableReason = (() => {
+  if (!hasResolvedAppId) return 'App ID not set';
+  if (!activeAddress) return 'Connect wallet';
+  if ((pair.globals as any)?.phase !== 3) return 'Return allowed only in phase 3';
+  if (globalsRet === 1) return 'Already returned';
+  if (!s1Valid) return 'S1 not found (Load globals after Invest)';
+  if (!rValid) return `Enter r between 0 and ${globalsTVal || 0}`;
+  if (hasFundsInfo && underfundedForReturn) return `Underfunded: needs ≥ ${(globalsTVal + (E2 || 0)).toLocaleString()} µAlgos`;
+  if (busy) return 'Busy';
+  return '';
+})();
+
+
   const returnBlockers = useMemo(() => {
     const msgs: string[] = [];
     if (!hasResolvedAppId) msgs.push('App ID not set');
@@ -768,8 +797,8 @@ function SubjectActionsInner() {
         appIndex: id,
         appArgs: [str('return'), u64(r)],
         accounts,
-        // Two inner payments â†’ use higher flat fee
-        suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 4 },
+        // Two inner payments → compute exact fee
+        suggestedParams: { ...(sp as any), flatFee: true, fee: appCallFee(2) },
       });
       const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
       const payload = { stxns: stxns.map((b: Uint8Array) => Buffer.from(b).toString('base64')) };
@@ -902,7 +931,7 @@ function SubjectActionsInner() {
         appIndex: id,
         appArgs: [str('return'), u64(r)],
         accounts,
-        suggestedParams: { ...(sp as any), flatFee: true, fee: mf * 4 },
+        suggestedParams: { ...(sp as any), flatFee: true, fee: appCallFee(2) },
       });
       const stxns = await signTransactions([(algosdk as any).encodeUnsignedTransaction(call)]);
       const payload = { stxns: stxns.map((b: Uint8Array) => Buffer.from(b).toString('base64')) };
@@ -1004,6 +1033,13 @@ function SubjectActionsInner() {
         <button className="text-xs underline" onClick={loadGlobals} disabled={!!busy || !hasResolvedAppId}>Load globals</button>
       </div>
 
+      {/* API-disabled note for this branch */}
+      <div className="text-[11px] text-amber-700 mt-1">
+        Note: on <code>feature/v2-bridge-cleanup</code>, only <code>/api/health</code> is enabled. Calls to
+        <code> /api/pair</code>, <code> /api/history</code>, <code> /api/account</code>, <code> /api/submit</code>, and
+        <code> /api/pending</code> will 404 on this branch.
+      </div>  
+
       {/* Inline status */}
       {inlineStatus && (
         <div className="text-xs">
@@ -1046,26 +1082,42 @@ function SubjectActionsInner() {
       {(typeof funds.balance === 'number' || funds.error) && (
         <div className="text-xs text-neutral-700">
           {typeof funds.balance === 'number' ? (
-            (()=>{
-              const ok = funds.balance >= APP_FUND_THRESHOLD;
-              const algo = (funds.balance / 1_000_000).toFixed(6);
-              const tVal = (() => { const g:any = pair.globals as any; return (g && typeof g.t === 'number') ? Number(g.t) : 0; })();
-              const needsFunding = tVal > 0 && (funds.balance ?? 0) < tVal;
-              return (
-                <div>
-                  App balance: {ok ? <span className="text-green-600">OK ({'>'}= 0.20 ALGO)</span> : <span className="text-amber-600">Low (needs {'>'}= 0.20 ALGO)</span>} Â· {algo} ALGO
-                  {needsFunding && (
-                    <div className="mt-1 text-amber-700">
-                      App underfunded. Needs {'>'}= {tVal.toLocaleString()} microAlgos before Subject 2 can return. Use the QR below to fund.
-                    </div>
-                  )}
-                  {/* QR and address block removed for simplicity */}
-                </div>
-              );
-            })()
-          ) : (
-            <span className="text-red-600">{funds.error}</span>
-          )}
+  (() => {
+    const algo = (funds.balance / 1_000_000).toFixed(6);
+    const tVal = (() => {
+      const g: any = pair.globals as any;
+      return (g && typeof g.t === 'number') ? g.t : 0;
+    })();
+
+    // Invest-side solvency (refund): needs ≥ (E1 - s)
+    const needsForInvest = requiredForRefund; // from earlier computation
+    const okInvest = funds.balance >= needsForInvest;
+
+    // Return-side solvency: needs ≥ t + E2 (only meaningful after invest)
+    const needsForReturn = (tVal || 0) + (E2 || 0);
+    const okReturn = funds.balance >= needsForReturn;
+
+    return (
+      <div>
+        App balance · {algo} ALGO
+        {!okInvest && (
+          <div className="mt-1 text-amber-700">
+            Underfunded for Invest refund: needs ≥ {needsForInvest.toLocaleString()} microAlgos.
+          </div>
+        )}
+        {tVal > 0 && !okReturn && (
+          <div className="mt-1 text-amber-700">
+            Underfunded for Return: needs ≥ {needsForReturn.toLocaleString()} microAlgos.
+          </div>
+        )}
+        {/* QR and address block removed for simplicity */}
+      </div>
+    );
+  })()
+) : (
+  <span className="text-red-600">{funds.error}</span>
+)}
+
         </div>
       )}
 
@@ -1087,8 +1139,11 @@ function SubjectActionsInner() {
           disabled={investDisabled}>
           {busy==="invest" ? "Investingâ€¦" : "Invest"}
         </button>
-        {(typeof funds.balance === 'number' && funds.balance < APP_FUND_THRESHOLD) && (
-          <span className="text-xs text-amber-600">App balance low; needs {'>'}= 0.20 ALGO</span>
+        {(typeof funds.balance === 'number' && funds.balance < requiredForRefund) && (
+          <span className="text-xs text-amber-600">
+            App underfunded; needs ≥ {requiredForRefund.toLocaleString()} microAlgos
+          </span>
+
         )}
       </div>
 
@@ -1168,7 +1223,7 @@ function SubjectActionsInner() {
             onChange={(e)=> setReturnRInput(e.target.value.replace(/[^\d]/g, ''))}
             placeholder={`0 <= r <= ${globalsTVal || 0}`}
           />
-          <button className="text-xs underline" onClick={doReturn} disabled={returnDisabled}>
+          <button className="text-xs underline" onClick={doReturn} disabled={returnDisabled} title={returnDisableReason}>
             {busy === 'return' ? 'Returningâ€¦' : 'Return'}
           </button>
         </div>
@@ -1203,7 +1258,7 @@ function SubjectActionsInner() {
       {false && (
       <div className="mt-6 rounded-xl border p-3 space-y-2">
         <h4 className="text-md font-semibold">Quick Demo (single account)</h4>
-        <div className="text-xs text-neutral-700">Runs: [Phase 2 if experimenter] â†’ Invest â†’ Return</div>
+        <div className="text-xs text-neutral-700">Runs: [Phase 2 if experimenter] → Invest → Return</div>
         <div className="flex items-center gap-3 text-sm flex-wrap">
           <label className="flex items-center gap-2">
             <span>s (microAlgos)</span>

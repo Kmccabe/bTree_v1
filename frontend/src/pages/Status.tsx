@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { HealthSummary, ProbeResult } from "../../api/health.js";
+import type { HealthSummary, ProbeResult } from "../lib/health-types";
 
 const REQUEST_TIMEOUT_MS = 5000;
 const AUTO_REFRESH_MS = 15000;

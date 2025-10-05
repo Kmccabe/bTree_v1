@@ -25,16 +25,15 @@ export function algodHeaders(extra?: Record<string, string>) {
     "VITE_TESTNET_ALGOD_TOKEN"
   ]);
 
-  const tokenHeader = firstEnv([
-    "ALGOD_TOKEN_HEADER",
-    "TESTNET_ALGOD_TOKEN_HEADER"
-  ]) || DEFAULT_TOKEN_HEADER;
+  const tokenHeader =
+    firstEnv(["ALGOD_TOKEN_HEADER", "TESTNET_ALGOD_TOKEN_HEADER"]) ||
+    DEFAULT_TOKEN_HEADER;
 
   if (token) headers[tokenHeader] = token;
   return headers;
 }
 
-export function algodUrl(path: string) {
+export function algodUrl(path?: string) {
   const base = firstEnv([
     "ALGOD_URL",
     "TESTNET_ALGOD_URL",
@@ -47,7 +46,9 @@ export function algodUrl(path: string) {
     );
   }
 
-  const normalizedBase = base.replace(/\/$/, "");
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  // changed: remove one-or-more trailing slashes (was /\/$/)
+  const normalizedBase = base.replace(/\/+$/, "");
+  // changed: tolerate undefined path (no .startsWith on undefined)
+  const normalizedPath = !path ? "" : (path.startsWith("/") ? path : `/${path}`);
   return `${normalizedBase}${normalizedPath}`;
 }
