@@ -202,7 +202,8 @@ Why this branch?
 We’re cleaning up the V1↔V2 bridge, tightening guards, and keeping deploy size within hobby limits.
 Full APIs can be re-enabled later by moving files back from frontend/api_disabled/.
 
-<!-- Optional: show preflight CI badge if you have .github/workflows/preflight.yml --> <!-- Replace USER/REPO with yours --> <!-- [![Preflight](https://github.com/USER/REPO/actions/workflows/preflight.yml/badge.svg)](https://github.com/USER/REPO/actions/workflows/preflight.yml) -->
+[![Preflight](https://github.com/Kmccabe/bTree_v1/actions/workflows/preflight.yml/badge.svg)](https://github.com/Kmccabe/bTree_v1/actions/workflows/preflight.yml)
+
 ## 🐛 Troubleshooting
 
 
