@@ -1,6 +1,7 @@
-﻿import React from 'react';
+import React from 'react';
 import { createBrowserRouter, Navigate, NavLink, Outlet } from 'react-router-dom';
 import Layout from './components/layout/Layout';
+import { useWallet, PROVIDER_ID } from '@txnlab/use-wallet'; // NEW
 
 // Pages
 import Landing from './pages/Landing';
@@ -37,14 +38,87 @@ function SubjectLayout() {
 }
 
 function SubjectSignIn() {
+  const { activeAddress, providers, clients } = useWallet();
+  const pera = React.useMemo(
+    () => providers?.find(p => p.metadata.id === PROVIDER_ID.PERA),
+    [providers]
+  );
+
+  const handleConnect = React.useCallback(async () => {
+    const target = pera ?? providers?.[0];
+    const peraClient = clients?.[PROVIDER_ID.PERA];
+    if (!target) {
+      console.warn('Wallet provider not initialized yet');
+      return;
+    }
+    try {
+      await target.connect();
+      if (!target.isActive) target.setActiveProvider?.();
+    } catch (err: any) {
+      const msg = String(err?.message || err).toLowerCase();
+      if (msg.includes('currently connected') && peraClient) {
+        try {
+          await peraClient.reconnect(() => {});
+          if (!target.isActive) target.setActiveProvider?.();
+        } catch (e) {
+          console.error('Reconnect failed:', e);
+        }
+      } else {
+        console.error('Connect failed:', err);
+      }
+    }
+  }, [clients, pera, providers]);
+
+  const handleDisconnect = React.useCallback(async () => {
+    try { await pera?.disconnect(); } catch {}
+    try { await clients?.[PROVIDER_ID.PERA]?.disconnect?.(); } catch {}
+  }, [clients, pera]);
+
+  React.useEffect(() => {
+    if (!pera) return;
+    if (Array.isArray(pera.accounts) && pera.accounts.length > 0 && !pera.isActive) {
+      try { pera.setActiveProvider?.(); } catch {}
+    }
+  }, [pera]);
+
+  const short = (a?: string | null) =>
+    (a && a.length > 12) ? `${a.slice(0,6)}...${a.slice(-6)}` : (a || '');
+
+  const statusLines = (
+    <div className="mt-3 text-xs text-neutral-500 space-y-1">
+      <div>Pera active: {String(!!pera?.isActive)}</div>
+      <div>Pera accounts: {pera?.accounts?.length ?? 0}</div>
+      <div>Active address: {activeAddress ? short(activeAddress) : '(none)'}</div>
+    </div>
+  );
+
   return (
     <div className="space-y-2">
       <h2 className="font-semibold">Wallet Sign-In</h2>
-      <p className="text-sm text-neutral-700">Connect / disconnect your wallet here.</p>
-      <p className="text-xs text-neutral-500">Next: go to <code>/subject/register</code>.</p>
+      {activeAddress ? (
+        <div className="text-sm text-neutral-700">
+          <div>Connected as <code>{short(activeAddress)}</code></div>
+          <div className="mt-2">
+            <button className="underline text-sm" onClick={handleDisconnect}>Disconnect</button>
+          </div>
+          <div className="mt-3 text-xs text-neutral-500">
+            Next: go to <NavLink to="../register" className="underline">Register</NavLink>.
+          </div>
+          {statusLines}
+        </div>
+      ) : (
+        <div className="text-sm text-neutral-700">
+          <button className="underline text-sm" onClick={handleConnect}>Connect Pera Wallet</button>
+          <div className="mt-2 text-xs text-neutral-500">
+            Uses the same Pera-first flow as the main app.
+          </div>
+          {statusLines}
+        </div>
+      )}
     </div>
   );
 }
+
 
 function SubjectRegister() {
   return (
@@ -65,7 +139,7 @@ function SubjectShowUp() {
     <div>
       <h2 className="font-semibold">Show Up</h2>
       <p className="text-sm text-neutral-700">
-        When the experiment starts, you’ll confirm your participation by opting in on-chain.
+        When the experiment starts, you'll confirm your participation by opting in on-chain.
       </p>
       <button className="mt-2 border rounded px-3 py-1 text-sm bg-blue-50 text-blue-700" disabled>
         Opt In (coming soon)
