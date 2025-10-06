@@ -1,0 +1,485 @@
+#pragma version 8
+txn NumAppArgs
+int 0
+==
+bnz main_l16
+txna ApplicationArgs 0
+method "register_intent(byte[],byte[],byte[])void"
+==
+bnz main_l15
+txna ApplicationArgs 0
+method "admin_open()void"
+==
+bnz main_l14
+txna ApplicationArgs 0
+method "admin_close()void"
+==
+bnz main_l13
+txna ApplicationArgs 0
+method "admin_add_capacity(uint64)void"
+==
+bnz main_l12
+txna ApplicationArgs 0
+method "admin_set_reward(uint64)void"
+==
+bnz main_l11
+txna ApplicationArgs 0
+method "link_payment_begin(byte[])void"
+==
+bnz main_l10
+txna ApplicationArgs 0
+method "link_finish(address)void"
+==
+bnz main_l9
+err
+main_l9:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub linkfinishcaster_13
+int 1
+return
+main_l10:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub linkpaymentbegincaster_12
+int 1
+return
+main_l11:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub adminsetrewardcaster_11
+int 1
+return
+main_l12:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub adminaddcapacitycaster_10
+int 1
+return
+main_l13:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub adminclosecaster_9
+int 1
+return
+main_l14:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub adminopencaster_8
+int 1
+return
+main_l15:
+txn OnCompletion
+int NoOp
+==
+txn ApplicationID
+int 0
+!=
+&&
+assert
+callsub registerintentcaster_7
+int 1
+return
+main_l16:
+txn OnCompletion
+int NoOp
+==
+bnz main_l18
+err
+main_l18:
+txn ApplicationID
+int 0
+==
+assert
+txn NumAppArgs
+int 1
+>=
+// cap_arg
+assert
+byte "admin_addr"
+txn Sender
+app_global_put
+byte "is_open"
+int 1
+app_global_put
+byte "cap_total"
+txna ApplicationArgs 0
+btoi
+app_global_put
+byte "registered_count"
+int 0
+app_global_put
+byte "micro_reward"
+int 1000
+app_global_put
+int 1
+return
+
+// register_intent
+registerintent_0:
+proto 3 0
+byte "is_open"
+app_global_get
+int 1
+==
+// registry_closed
+assert
+byte "registered_count"
+app_global_get
+byte "cap_total"
+app_global_get
+<
+// capacity_reached
+assert
+byte "profile:"
+txn Sender
+concat
+box_get
+store 3
+store 2
+load 3
+int 0
+==
+// already_registered
+assert
+byte "profile:"
+txn Sender
+concat
+int 1
+itob
+box_put
+byte "registered_count"
+app_global_get
+int 1
++
+store 0
+byte "registered_count"
+load 0
+app_global_put
+load 0
+byte "cap_total"
+app_global_get
+==
+bnz registerintent_0_l3
+registerintent_0_l1:
+byte "micro_reward"
+app_global_get
+store 1
+global CurrentApplicationAddress
+balance
+global CurrentApplicationAddress
+min_balance
+-
+load 1
+>=
+// insufficient_reward_funds
+assert
+itxn_begin
+int pay
+itxn_field TypeEnum
+txn Sender
+itxn_field Receiver
+load 1
+itxn_field Amount
+int 0
+itxn_field Fee
+itxn_submit
+frame_dig -1
+extract 2 0
+len
+int 0
+>
+bz registerintent_0_l4
+byte "payment_cipher:"
+txn Sender
+concat
+frame_dig -1
+extract 2 0
+box_put
+b registerintent_0_l4
+registerintent_0_l3:
+byte "is_open"
+int 0
+app_global_put
+b registerintent_0_l1
+registerintent_0_l4:
+int 1
+return
+
+// admin_open
+adminopen_1:
+proto 0 0
+txn Sender
+byte "admin_addr"
+app_global_get
+==
+// admin_only
+assert
+byte "is_open"
+int 1
+app_global_put
+int 1
+return
+
+// admin_close
+adminclose_2:
+proto 0 0
+txn Sender
+byte "admin_addr"
+app_global_get
+==
+// admin_only
+assert
+byte "is_open"
+int 0
+app_global_put
+int 1
+return
+
+// admin_add_capacity
+adminaddcapacity_3:
+proto 1 0
+txn Sender
+byte "admin_addr"
+app_global_get
+==
+// admin_only
+assert
+byte "cap_total"
+byte "cap_total"
+app_global_get
+frame_dig -1
++
+app_global_put
+int 1
+return
+
+// admin_set_reward
+adminsetreward_4:
+proto 1 0
+txn Sender
+byte "admin_addr"
+app_global_get
+==
+// admin_only
+assert
+frame_dig -1
+int 1000
+>=
+// min_reward
+assert
+byte "micro_reward"
+frame_dig -1
+app_global_put
+int 1
+return
+
+// link_payment_begin
+linkpaymentbegin_5:
+proto 1 0
+global GroupSize
+int 2
+==
+// group_size
+assert
+txn GroupIndex
+int 0
+==
+// group_pos
+assert
+frame_dig -1
+extract 2 0
+len
+int 0
+>
+// cipher_required
+assert
+byte "link_pending:"
+txn Sender
+concat
+box_get
+store 5
+store 4
+load 5
+bnz linkpaymentbegin_5_l2
+int 0
+b linkpaymentbegin_5_l3
+linkpaymentbegin_5_l2:
+byte "link_pending:"
+txn Sender
+concat
+box_del
+linkpaymentbegin_5_l3:
+pop
+byte "link_pending:"
+txn Sender
+concat
+frame_dig -1
+extract 2 0
+box_put
+int 1
+return
+
+// link_finish
+linkfinish_6:
+proto 1 0
+global GroupSize
+int 2
+==
+// group_size
+assert
+txn GroupIndex
+int 1
+==
+// group_pos
+assert
+gtxn 0 TypeEnum
+int appl
+==
+// gtxn0_appcall
+assert
+gtxn 0 ApplicationID
+global CurrentApplicationID
+==
+// gtxn0_same_app
+assert
+gtxn 0 Sender
+frame_dig -1
+==
+// payment_sender
+assert
+byte "link_pending:"
+frame_dig -1
+concat
+box_get
+store 7
+store 6
+load 7
+// no_pending
+assert
+load 6
+store 8
+byte "link:"
+txn Sender
+concat
+frame_dig -1
+box_put
+byte "payment_cipher:"
+txn Sender
+concat
+load 8
+box_put
+byte "link_pending:"
+frame_dig -1
+concat
+box_del
+pop
+int 1
+return
+
+// register_intent_caster
+registerintentcaster_7:
+proto 0 0
+byte ""
+dupn 2
+txna ApplicationArgs 1
+frame_bury 0
+txna ApplicationArgs 2
+frame_bury 1
+txna ApplicationArgs 3
+frame_bury 2
+frame_dig 0
+frame_dig 1
+frame_dig 2
+callsub registerintent_0
+retsub
+
+// admin_open_caster
+adminopencaster_8:
+proto 0 0
+callsub adminopen_1
+retsub
+
+// admin_close_caster
+adminclosecaster_9:
+proto 0 0
+callsub adminclose_2
+retsub
+
+// admin_add_capacity_caster
+adminaddcapacitycaster_10:
+proto 0 0
+int 0
+txna ApplicationArgs 1
+btoi
+frame_bury 0
+frame_dig 0
+callsub adminaddcapacity_3
+retsub
+
+// admin_set_reward_caster
+adminsetrewardcaster_11:
+proto 0 0
+int 0
+txna ApplicationArgs 1
+btoi
+frame_bury 0
+frame_dig 0
+callsub adminsetreward_4
+retsub
+
+// link_payment_begin_caster
+linkpaymentbegincaster_12:
+proto 0 0
+byte ""
+txna ApplicationArgs 1
+frame_bury 0
+frame_dig 0
+callsub linkpaymentbegin_5
+retsub
+
+// link_finish_caster
+linkfinishcaster_13:
+proto 0 0
+byte ""
+txna ApplicationArgs 1
+frame_bury 0
+frame_dig 0
+callsub linkfinish_6
+retsub

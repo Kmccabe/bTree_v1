@@ -1,34 +1,70 @@
+# contracts/registry/compile.py
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from pyteal import Mode, compileTeal
+from pyteal import *
 
-try:\n    from .registry import get_router\nexcept ImportError:\n    from registry import get_router
+ARTIFACTS_DIR = Path(__file__).resolve().parent.parent / "artifacts"
+ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _write(path: Path, data: str | bytes) -> None:
+    if isinstance(data, bytes):
+        path.write_bytes(data)
+    else:
+        path.write_text(data, encoding="utf-8")
 
 
 def main() -> None:
-    router = get_router()
-    approval, clear, contract = router.compile_program(version=8)
+    """
+    Compile the bTree Registry contract to TEAL + contract JSON.
 
-    artifacts_dir = Path(__file__).resolve().parents[1] / "artifacts"
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    Supports two shapes of contracts/registry/registry.py:
+      1) get_router() -> Router   (preferred)
+      2) approval_program(), clear_state_program() -> Expr
+    """
+    # Lazy import to avoid import-time side effects
+    try:
+        from .registry import get_router  # type: ignore
+        router = get_router()  # Router
+        # PyTeal >= 0.24
+        approval_expr, clear_expr, contract_obj = router.compile_program(
+            version=8, optimize=OptimizeOptions(scratch_slots=True)
+        )
+        approval_teal = (
+            approval_expr
+            if isinstance(approval_expr, str)
+            else compileTeal(approval_expr, Mode.Application, version=8)
+        )
+        clear_teal = (
+            clear_expr
+            if isinstance(clear_expr, str)
+            else compileTeal(clear_expr, Mode.Application, version=8)
+        )
+        contract_json = json.dumps(contract_obj.dictify(), indent=2)
+    except ImportError:
+        # Fallback to plain functions
+        from .registry import approval_program, clear_state_program  # type: ignore
 
-    approval_path = artifacts_dir / "registry_approval.teal"
-    clear_path = artifacts_dir / "registry_clear.teal"
-    contract_path = artifacts_dir / "registry_contract.json"
+        approval_expr = approval_program()
+        clear_expr = clear_state_program()
+        approval_teal = compileTeal(approval_expr, Mode.Application, version=8)
+        clear_teal = compileTeal(clear_expr, Mode.Application, version=8)
+        # Minimal ABI artifact when no Router present
+        contract_json = json.dumps(
+            {"name": "bTree Registry (no-router)", "networks": {}, "methods": []}, indent=2
+        )
 
-    approval_path.write_text(compileTeal(approval, mode=Mode.Application, version=8) + "\n")
-    clear_path.write_text(compileTeal(clear, mode=Mode.Application, version=8) + "\n")
-    contract_path.write_text(json.dumps(contract.dictify(), indent=2) + "\n")
+    _write(ARTIFACTS_DIR / "registry_approval.teal", approval_teal)
+    _write(ARTIFACTS_DIR / "registry_clear.teal", clear_teal)
+    _write(ARTIFACTS_DIR / "registry.json", contract_json)
 
-    print(f"Wrote approval TEAL -> {approval_path}")
-    print(f"Wrote clear TEAL    -> {clear_path}")
-    print(f"Wrote app spec      -> {contract_path}")
-    print("Box prefixes in use: profile:, payment_cipher:, link:, link_pending:")
+    print(f"Wrote: {ARTIFACTS_DIR / 'registry_approval.teal'}")
+    print(f"Wrote: {ARTIFACTS_DIR / 'registry_clear.teal'}")
+    print(f"Wrote: {ARTIFACTS_DIR / 'registry.json'}")
 
 
 if __name__ == "__main__":
     main()
-

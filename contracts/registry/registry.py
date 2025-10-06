@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Tuple
 
 from pyteal import (
@@ -12,6 +10,8 @@ from pyteal import (
     BoxPut,
     Bytes,
     CallConfig,
+    OnComplete,
+    OnCompleteAction,
     Concat,
     Expr,
     Global,
@@ -19,9 +19,11 @@ from pyteal import (
     If,
     Int,
     Itob,
+    Btoi,
     Len,
     MinBalance,
-    Return,
+    Approve,
+    Pop,
     Router,
     ScratchVar,
     Seq,
@@ -68,30 +70,24 @@ def assert_admin() -> Expr:
 
 
 def get_router() -> Router:
+    bootstrap_expr = Seq(
+        Assert(Txn.application_args.length() >= Int(1), comment="cap_arg"),
+        App.globalPut(ADMIN_ADDR_KEY, Txn.sender()),
+        App.globalPut(IS_OPEN_KEY, Int(1)),
+        App.globalPut(CAP_TOTAL_KEY, Btoi(Txn.application_args[0])),
+        App.globalPut(REGISTERED_COUNT_KEY, Int(0)),
+        App.globalPut(MICRO_REWARD_KEY, MICRO_REWARD_DEFAULT),
+        Approve(),
+    )
+
     router = Router(
         "bTreeRegistry",
         BareCallActions(
-            no_op=CallConfig.CALL,
-            close_out=CallConfig.NEVER,
-            clear_state=CallConfig.CALL,
-            delete_application=CallConfig.NEVER,
-            update_application=CallConfig.NEVER,
-            opt_in=CallConfig.NEVER,
+            no_op=OnCompleteAction(action=bootstrap_expr, call_config=CallConfig.CREATE),
         ),
     )
 
-    @router.create
-    def bootstrap(cap_total: abi.Uint64) -> Expr:
-        return Seq(
-            App.globalPut(ADMIN_ADDR_KEY, Txn.sender()),
-            App.globalPut(IS_OPEN_KEY, Int(1)),
-            App.globalPut(CAP_TOTAL_KEY, cap_total.get()),
-            App.globalPut(REGISTERED_COUNT_KEY, Int(0)),
-            App.globalPut(MICRO_REWARD_KEY, MICRO_REWARD_DEFAULT),
-            Return(Int(1)),
-        )
-
-    @router.method("register_intent(campaign:byte[],contact_hint:byte[],payout_cipher:byte[])")
+    @router.method
     def register_intent(
         campaign: abi.DynamicBytes,
         contact_hint: abi.DynamicBytes,
@@ -129,7 +125,7 @@ def get_router() -> Router:
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields(
                 {
-                    TxnField.type_enum: Int(TxnType.Payment),
+                    TxnField.type_enum: TxnType.Payment,
                     TxnField.receiver: sender,
                     TxnField.amount: reward.load(),
                     TxnField.fee: Int(0),
@@ -139,7 +135,7 @@ def get_router() -> Router:
             If(Len(payout_bytes) > Int(0)).Then(
                 BoxPut(payment_cipher_key(sender), payout_bytes)
             ),
-            Return(Int(1)),
+            Approve(),
         )
 
     @router.method
@@ -147,7 +143,7 @@ def get_router() -> Router:
         return Seq(
             assert_admin(),
             App.globalPut(IS_OPEN_KEY, Int(1)),
-            Return(Int(1)),
+            Approve(),
         )
 
     @router.method
@@ -155,7 +151,7 @@ def get_router() -> Router:
         return Seq(
             assert_admin(),
             App.globalPut(IS_OPEN_KEY, Int(0)),
-            Return(Int(1)),
+            Approve(),
         )
 
     @router.method
@@ -163,7 +159,7 @@ def get_router() -> Router:
         return Seq(
             assert_admin(),
             App.globalPut(CAP_TOTAL_KEY, App.globalGet(CAP_TOTAL_KEY) + delta.get()),
-            Return(Int(1)),
+            Approve(),
         )
 
     @router.method
@@ -172,22 +168,22 @@ def get_router() -> Router:
             assert_admin(),
             Assert(amount.get() >= MICRO_REWARD_DEFAULT, comment="min_reward"),
             App.globalPut(MICRO_REWARD_KEY, amount.get()),
-            Return(Int(1)),
+            Approve(),
         )
 
-    @router.method("link_payment_begin(payout_cipher:byte[])")
+    @router.method
     def link_payment_begin(payout_cipher: abi.DynamicBytes) -> Expr:
         payout_bytes = payout_cipher.get()
         pending_key = link_pending_key(Txn.sender())
         existing = BoxGet(pending_key)
         return Seq(
             Assert(Global.group_size() == Int(2), comment="group_size"),
-            Assert(Global.group_index() == Int(0), comment="group_pos"),
+            Assert(Txn.group_index() == Int(0), comment="group_pos"),
             Assert(Len(payout_bytes) > Int(0), comment="cipher_required"),
             existing,
-            If(existing.hasValue()).Then(BoxDelete(pending_key)),
+            Pop(If(existing.hasValue(), BoxDelete(pending_key), Int(0))),
             BoxPut(pending_key, payout_bytes),
-            Return(Int(1)),
+            Approve(),
         )
 
     @router.method
@@ -199,9 +195,9 @@ def get_router() -> Router:
         experiment_addr = Txn.sender()
         return Seq(
             Assert(Global.group_size() == Int(2), comment="group_size"),
-            Assert(Global.group_index() == Int(1), comment="group_pos"),
+            Assert(Txn.group_index() == Int(1), comment="group_pos"),
             Assert(
-                Gtxn[0].type_enum() == Int(TxnType.ApplicationCall),
+                Gtxn[0].type_enum() == TxnType.ApplicationCall,
                 comment="gtxn0_appcall",
             ),
             Assert(
@@ -214,8 +210,8 @@ def get_router() -> Router:
             cipher.store(pending.value()),
             BoxPut(link_key(experiment_addr), payment_bytes),
             BoxPut(payment_cipher_key(experiment_addr), cipher.load()),
-            BoxDelete(pending_key),
-            Return(Int(1)),
+            Pop(BoxDelete(pending_key)),
+            Approve(),
         )
 
     return router

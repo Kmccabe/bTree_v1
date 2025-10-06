@@ -1,0 +1,88 @@
+{
+  "name": "bTreeRegistry",
+  "methods": [
+    {
+      "name": "register_intent",
+      "args": [
+        {
+          "type": "byte[]",
+          "name": "campaign"
+        },
+        {
+          "type": "byte[]",
+          "name": "contact_hint"
+        },
+        {
+          "type": "byte[]",
+          "name": "payout_cipher"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "admin_open",
+      "args": [],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "admin_close",
+      "args": [],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "admin_add_capacity",
+      "args": [
+        {
+          "type": "uint64",
+          "name": "delta"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "admin_set_reward",
+      "args": [
+        {
+          "type": "uint64",
+          "name": "amount"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "link_payment_begin",
+      "args": [
+        {
+          "type": "byte[]",
+          "name": "payout_cipher"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      }
+    },
+    {
+      "name": "link_finish",
+      "args": [
+        {
+          "type": "address",
+          "name": "payment_addr"
+        }
+      ],
+      "returns": {
+        "type": "void"
+      }
+    }
+  ],
+  "networks": {}
+}
