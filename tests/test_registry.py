@@ -29,6 +29,8 @@ METHODS = {m.name: m for m in CONTRACT.methods}
 
 
 def _program_to_teal(program) -> str:
+    if isinstance(program, str):
+        return program
     if hasattr(program, "to_teal"):
         return program.to_teal()
     if hasattr(program, "teal"):
