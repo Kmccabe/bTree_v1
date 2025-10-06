@@ -4,14 +4,12 @@ from pyteal import (
     App,
     Assert,
     Balance,
-    BareCallActions,
     BoxDelete,
     BoxGet,
     BoxPut,
     Bytes,
     CallConfig,
     OnComplete,
-    OnCompleteAction,
     Concat,
     Expr,
     Global,
@@ -24,6 +22,7 @@ from pyteal import (
     MinBalance,
     Approve,
     Pop,
+    MethodConfig,
     Router,
     ScratchVar,
     Seq,
@@ -70,22 +69,19 @@ def assert_admin() -> Expr:
 
 
 def get_router() -> Router:
-    bootstrap_expr = Seq(
-        Assert(Txn.application_args.length() >= Int(1), comment="cap_arg"),
-        App.globalPut(ADMIN_ADDR_KEY, Txn.sender()),
-        App.globalPut(IS_OPEN_KEY, Int(1)),
-        App.globalPut(CAP_TOTAL_KEY, Btoi(Txn.application_args[0])),
-        App.globalPut(REGISTERED_COUNT_KEY, Int(0)),
-        App.globalPut(MICRO_REWARD_KEY, MICRO_REWARD_DEFAULT),
-        Approve(),
-    )
+    router = Router("bTreeRegistry")
 
-    router = Router(
-        "bTreeRegistry",
-        BareCallActions(
-            no_op=OnCompleteAction(action=bootstrap_expr, call_config=CallConfig.CREATE),
-        ),
-    )
+    @router.method(no_op=CallConfig.CREATE)
+    def bootstrap(cap_total: abi.Uint64) -> Expr:
+        return Seq(
+            Assert(Txn.application_id() == Int(0)),
+            App.globalPut(ADMIN_ADDR_KEY, Txn.sender()),
+            App.globalPut(IS_OPEN_KEY, Int(1)),
+            App.globalPut(CAP_TOTAL_KEY, cap_total.get()),
+            App.globalPut(REGISTERED_COUNT_KEY, Int(0)),
+            App.globalPut(MICRO_REWARD_KEY, MICRO_REWARD_DEFAULT),
+            Approve(),
+        )
 
     @router.method
     def register_intent(

@@ -214,6 +214,7 @@ def main() -> None:
 
     global_schema = StateSchema(num_uints=5, num_byte_slices=1)
     local_schema = StateSchema(num_uints=0, num_byte_slices=0)
+    bootstrap_method = next(m for m in contract.methods if m.name == "bootstrap")
     app_id = deploy_app(
         client,
         admin_sk,
@@ -221,7 +222,7 @@ def main() -> None:
         CLEAR_TEAL,
         global_schema,
         local_schema,
-        app_args=[encode_u64(2)],
+        app_args=[bootstrap_method.get_selector(), encode_u64(2)],
     )
     app_addr = get_application_address(app_id)
     print(f"App address: {app_addr}")

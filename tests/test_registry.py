@@ -1,11 +1,13 @@
 import base64
 import os
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Sequence, Tuple
 
 import algosdk
 import pytest
 from algosdk import account, encoding, mnemonic, transaction
+from algosdk.abi.contract import Contract
 from algosdk.error import AlgodHTTPError
 from algosdk.logic import get_application_address
 from algosdk.transaction import ApplicationNoOpTxn, BoxReference, OnComplete, PaymentTxn, wait_for_confirmation
@@ -26,6 +28,11 @@ LINK_PENDING_PREFIX = b"link_pending:"
 ROUTER = get_router()
 APPROVAL_PROG, CLEAR_PROG, CONTRACT = ROUTER.compile_program(version=8)
 METHODS = {m.name: m for m in CONTRACT.methods}
+CONTRACT_JSON_PATH = Path(__file__).resolve().parents[1] / "contracts" / "artifacts" / "registry.json"
+if CONTRACT_JSON_PATH.exists():
+    CONTRACT_FROM_JSON = Contract.from_json(CONTRACT_JSON_PATH.read_text())
+else:
+    CONTRACT_FROM_JSON = CONTRACT
 
 
 def _program_to_teal(program) -> str:
@@ -41,6 +48,42 @@ def _program_to_teal(program) -> str:
 
 APPROVAL_TEAL = _program_to_teal(APPROVAL_PROG)
 CLEAR_TEAL = _program_to_teal(CLEAR_PROG)
+
+
+def addr_bytes(addr: str) -> bytes:
+    return encoding.decode_address(addr)
+
+
+def b_profile(addr_b: bytes) -> bytes:
+    return PROFILE_PREFIX + addr_b
+
+
+def b_payment_cipher(addr_b: bytes) -> bytes:
+    return PAYMENT_CIPHER_PREFIX + addr_b
+
+
+def b_link(addr_b: bytes) -> bytes:
+    return LINK_PREFIX + addr_b
+
+
+def b_link_pending(addr_b: bytes) -> bytes:
+    return LINK_PENDING_PREFIX + addr_b
+
+
+def app_address(app_id: int) -> str:
+    return get_application_address(app_id)
+
+
+def bootstrap_registry(client: algod_v2.AlgodClient, app_id: int, admin_sk: str, cap: int = 2) -> None:
+    method = CONTRACT_FROM_JSON.get_method_by_name("bootstrap")
+    _ = method.get_selector()
+    call_app(
+        client,
+        admin_sk,
+        app_id,
+        "bootstrap",
+        args=[encode_u64(cap)],
+    )
 
 
 def get_algod() -> algod_v2.AlgodClient:
@@ -247,6 +290,8 @@ def expA(algod, dispenser):
 def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str, cap_total: int = 2) -> int:
     global_schema = transaction.StateSchema(4, 1)
     local_schema = transaction.StateSchema(0, 0)
+    bootstrap_method = METHODS["bootstrap"]
+    app_args = [bootstrap_method.get_selector(), encode_u64(cap_total)]
     return deploy_app(
         client,
         admin_sk,
@@ -255,32 +300,33 @@ def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str, cap_total: 
         global_schema,
         local_schema,
         extra_pages=0,
-        app_args=[encode_u64(cap_total)],
+        app_args=app_args,
     )
 
 
 @pytest.fixture
 def app_id(algod, admin, dispenser):
     app_id = deploy_registry_app(algod, admin[0], cap_total=2)
-    app_addr = get_application_address(app_id)
+    bootstrap_registry(algod, app_id, admin[0], cap=2)
+    app_addr = app_address(app_id)
     fund(algod, dispenser[0], app_addr, 5_000_000)
     return app_id
 
 
 def profile_box_key(addr: str) -> bytes:
-    return PROFILE_PREFIX + encode_addr(addr)
+    return b_profile(addr_bytes(addr))
 
 
 def payment_cipher_box_key(addr: str) -> bytes:
-    return PAYMENT_CIPHER_PREFIX + encode_addr(addr)
+    return b_payment_cipher(addr_bytes(addr))
 
 
 def link_box_key(addr: str) -> bytes:
-    return LINK_PREFIX + encode_addr(addr)
+    return b_link(addr_bytes(addr))
 
 
 def link_pending_box_key(addr: str) -> bytes:
-    return LINK_PENDING_PREFIX + encode_addr(addr)
+    return b_link_pending(addr_bytes(addr))
 
 
 @pytest.mark.localnet
@@ -425,6 +471,7 @@ def test_admin_close_blocks_new(algod, app_id, admin, dispenser):
 @pytest.mark.localnet
 def test_insufficient_funds_blocks_reward(algod, admin, dispenser):
     app_id = deploy_registry_app(algod, admin[0], cap_total=2)
+    bootstrap_registry(algod, app_id, admin[0], cap=2)
     sk_new, addr_new = create_account()
     fund(algod, dispenser[0], addr_new, 3_000_000)
     prof_key = profile_box_key(addr_new)
@@ -459,7 +506,7 @@ def test_link_dual_wallet_group_success(algod, app_id, dispenser, payA, expA):
         app_args=begin_args,
         boxes=begin_boxes,
     )
-    finish_args = [METHODS["link_finish"].get_selector(), encode_addr(pay_addr)]
+    finish_args = [METHODS["link_finish"].get_selector(), addr_bytes(pay_addr)]
     finish_boxes = _as_box_refs(
         [
             (app_id, pending_key),
@@ -481,7 +528,7 @@ def test_link_dual_wallet_group_success(algod, app_id, dispenser, payA, expA):
     stx1 = txn1.sign(exp_sk)
     txid = algod.send_transactions([stx0, stx1])
     wait_for_confirmation(algod, txid, 4)
-    assert box_get(algod, app_id, link_box_key(exp_addr)) == encode_addr(pay_addr)
+    assert box_get(algod, app_id, link_box_key(exp_addr)) == addr_bytes(pay_addr)
     assert box_get(algod, app_id, payment_cipher_box_key(exp_addr)) == b"ENC"
     assert not box_exists(algod, app_id, pending_key)
 
@@ -498,7 +545,7 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
     pending_key = link_pending_box_key(pay_addr)
 
     # Wrong order: finish first
-    finish_args = [METHODS["link_finish"].get_selector(), encode_addr(pay_addr)]
+    finish_args = [METHODS["link_finish"].get_selector(), addr_bytes(pay_addr)]
     finish_boxes = _as_box_refs(
         [
             (app_id, pending_key),
@@ -538,7 +585,7 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
         app_args=begin_args,
         boxes=begin_boxes,
     )
-    mismatched_args = [METHODS["link_finish"].get_selector(), encode_addr(pay2_addr)]
+    mismatched_args = [METHODS["link_finish"].get_selector(), addr_bytes(pay2_addr)]
     mismatched_boxes = _as_box_refs(
         [
             (app_id, link_pending_box_key(pay_addr)),
