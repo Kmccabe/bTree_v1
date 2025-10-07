@@ -1,16 +1,15 @@
 import base64
+import json
 import os
+import pathlib
 from contextlib import contextmanager
-from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Sequence, Tuple
+from typing import Callable, Dict, Iterable, Sequence, Tuple
 
-import algosdk
 import pytest
-from algosdk import account, encoding, mnemonic, transaction
-from algosdk.abi.contract import Contract
+from algosdk import account, encoding as enc, logic, mnemonic
+from algosdk.abi import ABIType, Contract, Method
 from algosdk.error import AlgodHTTPError
-from algosdk.logic import get_application_address
-from algosdk.transaction import ApplicationNoOpTxn, BoxReference, OnComplete, PaymentTxn, wait_for_confirmation
+from algosdk.future import transaction as tx
 from algosdk.v2client import algod as algod_v2
 from pyteal import Mode, compileTeal
 
@@ -20,19 +19,32 @@ from contracts.registry.registry import get_router
 ALGOD_URL = os.environ.get("ALGOD_URL", "http://localhost:4001")
 ALGOD_TOKEN = os.environ.get("ALGOD_TOKEN", "a" * 64)
 
-PROFILE_PREFIX = b"profile:"
-PAYMENT_CIPHER_PREFIX = b"payment_cipher:"
-LINK_PREFIX = b"link:"
-LINK_PENDING_PREFIX = b"link_pending:"
-
 ROUTER = get_router()
-APPROVAL_PROG, CLEAR_PROG, CONTRACT = ROUTER.compile_program(version=8)
-METHODS = {m.name: m for m in CONTRACT.methods}
-CONTRACT_JSON_PATH = Path(__file__).resolve().parents[1] / "contracts" / "artifacts" / "registry.json"
-if CONTRACT_JSON_PATH.exists():
-    CONTRACT_FROM_JSON = Contract.from_json(CONTRACT_JSON_PATH.read_text())
-else:
-    CONTRACT_FROM_JSON = CONTRACT
+APPROVAL_PROG, CLEAR_PROG, _ = ROUTER.compile_program(version=8)
+
+CONTRACT_PATH = pathlib.Path(__file__).resolve().parents[1] / "contracts" / "artifacts" / "registry.json"
+CONTRACT_DATA = json.loads(CONTRACT_PATH.read_text())
+CONTRACT = Contract.from_json(CONTRACT_DATA)
+
+
+def m(name: str) -> Method:
+    return CONTRACT.get_method_by_name(name)
+
+
+def sel(sig: str) -> bytes:
+    return Method.from_signature(sig).get_selector()
+
+
+def enc_u64(n: int) -> bytes:
+    return ABIType.from_string("uint64").encode(n)
+
+
+def enc_addr(addr: str) -> bytes:
+    return ABIType.from_string("address").encode(addr)
+
+
+def enc_bytes(data: bytes) -> bytes:
+    return ABIType.from_string("byte[]").encode(data)
 
 
 def _program_to_teal(program) -> str:
@@ -51,39 +63,62 @@ CLEAR_TEAL = _program_to_teal(CLEAR_PROG)
 
 
 def addr_bytes(addr: str) -> bytes:
-    return encoding.decode_address(addr)
+    return enc.decode_address(addr)
 
 
 def b_profile(addr_b: bytes) -> bytes:
-    return PROFILE_PREFIX + addr_b
+    return b'profile:' + addr_b
 
 
 def b_payment_cipher(addr_b: bytes) -> bytes:
-    return PAYMENT_CIPHER_PREFIX + addr_b
+    return b'payment_cipher:' + addr_b
 
 
 def b_link(addr_b: bytes) -> bytes:
-    return LINK_PREFIX + addr_b
+    return b'link:' + addr_b
 
 
 def b_link_pending(addr_b: bytes) -> bytes:
-    return LINK_PENDING_PREFIX + addr_b
+    return b'link_pending:' + addr_b
 
 
 def app_address(app_id: int) -> str:
-    return get_application_address(app_id)
+    return logic.get_application_address(app_id)
 
 
-def bootstrap_registry(client: algod_v2.AlgodClient, app_id: int, admin_sk: str, cap: int = 2) -> None:
-    method = CONTRACT_FROM_JSON.get_method_by_name("bootstrap")
-    _ = method.get_selector()
-    call_app(
-        client,
-        admin_sk,
-        app_id,
-        "bootstrap",
-        args=[encode_u64(cap)],
+
+def call_abi(
+    client: algod_v2.AlgodClient,
+    sk: str,
+    app_id: int,
+    method_name: str,
+    args: Sequence,
+    boxes: Iterable[Tuple[int, bytes]] | None = None,
+    fee: int | None = None,
+) -> str:
+    sp = client.suggested_params()
+    sp.flat_fee = True
+    sp.fee = fee if fee is not None else 1000
+    sender = account.address_from_private_key(sk)
+    method = m(method_name)
+    app_args = [method.get_selector()]
+    for arg_type, value in zip(method.arg_types, args):
+        app_args.append(ABIType.from_string(arg_type).encode(value))
+    txn = tx.ApplicationNoOpTxn(
+        sender=sender,
+        sp=sp,
+        index=app_id,
+        app_args=app_args,
+        boxes=list(boxes or []),
     )
+    signed = txn.sign(sk)
+    txid = client.send_transaction(signed)
+    tx.wait_for_confirmation(client, txid, 4)
+    return txid
+
+
+def bootstrap_registry(client: algod_v2.AlgodClient, app_id: int, admin_sk: str, cap: int = 2) -> str:
+    return call_abi(client, admin_sk, app_id, "bootstrap", [cap])
 
 
 def get_algod() -> algod_v2.AlgodClient:
@@ -102,10 +137,10 @@ def fund(client: algod_v2.AlgodClient, src_sk: str, dest_addr: str, amount: int)
     sp = client.suggested_params()
     sp.flat_fee = True
     sp.fee = 1000
-    txn = PaymentTxn(src_addr, sp, dest_addr, amount)
+    txn = tx.PaymentTxn(src_addr, sp, dest_addr, amount)
     stxn = txn.sign(src_sk)
     txid = client.send_transaction(stxn)
-    wait_for_confirmation(client, txid, 4)
+    tx.wait_for_confirmation(client, txid, 4)
 
 
 def get_balance(client: algod_v2.AlgodClient, addr: str) -> int:
@@ -122,8 +157,8 @@ def deploy_app(
     creator_sk: str,
     approval_teal: str,
     clear_teal: str,
-    global_schema: transaction.StateSchema,
-    local_schema: transaction.StateSchema,
+    global_schema: tx.StateSchema,
+    local_schema: tx.StateSchema,
     extra_pages: int = 0,
     app_args: Sequence[bytes] | None = None,
 ) -> int:
@@ -133,10 +168,10 @@ def deploy_app(
     sp = client.suggested_params()
     sp.flat_fee = True
     sp.fee = 1000
-    txn = transaction.ApplicationCreateTxn(
+    txn = tx.ApplicationCreateTxn(
         sender=sender,
         sp=sp,
-        on_complete=OnComplete.NoOpOC,
+        on_complete=tx.OnComplete.NoOpOC,
         approval_program=approval,
         clear_program=clear,
         global_schema=global_schema,
@@ -146,55 +181,10 @@ def deploy_app(
     )
     stxn = txn.sign(creator_sk)
     txid = client.send_transaction(stxn)
-    result = wait_for_confirmation(client, txid, 4)
+    result = tx.wait_for_confirmation(client, txid, 4)
     return result["application-index"]
 
 
-def _as_box_refs(boxes: Iterable[Tuple[int, bytes]] | None) -> List[BoxReference] | None:
-    if not boxes:
-        return None
-    # Preserve order but dedupe identical entries
-    seen: set[Tuple[int, bytes]] = set()
-    refs: List[BoxReference] = []
-    for app_id, key in boxes:
-        entry = (app_id, key)
-        if entry in seen:
-            continue
-        seen.add(entry)
-        refs.append(BoxReference(app_id, key))
-    return refs
-
-
-def call_app(
-    client: algod_v2.AlgodClient,
-    caller_sk: str,
-    app_id: int,
-    method: str,
-    args: Sequence[bytes] | None = None,
-    boxes: Iterable[Tuple[int, bytes]] | None = None,
-    fee: int | None = None,
-    on_complete: OnComplete = OnComplete.NoOpOC,
-) -> Dict:
-    caller_addr = account.address_from_private_key(caller_sk)
-    method_obj = METHODS[method]
-    raw_args: List[bytes] = list(args or [])
-    while len(raw_args) < len(method_obj.args):
-        raw_args.append(b"")
-    app_args = [method_obj.get_selector(), *raw_args]
-    sp = client.suggested_params()
-    sp.flat_fee = True
-    sp.fee = fee if fee is not None else 1000
-    txn = transaction.ApplicationCallTxn(
-        sender=caller_addr,
-        sp=sp,
-        index=app_id,
-        on_complete=on_complete,
-        app_args=app_args,
-        boxes=_as_box_refs(boxes),
-    )
-    stxn = txn.sign(caller_sk)
-    txid = client.send_transaction(stxn)
-    return wait_for_confirmation(client, txid, 4)
 
 
 def read_global_state(client: algod_v2.AlgodClient, app_id: int) -> Dict[str, int | bytes]:
@@ -227,13 +217,6 @@ def balance_delta(client: algod_v2.AlgodClient, addr: str) -> Callable[[], int]:
     before = get_balance(client, addr)
     yield lambda: get_balance(client, addr) - before
 
-
-def encode_u64(value: int) -> bytes:
-    return value.to_bytes(8, "big")
-
-
-def encode_addr(addr: str) -> bytes:
-    return encoding.decode_address(addr)
 
 
 @pytest.fixture(scope="session")
@@ -287,11 +270,9 @@ def expA(algod, dispenser):
     return _funded_account(algod, dispenser)
 
 
-def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str, cap_total: int = 2) -> int:
-    global_schema = transaction.StateSchema(4, 1)
-    local_schema = transaction.StateSchema(0, 0)
-    bootstrap_method = METHODS["bootstrap"]
-    app_args = [bootstrap_method.get_selector(), encode_u64(cap_total)]
+def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str) -> int:
+    global_schema = tx.StateSchema(4, 1)
+    local_schema = tx.StateSchema(0, 0)
     return deploy_app(
         client,
         admin_sk,
@@ -300,13 +281,12 @@ def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str, cap_total: 
         global_schema,
         local_schema,
         extra_pages=0,
-        app_args=app_args,
     )
 
 
 @pytest.fixture
 def app_id(algod, admin, dispenser):
-    app_id = deploy_registry_app(algod, admin[0], cap_total=2)
+    app_id = deploy_registry_app(algod, admin[0])
     bootstrap_registry(algod, app_id, admin[0], cap=2)
     app_addr = app_address(app_id)
     fund(algod, dispenser[0], app_addr, 5_000_000)
@@ -344,7 +324,7 @@ def test_register_first_time_pays_reward(algod, app_id, sA):
     prof_key = profile_box_key(addr)
     cipher_key = payment_cipher_box_key(addr)
     with balance_delta(algod, addr) as delta:
-        call_app(
+        call_abi(
             algod,
             sk,
             app_id,
@@ -364,7 +344,7 @@ def test_register_duplicate_rejected(algod, app_id, sA):
     sk, addr = sA
     prof_key = profile_box_key(addr)
     cipher_key = payment_cipher_box_key(addr)
-    call_app(
+    call_abi(
         algod,
         sk,
         app_id,
@@ -373,7 +353,7 @@ def test_register_duplicate_rejected(algod, app_id, sA):
         boxes=[(app_id, prof_key), (app_id, cipher_key)],
     )
     with pytest.raises(AlgodHTTPError):
-        call_app(
+        call_abi(
             algod,
             sk,
             app_id,
@@ -388,7 +368,7 @@ def test_cap_enforced_and_auto_closes(algod, app_id, sB, sC, dispenser):
     for sk, addr in (sB, sC):
         prof_key = profile_box_key(addr)
         cipher_key = payment_cipher_box_key(addr)
-        call_app(
+        call_abi(
             algod,
             sk,
             app_id,
@@ -404,7 +384,7 @@ def test_cap_enforced_and_auto_closes(algod, app_id, sB, sC, dispenser):
     prof_key = profile_box_key(addr_new)
     cipher_key = payment_cipher_box_key(addr_new)
     with pytest.raises(AlgodHTTPError):
-        call_app(
+        call_abi(
             algod,
             sk_new,
             app_id,
@@ -419,7 +399,7 @@ def test_admin_add_capacity_and_reopen(algod, app_id, admin, sA, sB, sC):
     for sk, addr in (sA, sB):
         prof_key = profile_box_key(addr)
         cipher_key = payment_cipher_box_key(addr)
-        call_app(
+        call_abi(
             algod,
             sk,
             app_id,
@@ -427,17 +407,17 @@ def test_admin_add_capacity_and_reopen(algod, app_id, admin, sA, sB, sC):
             args=[b"", b"", b""],
             boxes=[(app_id, prof_key), (app_id, cipher_key)],
         )
-    call_app(
+    call_abi(
         algod,
         admin[0],
         app_id,
         "admin_add_capacity",
-        args=[encode_u64(3)],
+        args=[3],
     )
-    call_app(algod, admin[0], app_id, "admin_open")
+    call_abi(algod, admin[0], app_id, "admin_open", [])
     prof_key = profile_box_key(sC[1])
     cipher_key = payment_cipher_box_key(sC[1])
-    call_app(
+    call_abi(
         algod,
         sC[0],
         app_id,
@@ -452,13 +432,13 @@ def test_admin_add_capacity_and_reopen(algod, app_id, admin, sA, sB, sC):
 
 @pytest.mark.localnet
 def test_admin_close_blocks_new(algod, app_id, admin, dispenser):
-    call_app(algod, admin[0], app_id, "admin_close")
+    call_abi(algod, admin[0], app_id, "admin_close", [])
     sk_new, addr_new = create_account()
     fund(algod, dispenser[0], addr_new, 3_000_000)
     prof_key = profile_box_key(addr_new)
     cipher_key = payment_cipher_box_key(addr_new)
     with pytest.raises(AlgodHTTPError):
-        call_app(
+        call_abi(
             algod,
             sk_new,
             app_id,
@@ -470,14 +450,14 @@ def test_admin_close_blocks_new(algod, app_id, admin, dispenser):
 
 @pytest.mark.localnet
 def test_insufficient_funds_blocks_reward(algod, admin, dispenser):
-    app_id = deploy_registry_app(algod, admin[0], cap_total=2)
+    app_id = deploy_registry_app(algod, admin[0])
     bootstrap_registry(algod, app_id, admin[0], cap=2)
     sk_new, addr_new = create_account()
     fund(algod, dispenser[0], addr_new, 3_000_000)
     prof_key = profile_box_key(addr_new)
     cipher_key = payment_cipher_box_key(addr_new)
     with pytest.raises(AlgodHTTPError):
-        call_app(
+        call_abi(
             algod,
             sk_new,
             app_id,
@@ -496,40 +476,37 @@ def test_link_dual_wallet_group_success(algod, app_id, dispenser, payA, expA):
     sp = algod.suggested_params()
     sp.flat_fee = True
     sp.fee = 1000
+    pb = addr_bytes(pay_addr)
     pending_key = link_pending_box_key(pay_addr)
-    begin_args = [METHODS["link_payment_begin"].get_selector(), b"ENC"]
-    begin_boxes = _as_box_refs([(app_id, pending_key)])
-    txn0 = ApplicationNoOpTxn(
+    link_key = link_box_key(exp_addr)
+    cipher_key = payment_cipher_box_key(exp_addr)
+    txn0 = tx.ApplicationNoOpTxn(
         sender=pay_addr,
         sp=sp,
         index=app_id,
-        app_args=begin_args,
-        boxes=begin_boxes,
+        app_args=[sel("link_payment_begin(byte[])"), enc_bytes(b"ENC")],
+        boxes=[(app_id, pending_key)],
     )
-    finish_args = [METHODS["link_finish"].get_selector(), addr_bytes(pay_addr)]
-    finish_boxes = _as_box_refs(
-        [
-            (app_id, pending_key),
-            (app_id, link_box_key(exp_addr)),
-            (app_id, payment_cipher_box_key(exp_addr)),
-        ]
-    )
-    txn1 = ApplicationNoOpTxn(
+    txn1 = tx.ApplicationNoOpTxn(
         sender=exp_addr,
         sp=sp,
         index=app_id,
-        app_args=finish_args,
-        boxes=finish_boxes,
+        app_args=[sel("link_finish(address)"), enc_addr(pay_addr)],
+        boxes=[
+            (app_id, link_key),
+            (app_id, cipher_key),
+            (app_id, pending_key),
+        ],
     )
-    gid = transaction.calculate_group_id([txn0, txn1])
+    gid = tx.calculate_group_id([txn0, txn1])
     txn0.group = gid
     txn1.group = gid
     stx0 = txn0.sign(pay_sk)
     stx1 = txn1.sign(exp_sk)
     txid = algod.send_transactions([stx0, stx1])
-    wait_for_confirmation(algod, txid, 4)
-    assert box_get(algod, app_id, link_box_key(exp_addr)) == addr_bytes(pay_addr)
-    assert box_get(algod, app_id, payment_cipher_box_key(exp_addr)) == b"ENC"
+    tx.wait_for_confirmation(algod, txid, 4)
+    assert box_get(algod, app_id, link_key) == pb
+    assert box_get(algod, app_id, cipher_key) == b"ENC"
     assert not box_exists(algod, app_id, pending_key)
 
 
@@ -543,65 +520,63 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
     sp.flat_fee = True
     sp.fee = 1000
     pending_key = link_pending_box_key(pay_addr)
-
-    # Wrong order: finish first
-    finish_args = [METHODS["link_finish"].get_selector(), addr_bytes(pay_addr)]
-    finish_boxes = _as_box_refs(
-        [
-            (app_id, pending_key),
-            (app_id, link_box_key(exp_addr)),
-            (app_id, payment_cipher_box_key(exp_addr)),
-        ]
-    )
-    txn0 = ApplicationNoOpTxn(
+    link_key = link_box_key(exp_addr)
+    cipher_key = payment_cipher_box_key(exp_addr)
+    finish_first = tx.ApplicationNoOpTxn(
         sender=exp_addr,
         sp=sp,
         index=app_id,
-        app_args=finish_args,
-        boxes=finish_boxes,
+        app_args=[sel("link_finish(address)"), enc_addr(pay_addr)],
+        boxes=[
+            (app_id, pending_key),
+            (app_id, link_key),
+            (app_id, cipher_key),
+        ],
     )
-    begin_args = [METHODS["link_payment_begin"].get_selector(), b"ENC"]
-    begin_boxes = _as_box_refs([(app_id, pending_key)])
-    txn1 = ApplicationNoOpTxn(
+    begin_after = tx.ApplicationNoOpTxn(
         sender=pay_addr,
         sp=sp,
         index=app_id,
-        app_args=begin_args,
-        boxes=begin_boxes,
+        app_args=[sel("link_payment_begin(byte[])"), enc_bytes(b"ENC")],
+        boxes=[(app_id, pending_key)],
     )
-    gid = transaction.calculate_group_id([txn0, txn1])
-    txn0.group = gid
-    txn1.group = gid
+    gid = tx.calculate_group_id([finish_first, begin_after])
+    finish_first.group = gid
+    begin_after.group = gid
     with pytest.raises(AlgodHTTPError):
-        algod.send_transactions([txn0.sign(exp_sk), txn1.sign(pay_sk)])
+        algod.send_transactions([finish_first.sign(exp_sk), begin_after.sign(pay_sk)])
 
-    # Mismatch payment address on finish
     pay2_sk, pay2_addr = create_account()
     fund(algod, dispenser[0], pay2_addr, 3_000_000)
-    txn_begin = ApplicationNoOpTxn(
+    begin_txn = tx.ApplicationNoOpTxn(
         sender=pay_addr,
         sp=sp,
         index=app_id,
-        app_args=begin_args,
-        boxes=begin_boxes,
+        app_args=[sel("link_payment_begin(byte[])"), enc_bytes(b"ENC")],
+        boxes=[(app_id, pending_key)],
     )
-    mismatched_args = [METHODS["link_finish"].get_selector(), addr_bytes(pay2_addr)]
-    mismatched_boxes = _as_box_refs(
-        [
-            (app_id, link_pending_box_key(pay_addr)),
-            (app_id, link_box_key(exp_addr)),
-            (app_id, payment_cipher_box_key(exp_addr)),
-        ]
-    )
-    txn_finish = ApplicationNoOpTxn(
+    mismatch_finish = tx.ApplicationNoOpTxn(
         sender=exp_addr,
         sp=sp,
         index=app_id,
-        app_args=mismatched_args,
-        boxes=mismatched_boxes,
+        app_args=[sel("link_finish(address)"), enc_addr(pay2_addr)],
+        boxes=[
+            (app_id, pending_key),
+            (app_id, link_key),
+            (app_id, cipher_key),
+        ],
     )
-    gid2 = transaction.calculate_group_id([txn_begin, txn_finish])
-    txn_begin.group = gid2
-    txn_finish.group = gid2
+    gid2 = tx.calculate_group_id([begin_txn, mismatch_finish])
+    begin_txn.group = gid2
+    mismatch_finish.group = gid2
     with pytest.raises(AlgodHTTPError):
-        algod.send_transactions([txn_begin.sign(pay_sk), txn_finish.sign(exp_sk)])
+        algod.send_transactions([begin_txn.sign(pay_sk), mismatch_finish.sign(exp_sk)])
+
+
+
+
+
+
+
+
+
