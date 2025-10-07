@@ -22,6 +22,12 @@ from algosdk.v2client import algod as algod_v2
 ALGOD_URL = os.environ.get("ALGOD_URL", "http://localhost:4001")
 ALGOD_TOKEN = os.environ.get("ALGOD_TOKEN", "a" * 64)
 
+BASE_FEE_MICRO = 1000
+BOX_FEE_MICRO = 2000
+
+def fee_for(box_count: int) -> int:
+    return BASE_FEE_MICRO + BOX_FEE_MICRO * box_count
+
 # -----------------------
 # Ensure fresh artifacts
 # -----------------------
@@ -75,10 +81,7 @@ def call_abi(
     sp = client.suggested_params()
     sp.flat_fee = True
     boxes_list = list(boxes or [])
-    if fee is not None:
-        sp.fee = fee
-    else:
-        sp.fee = 1000 + 2000 * len(boxes_list)
+    sp.fee = fee if fee is not None else fee_for(len(boxes_list))
     atc = AtomicTransactionComposer()
     signer = AccountTransactionSigner(sk)
     atc.add_method_call(
@@ -110,6 +113,12 @@ def b_link(ab: bytes) -> bytes:
 
 def b_link_pending(ab: bytes) -> bytes:
     return b"link_pending:" + ab
+
+
+def boxes_for_register(app_id: int, addr: str) -> list[Tuple[int, bytes]]:
+    ab = addr_bytes(addr)
+    return [(app_id, b_profile(ab)), (app_id, b_payment_cipher(ab))]
+
 
 def abi_app_args(method_name: str, values: Sequence) -> list[bytes]:
     method = method_by_name(method_name)
@@ -204,8 +213,6 @@ def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str, cap_total: 
     res = tx.wait_for_confirmation(client, stxn.get_txid(), 4)
     return res["application-index"]
 
-def bootstrap_registry(client: algod_v2.AlgodClient, app_id: int, admin_sk: str, cap: int = 2) -> str:
-    return call_abi(client, admin_sk, app_id, "bootstrap", [cap])
 # -----------------------
 # Pytest fixtures
 # -----------------------
@@ -264,7 +271,7 @@ def test_deploy_defaults_sets_globals(algod, app_id):
 def test_register_first_time_pays_reward(algod, app_id, sA):
     sk, addr = sA
     ab = addr_bytes(addr)
-    boxes = [(app_id, b_profile(ab)), (app_id, b_payment_cipher(ab))]
+    boxes = boxes_for_register(app_id, addr)
     with balance_delta(algod, addr) as delta:
         call_abi(algod, sk, app_id, "register_intent", [b"", b"", b"X"], boxes=boxes)
     assert delta() >= 800
@@ -277,7 +284,7 @@ def test_register_first_time_pays_reward(algod, app_id, sA):
 def test_register_duplicate_rejected(algod, app_id, sA):
     sk, addr = sA
     ab = addr_bytes(addr)
-    boxes = [(app_id, b_profile(ab)), (app_id, b_payment_cipher(ab))]
+    boxes = boxes_for_register(app_id, addr)
     call_abi(algod, sk, app_id, "register_intent", [b"", b"", b""], boxes=boxes)
     with pytest.raises(AlgodHTTPError):
         call_abi(algod, sk, app_id, "register_intent", [b"", b"", b""], boxes=boxes)
@@ -286,7 +293,7 @@ def test_register_duplicate_rejected(algod, app_id, sA):
 def test_cap_enforced_and_auto_closes(algod, app_id, sB, sC, dispenser):
     for sk, addr in (sB, sC):
         ab = addr_bytes(addr)
-        boxes = [(app_id, b_profile(ab)), (app_id, b_payment_cipher(ab))]
+        boxes = boxes_for_register(app_id, addr)
         call_abi(algod, sk, app_id, "register_intent", [b"", b"", b""], boxes=boxes)
     gs = read_global_state(algod, app_id)
     assert gs["registered_count"] == 2
@@ -295,7 +302,7 @@ def test_cap_enforced_and_auto_closes(algod, app_id, sB, sC, dispenser):
     sk_new, addr_new = create_account()
     fund(algod, dispenser[0], addr_new, 3_000_000)
     ab_new = addr_bytes(addr_new)
-    boxes = [(app_id, b_profile(ab_new)), (app_id, b_payment_cipher(ab_new))]
+    boxes = boxes_for_register(app_id, addr_new)
     with pytest.raises(AlgodHTTPError):
         call_abi(algod, sk_new, app_id, "register_intent", [b"", b"", b""], boxes=boxes)
 
@@ -303,12 +310,12 @@ def test_cap_enforced_and_auto_closes(algod, app_id, sB, sC, dispenser):
 def test_admin_add_capacity_and_reopen(algod, app_id, admin, sA, sB, sC):
     for sk, addr in (sA, sB):
         ab = addr_bytes(addr)
-        boxes = [(app_id, b_profile(ab)), (app_id, b_payment_cipher(ab))]
+        boxes = boxes_for_register(app_id, addr)
         call_abi(algod, sk, app_id, "register_intent", [b"", b"", b""], boxes=boxes)
     call_abi(algod, admin[0], app_id, "admin_add_capacity", [3])
     call_abi(algod, admin[0], app_id, "admin_open", [])
     ab = addr_bytes(sC[1])
-    boxes = [(app_id, b_profile(ab)), (app_id, b_payment_cipher(ab))]
+    boxes = boxes_for_register(app_id, sC[1])
     call_abi(algod, sC[0], app_id, "register_intent", [b"", b"", b""], boxes=boxes)
     gs = read_global_state(algod, app_id)
     assert gs["registered_count"] == 3
@@ -320,7 +327,7 @@ def test_admin_close_blocks_new(algod, app_id, admin, dispenser):
     sk_new, addr_new = create_account()
     fund(algod, dispenser[0], addr_new, 3_000_000)
     ab = addr_bytes(addr_new)
-    boxes = [(app_id, b_profile(ab)), (app_id, b_payment_cipher(ab))]
+    boxes = boxes_for_register(app_id, addr_new)
     with pytest.raises(AlgodHTTPError):
         call_abi(algod, sk_new, app_id, "register_intent", [b"", b"", b""], boxes=boxes)
 
@@ -331,7 +338,7 @@ def test_insufficient_funds_blocks_reward(algod, admin, dispenser):
     sk_new, addr_new = create_account()
     fund(algod, dispenser[0], addr_new, 3_000_000)
     ab = addr_bytes(addr_new)
-    boxes = [(app, b_profile(ab)), (app, b_payment_cipher(ab))]
+    boxes = boxes_for_register(app, addr_new)
     with pytest.raises(AlgodHTTPError):
         call_abi(algod, sk_new, app, "register_intent", [b"", b"", b""], boxes=boxes)
 
@@ -344,9 +351,12 @@ def test_link_dual_wallet_group_success(algod, app_id, dispenser, payA, expA):
     exp_sk, exp_addr = expA
     fund(algod, dispenser[0], pay_addr, 3_000_000)
     fund(algod, dispenser[0], exp_addr, 3_000_000)
-    sp = algod.suggested_params()
-    sp.flat_fee = True
-    sp.fee = 1000
+    sp0 = algod.suggested_params()
+    sp0.flat_fee = True
+    sp0.fee = fee_for(1)
+    sp1 = algod.suggested_params()
+    sp1.flat_fee = True
+    sp1.fee = fee_for(3)
 
     pb = addr_bytes(pay_addr)
     eb = addr_bytes(exp_addr)
@@ -354,14 +364,14 @@ def test_link_dual_wallet_group_success(algod, app_id, dispenser, payA, expA):
 
     txn0 = tx.ApplicationNoOpTxn(
         sender=pay_addr,
-        sp=sp,
+        sp=sp0,
         index=app_id,
         app_args=abi_app_args("link_payment_begin", [b"ENC"]),
         boxes=[(app_id, pending_key)],
     )
     txn1 = tx.ApplicationNoOpTxn(
         sender=exp_addr,
-        sp=sp,
+        sp=sp1,
         index=app_id,
         app_args=abi_app_args("link_finish", [pay_addr]),
         boxes=[(app_id, b_link(eb)),
@@ -387,9 +397,12 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
     exp_sk, exp_addr = expA
     fund(algod, dispenser[0], pay_addr, 3_000_000)
     fund(algod, dispenser[0], exp_addr, 3_000_000)
-    sp = algod.suggested_params()
-    sp.flat_fee = True
-    sp.fee = 1000
+    sp0 = algod.suggested_params()
+    sp0.flat_fee = True
+    sp0.fee = fee_for(3)
+    sp1 = algod.suggested_params()
+    sp1.flat_fee = True
+    sp1.fee = fee_for(1)
 
     pb = addr_bytes(pay_addr)
     eb = addr_bytes(exp_addr)
@@ -398,7 +411,7 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
     # wrong order (finish first)
     finish_first = tx.ApplicationNoOpTxn(
         sender=exp_addr,
-        sp=sp,
+        sp=sp0,
         index=app_id,
         app_args=abi_app_args("link_finish", [pay_addr]),
         boxes=[(app_id, pending_key),
@@ -407,7 +420,7 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
     )
     begin_after = tx.ApplicationNoOpTxn(
         sender=pay_addr,
-        sp=sp,
+        sp=sp1,
         index=app_id,
         app_args=abi_app_args("link_payment_begin", [b"ENC"]),
         boxes=[(app_id, pending_key)],
@@ -421,17 +434,23 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
     # mismatch: finish points to different payment addr
     pay2_sk, pay2_addr = create_account()
     fund(algod, dispenser[0], pay2_addr, 3_000_000)
+    spb = algod.suggested_params()
+    spb.flat_fee = True
+    spb.fee = fee_for(1)
+    spf = algod.suggested_params()
+    spf.flat_fee = True
+    spf.fee = fee_for(3)
 
     begin_txn = tx.ApplicationNoOpTxn(
         sender=pay_addr,
-        sp=sp,
+        sp=spb,
         index=app_id,
         app_args=abi_app_args("link_payment_begin", [b"ENC"]),
         boxes=[(app_id, pending_key)],
     )
     mismatch_finish = tx.ApplicationNoOpTxn(
         sender=exp_addr,
-        sp=sp,
+        sp=spf,
         index=app_id,
         app_args=abi_app_args("link_finish", [pay2_addr]),
         boxes=[(app_id, pending_key),
@@ -443,6 +462,12 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
     mismatch_finish.group = gid2
     with pytest.raises(AlgodHTTPError):
         algod.send_transactions([begin_txn.sign(pay_sk), mismatch_finish.sign(exp_sk)])
+
+
+
+
+
+
 
 
 
