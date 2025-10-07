@@ -9,7 +9,8 @@ import pytest
 from algosdk import account, encoding as enc, logic, mnemonic
 from algosdk.abi import ABIType, Contract, Method
 from algosdk.error import AlgodHTTPError
-from algosdk.future import transaction as tx
+from algosdk import transaction as tx
+
 from algosdk.v2client import algod as algod_v2
 from pyteal import Mode, compileTeal
 
@@ -23,8 +24,8 @@ ROUTER = get_router()
 APPROVAL_PROG, CLEAR_PROG, _ = ROUTER.compile_program(version=8)
 
 CONTRACT_PATH = pathlib.Path(__file__).resolve().parents[1] / "contracts" / "artifacts" / "registry.json"
-CONTRACT_DATA = json.loads(CONTRACT_PATH.read_text())
-CONTRACT = Contract.from_json(CONTRACT_DATA)
+CONTRACT = Contract.from_json(CONTRACT_PATH.read_text())
+
 
 
 def m(name: str) -> Method:
