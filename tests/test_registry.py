@@ -73,9 +73,12 @@ def call_abi(
 ) -> str:
     sender = account.address_from_private_key(sk)
     sp = client.suggested_params()
+    sp.flat_fee = True
+    boxes_list = list(boxes or [])
     if fee is not None:
-        sp.flat_fee = True
         sp.fee = fee
+    else:
+        sp.fee = 1000 + 2000 * len(boxes_list)
     atc = AtomicTransactionComposer()
     signer = AccountTransactionSigner(sk)
     atc.add_method_call(
@@ -85,7 +88,7 @@ def call_abi(
         sp=sp,
         signer=signer,
         method_args=args,       # plain Python args (ATC ABI-encodes)
-        boxes=list(boxes or []),
+        boxes=boxes_list,
     )
     result = atc.execute(client, 4)
     return result.tx_ids[0]
@@ -107,6 +110,20 @@ def b_link(ab: bytes) -> bytes:
 
 def b_link_pending(ab: bytes) -> bytes:
     return b"link_pending:" + ab
+
+def abi_app_args(method_name: str, values: Sequence) -> list[bytes]:
+    method = method_by_name(method_name)
+    if len(values) != len(method.args):
+        raise ValueError(f"Argument count mismatch for {method_name}")
+    encoded = [method.get_selector()]
+    for arg, value in zip(method.args, values):
+        arg_type = arg.type
+        if isinstance(arg_type, str):
+            abi_type = ABIType.from_string(arg_type)
+        else:
+            abi_type = arg_type
+        encoded.append(abi_type.encode(value))
+    return encoded
 
 # -----------------------
 # Funding & balances
@@ -164,13 +181,14 @@ def box_exists(client: algod_v2.AlgodClient, app_id: int, key: bytes) -> bool:
 # -----------------------
 # Deploy & bootstrap
 # -----------------------
-def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str) -> int:
+def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str, cap_total: int = 2) -> int:
     approval = compile_teal(client, APPROVAL_TEAL)
     clear    = compile_teal(client, CLEAR_TEAL)
     sender = account.address_from_private_key(admin_sk)
     sp = client.suggested_params()
     sp.flat_fee = True
     sp.fee = 1000
+    bootstrap = method_by_name("bootstrap")
     txn = tx.ApplicationCreateTxn(
         sender=sender,
         sp=sp,
@@ -179,6 +197,7 @@ def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str) -> int:
         clear_program=clear,
         global_schema=tx.StateSchema(4, 1),  # is_open, cap_total, registered_count, micro_reward; admin_addr bytes
         local_schema=tx.StateSchema(0, 0),
+        app_args=[bootstrap.get_selector(), ABIType.from_string("uint64").encode(cap_total)],
     )
     stxn = txn.sign(admin_sk)
     client.send_transaction(stxn)
@@ -187,7 +206,6 @@ def deploy_registry_app(client: algod_v2.AlgodClient, admin_sk: str) -> int:
 
 def bootstrap_registry(client: algod_v2.AlgodClient, app_id: int, admin_sk: str, cap: int = 2) -> str:
     return call_abi(client, admin_sk, app_id, "bootstrap", [cap])
-
 # -----------------------
 # Pytest fixtures
 # -----------------------
@@ -225,10 +243,10 @@ def expA(algod, dispenser):  return _funded(algod, dispenser)
 @pytest.fixture
 def app_id(algod, admin, dispenser):
     app = deploy_registry_app(algod, admin[0])
-    # bootstrap as the SAME admin used for admin_* calls
-    bootstrap_registry(algod, app, admin[0], cap=2)
     # fund app escrow so reward inner tx can succeed
     fund(algod, dispenser[0], app_address(app), 5_000_000)
+    # bump reward so net payout remains positive even after box fees
+    call_abi(algod, admin[0], app, "admin_set_reward", [6_000])
     return app
 
 # -----------------------
@@ -308,9 +326,8 @@ def test_admin_close_blocks_new(algod, app_id, admin, dispenser):
 
 @pytest.mark.localnet
 def test_insufficient_funds_blocks_reward(algod, admin, dispenser):
-    # Deploy fresh app & bootstrap but DO NOT fund escrow
+    # Deploy fresh app but DO NOT fund escrow
     app = deploy_registry_app(algod, admin[0])
-    bootstrap_registry(algod, app, admin[0], cap=2)
     sk_new, addr_new = create_account()
     fund(algod, dispenser[0], addr_new, 3_000_000)
     ab = addr_bytes(addr_new)
@@ -321,12 +338,6 @@ def test_insufficient_funds_blocks_reward(algod, admin, dispenser):
 # -----------------------
 # Dual-wallet link tests
 # -----------------------
-def sel(sig: str) -> bytes:
-    return Method.from_signature(sig).get_selector()
-
-def enc_addr_abi(addr: str) -> bytes:
-    return ABIType.from_string("address").encode(addr)
-
 @pytest.mark.localnet
 def test_link_dual_wallet_group_success(algod, app_id, dispenser, payA, expA):
     pay_sk, pay_addr = payA
@@ -345,14 +356,14 @@ def test_link_dual_wallet_group_success(algod, app_id, dispenser, payA, expA):
         sender=pay_addr,
         sp=sp,
         index=app_id,
-        app_args=[sel("link_payment_begin(byte[])"), b"ENC"],
+        app_args=abi_app_args("link_payment_begin", [b"ENC"]),
         boxes=[(app_id, pending_key)],
     )
     txn1 = tx.ApplicationNoOpTxn(
         sender=exp_addr,
         sp=sp,
         index=app_id,
-        app_args=[sel("link_finish(address)"), enc_addr_abi(pay_addr)],
+        app_args=abi_app_args("link_finish", [pay_addr]),
         boxes=[(app_id, b_link(eb)),
                (app_id, b_payment_cipher(eb)),
                (app_id, pending_key)],
@@ -389,7 +400,7 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
         sender=exp_addr,
         sp=sp,
         index=app_id,
-        app_args=[sel("link_finish(address)"), enc_addr_abi(pay_addr)],
+        app_args=abi_app_args("link_finish", [pay_addr]),
         boxes=[(app_id, pending_key),
                (app_id, b_link(eb)),
                (app_id, b_payment_cipher(eb))],
@@ -398,7 +409,7 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
         sender=pay_addr,
         sp=sp,
         index=app_id,
-        app_args=[sel("link_payment_begin(byte[])"), b"ENC"],
+        app_args=abi_app_args("link_payment_begin", [b"ENC"]),
         boxes=[(app_id, pending_key)],
     )
     gid = tx.calculate_group_id([finish_first, begin_after])
@@ -415,14 +426,14 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
         sender=pay_addr,
         sp=sp,
         index=app_id,
-        app_args=[sel("link_payment_begin(byte[])"), b"ENC"],
+        app_args=abi_app_args("link_payment_begin", [b"ENC"]),
         boxes=[(app_id, pending_key)],
     )
     mismatch_finish = tx.ApplicationNoOpTxn(
         sender=exp_addr,
         sp=sp,
         index=app_id,
-        app_args=[sel("link_finish(address)"), enc_addr_abi(pay2_addr)],
+        app_args=abi_app_args("link_finish", [pay2_addr]),
         boxes=[(app_id, pending_key),
                (app_id, b_link(eb)),
                (app_id, b_payment_cipher(eb))],
@@ -432,3 +443,9 @@ def test_link_order_and_mismatch_fail(algod, app_id, dispenser, payA, expA):
     mismatch_finish.group = gid2
     with pytest.raises(AlgodHTTPError):
         algod.send_transactions([begin_txn.sign(pay_sk), mismatch_finish.sign(exp_sk)])
+
+
+
+
+
+
