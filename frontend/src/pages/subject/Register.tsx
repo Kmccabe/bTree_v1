@@ -66,7 +66,7 @@ export default function Register(): JSX.Element {
     try {
       const sp = await algodClient.getTransactionParams().do();
       sp.flatFee = true;
-      sp.fee = feeFor(2);
+      sp.fee = BigInt(feeFor(2));
 
       const signer: TransactionSigner = async (txnGroup, indexes) => {
         const toSign = indexes.map((idx) => txnGroup[idx].toByte());

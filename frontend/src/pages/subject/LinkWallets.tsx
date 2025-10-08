@@ -99,8 +99,8 @@ export default function LinkWallets(): JSX.Element {
 
     try {
       const baseSp = await algodClient.getTransactionParams().do();
-      const sp0: algosdk.SuggestedParams = { ...baseSp, fee: feeFor(1), flatFee: true };
-      const sp1: algosdk.SuggestedParams = { ...baseSp, fee: feeFor(3), flatFee: true };
+      const sp0: algosdk.SuggestedParams = { ...baseSp, fee: BigInt(feeFor(1)), flatFee: true };
+      const sp1: algosdk.SuggestedParams = { ...baseSp, fee: BigInt(feeFor(3)), flatFee: true };
 
       const payBytes = addrBytes(paymentAddress);
       const expBytes = addrBytes(experimentAddress);
@@ -108,7 +108,7 @@ export default function LinkWallets(): JSX.Element {
       const pendingKey = bLinkPending(payBytes);
 
       const txn0 = algosdk.makeApplicationNoOpTxnFromObject({
-        from: paymentAddress,
+        sender: paymentAddress,
         appIndex: appId,
         suggestedParams: sp0,
         appArgs: abiAppArgs("link_payment_begin", [cipherBytes]),
@@ -116,7 +116,7 @@ export default function LinkWallets(): JSX.Element {
       });
 
       const txn1 = algosdk.makeApplicationNoOpTxnFromObject({
-        from: experimentAddress,
+        sender: experimentAddress,
         appIndex: appId,
         suggestedParams: sp1,
         appArgs: abiAppArgs("link_finish", [paymentAddress]),
