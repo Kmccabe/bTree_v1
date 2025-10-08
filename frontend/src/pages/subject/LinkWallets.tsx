@@ -1,5 +1,5 @@
 ﻿import { useCallback, useMemo, useState } from "react";
-import * as algosdk from "algosdk";
+import algosdk from "algosdk";
 import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
 import { feeFor } from "../../features/registry/fees";
 import { addrBytes, bLink, bLinkPending, bPaymentCipher } from "../../features/registry/boxes";
@@ -8,6 +8,9 @@ import { abiAppArgs } from "../../features/registry/abi";
 const ALGOD_URL = (import.meta.env.VITE_ALGOD_URL as string | undefined) || "http://localhost:4001";
 const ALGOD_TOKEN = (import.meta.env.VITE_ALGOD_TOKEN as string | undefined) || "a".repeat(64);
 const encoder = new TextEncoder();
+
+const normalizeSigned = (signed: (Uint8Array | ArrayLike<number>)[]): Uint8Array[] =>
+  signed.map((blob) => (blob instanceof Uint8Array ? blob : new Uint8Array(blob)));
 
 export default function LinkWallets(): JSX.Element {
   const { providers, clients, activeAddress, signTransactions } = useWallet();
@@ -68,8 +71,7 @@ export default function LinkWallets(): JSX.Element {
     if (!signTransactions) throw new Error("Wallet signing unavailable");
     await ensureActiveAccount(addr);
     const signed = await signTransactions([txn.toByte()]);
-    const blob = signed[0] instanceof Uint8Array ? signed[0] : new Uint8Array(signed[0]);
-    return blob;
+    return normalizeSigned(signed)[0];
   }, [ensureActiveAccount, signTransactions]);
 
   const handleLink = useCallback(async () => {
@@ -90,6 +92,7 @@ export default function LinkWallets(): JSX.Element {
       setError("Select an experiment wallet address");
       return;
     }
+
     setBusy(true);
     setError(null);
     setStatus(null);
@@ -104,37 +107,25 @@ export default function LinkWallets(): JSX.Element {
       const cipherBytes = encoder.encode(cipher || "ENC");
       const pendingKey = bLinkPending(payBytes);
 
-      const txn0 = algosdk.makeApplicationNoOpTxn(
-        paymentAddress,
-        sp0,
-        appId,
-        abiAppArgs("link_payment_begin", [cipherBytes]),
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        [{ appIndex: appId, name: pendingKey }],
-      );
+      const txn0 = algosdk.makeApplicationNoOpTxnFromObject({
+        from: paymentAddress,
+        appIndex: appId,
+        suggestedParams: sp0,
+        appArgs: abiAppArgs("link_payment_begin", [cipherBytes]),
+        boxes: [{ appIndex: appId, name: pendingKey }],
+      });
 
-      const txn1 = algosdk.makeApplicationNoOpTxn(
-        experimentAddress,
-        sp1,
-        appId,
-        abiAppArgs("link_finish", [experimentAddress]),
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        [
+      const txn1 = algosdk.makeApplicationNoOpTxnFromObject({
+        from: experimentAddress,
+        appIndex: appId,
+        suggestedParams: sp1,
+        appArgs: abiAppArgs("link_finish", [paymentAddress]),
+        boxes: [
           { appIndex: appId, name: bLink(expBytes) },
           { appIndex: appId, name: bPaymentCipher(expBytes) },
           { appIndex: appId, name: pendingKey },
         ],
-      );
+      });
 
       const gid = algosdk.computeGroupID([txn0, txn1]);
       txn0.group = gid;
@@ -142,7 +133,9 @@ export default function LinkWallets(): JSX.Element {
 
       const signed0 = await signWithAddress(paymentAddress, txn0);
       const signed1 = await signWithAddress(experimentAddress, txn1);
-      const { txId } = await algodClient.sendRawTransaction([signed0, signed1]).do();
+      const response = await algodClient.sendRawTransaction([signed0, signed1]).do();
+      const txId = (response as { txId?: string; txid?: string }).txId || (response as { txid?: string }).txid;
+      if (!txId) throw new Error("Unable to retrieve transaction ID");
       await algosdk.waitForConfirmation(algodClient, txId, 4);
       setStatus(txId);
     } catch (err) {
@@ -157,9 +150,7 @@ export default function LinkWallets(): JSX.Element {
     <main className="mx-auto max-w-3xl space-y-6 p-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Link Wallets</h1>
-        <p className="text-sm text-neutral-600">
-          Establish a link between payment and experiment wallets for the Registry application.
-        </p>
+        <p className="text-sm text-neutral-600">Establish a dual-wallet link for the Registry application.</p>
       </header>
 
       <section className="rounded border p-4 space-y-3">
@@ -190,7 +181,7 @@ export default function LinkWallets(): JSX.Element {
       <section className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2 rounded border p-4">
           <h2 className="text-lg font-medium">Payment wallet</h2>
-          <p className="text-xs text-neutral-600">Select the wallet responsible for initiating the payment.</p>
+          <p className="text-xs text-neutral-600">Account that initiates the link.</p>
           <select
             className="w-full rounded border px-3 py-2 text-sm"
             value={paymentAddress}
@@ -198,9 +189,7 @@ export default function LinkWallets(): JSX.Element {
           >
             <option value="">Choose account</option>
             {peraAccounts.map((acct) => (
-              <option key={acct.address} value={acct.address}>
-                {acct.address}
-              </option>
+              <option key={acct.address} value={acct.address}>{acct.address}</option>
             ))}
           </select>
           {activeAddress && (
@@ -212,13 +201,12 @@ export default function LinkWallets(): JSX.Element {
               Use active ({activeAddress.slice(0, 6)}…)
             </button>
           )}
-          {paymentAddress && (
-            <p className="text-xs text-neutral-600">Selected: <code>{paymentAddress}</code></p>
-          )}
+          {paymentAddress && <p className="text-xs text-neutral-600">Selected: <code>{paymentAddress}</code></p>}
         </div>
+
         <div className="space-y-2 rounded border p-4">
           <h2 className="text-lg font-medium">Experiment wallet</h2>
-          <p className="text-xs text-neutral-600">Select the wallet that will finish the link.</p>
+          <p className="text-xs text-neutral-600">Account that completes the link.</p>
           <select
             className="w-full rounded border px-3 py-2 text-sm"
             value={experimentAddress}
@@ -226,9 +214,7 @@ export default function LinkWallets(): JSX.Element {
           >
             <option value="">Choose account</option>
             {peraAccounts.map((acct) => (
-              <option key={acct.address} value={acct.address}>
-                {acct.address}
-              </option>
+              <option key={acct.address} value={acct.address}>{acct.address}</option>
             ))}
           </select>
           {activeAddress && (
@@ -240,9 +226,7 @@ export default function LinkWallets(): JSX.Element {
               Use active ({activeAddress.slice(0, 6)}…)
             </button>
           )}
-          {experimentAddress && (
-            <p className="text-xs text-neutral-600">Selected: <code>{experimentAddress}</code></p>
-          )}
+          {experimentAddress && <p className="text-xs text-neutral-600">Selected: <code>{experimentAddress}</code></p>}
         </div>
       </section>
 
@@ -260,10 +244,3 @@ export default function LinkWallets(): JSX.Element {
     </main>
   );
 }
-
-
-
-
-
-
-

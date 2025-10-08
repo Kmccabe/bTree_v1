@@ -1,5 +1,5 @@
 ﻿import { useCallback, useMemo, useState } from "react";
-import * as algosdk from "algosdk";
+import algosdk, { AtomicTransactionComposer, TransactionSigner } from "algosdk";
 import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
 import { feeFor } from "../../features/registry/fees";
 import { boxesForRegister } from "../../features/registry/boxes";
@@ -15,12 +15,11 @@ export default function Register(): JSX.Element {
   const [subjectCode, setSubjectCode] = useState<string>("");
   const [contactHint, setContactHint] = useState<string>("");
   const [payoutCipher, setPayoutCipher] = useState<string>("X");
-  const [status, setStatus] = useState<{ txId: string } | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const algodClient = useMemo(() => new algosdk.Algodv2(ALGOD_TOKEN, ALGOD_URL, ""), []);
-
   const peraProvider = useMemo(() => providers?.find((p) => p.metadata.id === PROVIDER_ID.PERA), [providers]);
   const peraClient = clients?.[PROVIDER_ID.PERA];
 
@@ -69,16 +68,20 @@ export default function Register(): JSX.Element {
       sp.flatFee = true;
       sp.fee = feeFor(2);
 
-      const signer: algosdk.TransactionSigner = async (txns) => signTransactions(txns);
+      const signer: TransactionSigner = async (txnGroup, indexes) => {
+        const toSign = indexes.map((idx) => txnGroup[idx].toByte());
+        const signed = await signTransactions(toSign);
+        return signed.map((blob) => (blob instanceof Uint8Array ? blob : new Uint8Array(blob)));
+      };
 
       const methodArgs = [
         subjectCode ? encoder.encode(subjectCode) : new Uint8Array(),
         contactHint ? encoder.encode(contactHint) : new Uint8Array(),
         encoder.encode(payoutCipher || "X"),
       ];
-      const boxes = boxesForRegister(appId, activeAddress);
+      const boxRefs = boxesForRegister(appId, activeAddress).map(([appIndex, name]) => ({ appIndex, name }));
 
-      const atc = new algosdk.AtomicTransactionComposer();
+      const atc = new AtomicTransactionComposer();
       atc.addMethodCall({
         appID: appId,
         method: mRegisterIntent,
@@ -86,12 +89,11 @@ export default function Register(): JSX.Element {
         sender: activeAddress,
         suggestedParams: sp,
         signer,
-        boxes,
+        boxes: boxRefs,
       });
 
       const result = await atc.execute(algodClient, 4);
-      const txId = result.txIDs[0];
-      setStatus({ txId });
+      setStatus(result.txIDs[0]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
@@ -115,12 +117,13 @@ export default function Register(): JSX.Element {
           {activeAddress ? <code className="text-xs">{activeAddress}</code> : <span className="text-xs text-neutral-600">Not connected</span>}
           <button
             className="rounded border px-2 py-1 text-xs"
-            onClick={handleConnect}
             type="button"
+            onClick={handleConnect}
           >
             {activeAddress ? "Reconnect" : "Connect"}
           </button>
         </div>
+
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Application ID</span>
           <input
@@ -132,6 +135,7 @@ export default function Register(): JSX.Element {
             pattern="\d*"
           />
         </label>
+
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Subject code (optional)</span>
           <input
@@ -141,6 +145,7 @@ export default function Register(): JSX.Element {
             placeholder="public bytes"
           />
         </label>
+
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Contact hint (optional)</span>
           <input
@@ -150,6 +155,7 @@ export default function Register(): JSX.Element {
             placeholder="email/handle (public)"
           />
         </label>
+
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Payout cipher</span>
           <input
@@ -159,22 +165,19 @@ export default function Register(): JSX.Element {
             placeholder="cipher text"
           />
         </label>
+
         <button
           className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-          onClick={handleRegister}
-          disabled={disabled}
           type="button"
+          disabled={disabled}
+          onClick={handleRegister}
         >
           {busy ? "Submitting..." : "Register intent"}
         </button>
-        {status && (
-          <p className="text-sm text-green-700">Registered (txid {status.txId})</p>
-        )}
-        {error && (
-          <p className="text-sm text-red-600">{error}</p>
-        )}
+
+        {status && <p className="text-sm text-green-700">Registered (txid {status})</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
       </section>
     </main>
   );
 }
-

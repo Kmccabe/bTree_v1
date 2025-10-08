@@ -1,4 +1,4 @@
-﻿import { Method, ABIType } from "algosdk/abi";
+﻿import { ABIType, Method } from "algosdk";
 
 export const sig_register_intent = "register_intent(byte[],byte[],byte[])";
 export const sig_admin_set_reward = "admin_set_reward(uint64)";
@@ -17,7 +17,7 @@ const METHOD_MAP: Record<string, Method> = {
   link_finish: mLinkFinish,
 };
 
-const encoder = new TextEncoder();
+const textEncoder = new TextEncoder();
 
 export const methodLookup = (name: string): Method => {
   const method = METHOD_MAP[name];
@@ -27,27 +27,19 @@ export const methodLookup = (name: string): Method => {
   return method;
 };
 
-export const abiAppArgs = (methodName: string, values: any[]): Uint8Array[] => {
+export const abiAppArgs = (methodName: string, values: unknown[]): Uint8Array[] => {
   const method = methodLookup(methodName);
   if (values.length !== method.args.length) {
     throw new Error(`Argument count mismatch for ${methodName}`);
   }
   const encoded: Uint8Array[] = [method.getSelector()];
   method.args.forEach((arg, idx) => {
-    const type = arg.type;
-    let abiType: ABIType;
-    if (typeof type === "string") {
-      abiType = ABIType.fromString(type);
-    } else {
-      abiType = type;
-    }
-    const value = values[idx];
-    // Accept string shortcuts for byte[] arguments
-    let finalValue = value;
-    if (typeof value === "string" && arg.type === "byte[]") {
-      finalValue = encoder.encode(value);
-    }
-    encoded.push(abiType.encode(finalValue));
+    const argType = typeof arg.type === "string" ? ABIType.fromString(arg.type) : arg.type;
+    const rawValue = values[idx];
+    const value = typeof rawValue === "string" && arg.type === "byte[]"
+      ? textEncoder.encode(rawValue)
+      : rawValue;
+    encoded.push(argType.encode(value as unknown));
   });
   return encoded;
 };
