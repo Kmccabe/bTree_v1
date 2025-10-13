@@ -6,12 +6,18 @@ import { ABIMethod, ABIType, type ABIValue } from "algosdk";
 // Signatures MUST include the return type (`void`)
 export const sig_register_intent = "register_intent(byte[],byte[],byte[])void";
 export const sig_admin_set_reward = "admin_set_reward(uint64)void";
+export const sig_admin_open = "admin_open()void";
+export const sig_admin_close = "admin_close()void";
+export const sig_admin_add_capacity = "admin_add_capacity(uint64)void";
 export const sig_link_begin = "link_payment_begin(byte[])void";
 export const sig_link_finish = "link_finish(address)void";
 
 // Method objects (use with ATC addMethodCall)
 export const mRegisterIntent = ABIMethod.fromSignature(sig_register_intent);
 export const mAdminSetReward = ABIMethod.fromSignature(sig_admin_set_reward);
+export const mAdminOpen = ABIMethod.fromSignature(sig_admin_open);
+export const mAdminClose = ABIMethod.fromSignature(sig_admin_close);
+export const mAdminAddCapacity = ABIMethod.fromSignature(sig_admin_add_capacity);
 export const mLinkBegin      = ABIMethod.fromSignature(sig_link_begin);
 export const mLinkFinish     = ABIMethod.fromSignature(sig_link_finish);
 
@@ -19,6 +25,9 @@ export const mLinkFinish     = ABIMethod.fromSignature(sig_link_finish);
 const METHOD_MAP: Record<string, ABIMethod> = {
   register_intent: mRegisterIntent,
   admin_set_reward: mAdminSetReward,
+  admin_open: mAdminOpen,
+  admin_close: mAdminClose,
+  admin_add_capacity: mAdminAddCapacity,
   link_payment_begin: mLinkBegin,
   link_finish: mLinkFinish,
 };
