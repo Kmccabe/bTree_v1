@@ -14,6 +14,8 @@ import Privacy from './pages/legal/Privacy';
 import Terms from './pages/legal/Terms';
 import Consent from './pages/legal/Consent';
 import Status from './pages/Status';
+import Register from "./pages/subject/Register";
+import LinkWallets from "./pages/subject/LinkWallets";
 
 /* ---------- Inline stubs for /subject/* (we'll move to separate files later) ---------- */
 function SubjectLayout() {
@@ -172,9 +174,10 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="signin" replace /> },
           { path: 'signin', element: <SubjectSignIn /> },
-          { path: 'register', element: <SubjectRegister /> },
+          { path: 'register', element: <Register /> },
           { path: 'showup', element: <SubjectShowUp /> },
           { path: 'play', element: <SubjectPlay /> },
+          { path: 'link', element: <LinkWallets /> },
         ],
       },
 
