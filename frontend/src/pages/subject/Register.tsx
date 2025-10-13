@@ -23,6 +23,10 @@ export default function Register(): JSX.Element {
   const peraProvider = useMemo(() => providers?.find((p) => p.metadata.id === PROVIDER_ID.PERA), [providers]);
   const peraClient = clients?.[PROVIDER_ID.PERA];
 
+  // --- Explorer link helpers (TestNet) ---
+  const explorerTxUrl = (txid: string) => `https://testnet.algoexplorer.io/tx/${txid}`;
+  const explorerAppUrl = (appId: number) => `https://testnet.algoexplorer.io/application/${appId}`;
+
   const handleConnect = useCallback(async () => {
     if (!peraProvider) {
       setError("Pera wallet provider not ready");
@@ -175,7 +179,38 @@ export default function Register(): JSX.Element {
           {busy ? "Submitting..." : "Register intent"}
         </button>
 
-        {status && <p className="text-sm text-green-700">Registered (txid {status})</p>}
+        {status && (
+          <div className="mt-2 rounded border p-3 text-sm">
+            <div className="text-green-700 font-medium">Registered ✓</div>
+            <div className="mt-1">
+              txid:&nbsp;
+              <a
+                className="underline"
+                href={explorerTxUrl(status)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {status}
+              </a>
+            </div>
+            {!!appIdInput && (
+              <div className="mt-1">
+                app:&nbsp;
+                <a
+                  className="underline"
+                  href={explorerAppUrl(Number(appIdInput))}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {appIdInput}
+                </a>
+              </div>
+            )}
+            <div className="mt-2 text-neutral-700">
+              You’ll get an invite when you’re assigned.
+            </div>
+          </div>
+        )}
         {error && <p className="text-sm text-red-600">{error}</p>}
       </section>
     </main>
