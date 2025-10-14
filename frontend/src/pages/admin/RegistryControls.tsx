@@ -13,8 +13,9 @@ const ALGOD_URL =
   (import.meta.env.VITE_ALGOD_URL as string | undefined) || "https://testnet-api.algonode.cloud";
 const ALGOD_TOKEN = (import.meta.env.VITE_ALGOD_TOKEN as string | undefined) || "";
 
-const explorerTx = (txId: string) => `https://testnet.algoexplorer.io/tx/${txId}`;
-const explorerApp = (appId: number) => `https://testnet.algoexplorer.io/application/${appId}`;
+const explorerTx = (txId: string) => `https://lora.algokit.io/testnet/tx/${txId}`;
+const explorerApp = (appId: number) => `https://lora.algokit.io/testnet/application/${appId}`;
+const explorerAddr = (addr: string) => `https://lora.algokit.io/testnet/account/${addr}`;
 
 type ActionKind = "open" | "close" | "addCap" | "setReward";
 
@@ -30,6 +31,8 @@ export default function RegistryControls(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  const [adminAddr, setAdminAddr] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   const { providers, clients, activeAddress, signTransactions } = useWallet();
   const peraProvider = useMemo(
@@ -54,24 +57,27 @@ export default function RegistryControls(): JSX.Element {
     return Number.isInteger(num) && num >= 1000 ? num : null;
   }, [rewardInput]);
 
-  const canSubmit = !!activeAddress && !!signTransactions && !!appId && !busy;
+  const isAdmin = !!activeAddress && !!adminAddr && activeAddress === adminAddr;
+  const canSubmit = isAdmin && !!signTransactions && !!appId && !busy;
 
   const handleConnect = useCallback(async () => {
     if (!peraProvider) return;
     try {
       await peraProvider.connect();
-      if (!peraProvider.isActive) peraProvider.setActiveProvider?.();
     } catch (err: any) {
       const msg = String(err?.message || err);
-      if (msg.toLowerCase().includes("currently connected") && peraClient) {
+      setError(msg);
+    } finally {
+      try {
+        peraProvider?.setActiveProvider?.();
+      } catch {}
+      if (!peraProvider?.isActive && peraClient) {
         try {
           await peraClient.reconnect(() => {});
-          if (!peraProvider.isActive) peraProvider.setActiveProvider?.();
+          peraProvider?.setActiveProvider?.();
         } catch (reconnectErr) {
-          setError(String((reconnectErr as Error)?.message || reconnectErr));
+          setError((reconnectErr as Error)?.message ?? String(reconnectErr));
         }
-      } else {
-        setError(msg);
       }
     }
   }, [peraProvider, peraClient]);
@@ -85,9 +91,80 @@ export default function RegistryControls(): JSX.Element {
     } catch {}
   }, [peraProvider, peraClient]);
 
+  const decodeAdminFromInfo = (info: any): string | null => {
+    const entries =
+      info?.params?.["global-state"] ??
+      info?.params?.["globalState"] ??
+      info?.params?.globalState ??
+      [];
+    if (!Array.isArray(entries)) return null;
+    for (const entry of entries) {
+      const keyRaw = entry?.key ?? entry?.Key;
+      let key = "";
+      if (typeof keyRaw === "string") {
+        try {
+          key = new TextDecoder().decode(Uint8Array.from(atob(keyRaw), (c) => c.charCodeAt(0)));
+        } catch {
+          key = "";
+        }
+      } else if (keyRaw instanceof Uint8Array) {
+        key = new TextDecoder().decode(keyRaw);
+      }
+      if (key !== "admin_addr") continue;
+
+      const val = entry?.value ?? entry?.Value ?? {};
+      const bytesRaw = val.bytes ?? val.Bytes ?? null;
+      let adminBytes: Uint8Array | null = null;
+      if (typeof bytesRaw === "string" && bytesRaw) {
+        try {
+          adminBytes = Uint8Array.from(atob(bytesRaw), (c) => c.charCodeAt(0));
+        } catch {
+          adminBytes = null;
+        }
+      } else if (bytesRaw instanceof Uint8Array) {
+        adminBytes = bytesRaw;
+      } else if (Array.isArray(bytesRaw)) {
+        adminBytes = Uint8Array.from(bytesRaw);
+      }
+      if (adminBytes && adminBytes.length === 32) {
+        return algosdk.encodeAddress(adminBytes);
+      }
+    }
+    return null;
+  };
+
+  const readStatus = useCallback(async () => {
+    if (!appId) {
+      setError("Enter a valid App ID");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    setStatusMsg(null);
+    try {
+      const info = await algod.getApplicationByID(appId).do();
+      const admin = decodeAdminFromInfo(info);
+      setAdminAddr(admin);
+      setStatusMsg(admin ? "Admin wallet loaded." : "Admin wallet not set on registry.");
+    } catch (err: any) {
+      setAdminAddr(null);
+      setError(String(err?.message || err));
+    } finally {
+      setBusy(false);
+    }
+  }, [algod, appId]);
+
   const submit = useCallback(
     async (kind: ActionKind) => {
-      if (!activeAddress || !signTransactions || !appId) return;
+      if (!activeAddress || !signTransactions || !appId) {
+        setError("Connect a wallet and enter a valid App ID");
+        return;
+      }
+      if (!isAdmin) {
+        setError("Connect the admin wallet shown below.");
+        return;
+      }
       setBusy(true);
       setError(null);
       setResult(null);
@@ -147,14 +224,18 @@ export default function RegistryControls(): JSX.Element {
 
         const res = await atc.execute(algod, 4);
         setResult({ kind, txId: res.txIDs[0] });
+        setStatusMsg(null);
       } catch (err: any) {
         setError(String(err?.message || err));
       } finally {
         setBusy(false);
       }
     },
-    [activeAddress, signTransactions, appId, capDelta, rewardAmount, algod],
+    [activeAddress, signTransactions, appId, capDelta, rewardAmount, algod, isAdmin],
   );
+
+  const shortAddr = (addr?: string | null) =>
+    addr && addr.length > 12 ? `${addr.slice(0, 6)}...${addr.slice(-6)}` : addr || "—";
 
   return (
     <main className="mx-auto max-w-3xl p-6 space-y-6">
@@ -163,6 +244,19 @@ export default function RegistryControls(): JSX.Element {
         <p className="text-sm text-neutral-600">
           Send admin method calls to the registry contract on Algorand TestNet.
         </p>
+        <div className="text-sm text-neutral-600 space-y-1">
+          <div>Connected wallet: <code>{shortAddr(activeAddress)}</code></div>
+          <div>
+            Admin wallet:{" "}
+            {adminAddr ? (
+              <a className="underline" href={explorerAddr(adminAddr)} target="_blank" rel="noreferrer">
+                {adminAddr}
+              </a>
+            ) : (
+              <span className="text-neutral-500">Not loaded</span>
+            )}
+          </div>
+        </div>
       </header>
 
       <section className="rounded border p-4 space-y-4">
@@ -204,6 +298,17 @@ export default function RegistryControls(): JSX.Element {
           </label>
         </div>
 
+        <div className="flex gap-3">
+          <button
+            type="button"
+            className="rounded border px-4 py-2 text-sm font-medium hover:border-blue-400 disabled:opacity-40"
+            onClick={readStatus}
+            disabled={busy || !appId}
+          >
+            {busy ? "Reading..." : "Read Status"}
+          </button>
+        </div>
+
         <div className="flex items-center gap-3 rounded border px-3 py-2 text-sm">
           {activeAddress ? (
             <>
@@ -236,7 +341,7 @@ export default function RegistryControls(): JSX.Element {
           <button
             type="button"
             className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-            disabled={!canSubmit}
+            disabled={!canSubmit || !appId}
             onClick={() => submit("open")}
           >
             {busy ? "Submitting..." : "Open"}
@@ -244,7 +349,7 @@ export default function RegistryControls(): JSX.Element {
           <button
             type="button"
             className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-            disabled={!canSubmit}
+            disabled={!canSubmit || !appId}
             onClick={() => submit("close")}
           >
             {busy ? "Submitting..." : "Close"}
@@ -252,7 +357,7 @@ export default function RegistryControls(): JSX.Element {
           <button
             type="button"
             className="rounded bg-purple-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-            disabled={!canSubmit}
+            disabled={!canSubmit || !appId}
             onClick={() => submit("addCap")}
           >
             {busy ? "Submitting..." : "Add Capacity"}
@@ -260,12 +365,18 @@ export default function RegistryControls(): JSX.Element {
           <button
             type="button"
             className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-            disabled={!canSubmit}
+            disabled={!canSubmit || !appId}
             onClick={() => submit("setReward")}
           >
             {busy ? "Submitting..." : "Set Reward"}
           </button>
         </div>
+
+        {!isAdmin && adminAddr && (
+          <div className="text-sm text-amber-600">
+            Connect the admin wallet shown above to run registry actions.
+          </div>
+        )}
 
         {appId && (
           <div className="text-xs text-neutral-500">
@@ -279,6 +390,12 @@ export default function RegistryControls(): JSX.Element {
         {error && (
           <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
+          </div>
+        )}
+
+        {statusMsg && (
+          <div className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+            {statusMsg}
           </div>
         )}
 

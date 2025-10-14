@@ -23,8 +23,8 @@ export default function AdminSubjectPool(): JSX.Element {
 
   const algod = useMemo(() => new algosdk.Algodv2(ALGOD_TOKEN, ALGOD_URL, ""), []);
 
-  const explorerApp = (appId: number) => `https://testnet.algoexplorer.io/application/${appId}`;
-  const explorerAddr = (addr: string) => `https://testnet.algoexplorer.io/address/${addr}`;
+  const explorerApp = (appId: number) => `https://lora.algokit.io/testnet/application/${appId}`;
+  const explorerAddr = (addr: string) => `https://lora.algokit.io/testnet/account/${addr}`;
 
   const td = new TextDecoder();
 
