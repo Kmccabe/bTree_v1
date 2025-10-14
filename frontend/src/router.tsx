@@ -16,7 +16,9 @@ import Consent from './pages/legal/Consent';
 import Status from './pages/Status';
 import Register from "./pages/subject/Register";
 import LinkWallets from "./pages/subject/LinkWallets";
+import AdminHome from "./pages/admin/AdminHome";
 import AdminSubjectPool from "./pages/admin/SubjectPool";
+import RegistryControls from "./pages/admin/RegistryControls";
 
 /* ---------- Inline stubs for /subject/* (we'll move to separate files later) ---------- */
 function SubjectLayout() {
@@ -190,7 +192,9 @@ export const router = createBrowserRouter([
       { path: 'legal/terms', element: <Terms /> },
       { path: 'legal/consent', element: <Consent /> },
       { path: 'status', element: <Status /> },
+      { path: 'admin', element: <AdminHome /> },
       { path: 'admin/subject-pool', element: <AdminSubjectPool /> },
+      { path: 'admin/registry-controls', element: <RegistryControls /> },
 
       { path: '*', element: <NotFound /> },
     ],
