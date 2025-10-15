@@ -13,7 +13,7 @@ export const sig_link_begin = "link_payment_begin(byte[])void";
 export const sig_link_finish = "link_finish(address)void";
 
 // Method objects (use with ATC addMethodCall)
-export const mRegisterIntent = ABIMethod.fromSignature(sig_register_intent);
+export const mRegisterIntent = ABIMethod.fromSignature("register_intent(byte[],byte[],byte[])void");
 export const mAdminSetReward = ABIMethod.fromSignature(sig_admin_set_reward);
 export const mAdminOpen = ABIMethod.fromSignature(sig_admin_open);
 export const mAdminClose = ABIMethod.fromSignature(sig_admin_close);
