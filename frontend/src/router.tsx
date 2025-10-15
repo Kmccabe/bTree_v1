@@ -19,6 +19,7 @@ import LinkWallets from "./pages/subject/LinkWallets";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminSubjectPool from "./pages/admin/SubjectPool";
 import RegistryControls from "./pages/admin/RegistryControls";
+import SubjectPoolIndexer from "./pages/admin/SubjectPoolIndexer";
 
 /* ---------- Inline stubs for /subject/* (we'll move to separate files later) ---------- */
 function SubjectLayout() {
@@ -195,6 +196,7 @@ export const router = createBrowserRouter([
       { path: 'admin', element: <AdminHome /> },
       { path: 'admin/subject-pool', element: <AdminSubjectPool /> },
       { path: 'admin/registry-controls', element: <RegistryControls /> },
+      { path: 'admin/subject-pool-indexer', element: <SubjectPoolIndexer /> },
 
       { path: '*', element: <NotFound /> },
     ],

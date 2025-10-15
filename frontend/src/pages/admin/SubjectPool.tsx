@@ -181,11 +181,19 @@ export default function AdminSubjectPool(): JSX.Element {
 
   return (
     <main className="mx-auto max-w-3xl p-6 space-y-4">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Admin — Subject Pool</h1>
-        <p className="text-sm text-neutral-600">
-          Read registry status and per-subject boxes directly from Algod (TestNet).
-        </p>
+      <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold">Admin - Subject Pool</h1>
+          <p className="text-sm text-neutral-600">
+            Read registry status and per-subject boxes directly from Algod (TestNet).
+          </p>
+        </div>
+        <a
+          href="/admin/subject-pool-indexer"
+          className="text-sm text-blue-600 underline md:mt-1"
+        >
+          Subject Pool (Indexer)
+        </a>
       </header>
 
       <section className="rounded border p-4 space-y-3">
@@ -219,7 +227,7 @@ export default function AdminSubjectPool(): JSX.Element {
             disabled={busy || !appIdInput}
             onClick={onReadGlobals}
           >
-            {busy ? "Reading…" : "Read Status"}
+            {busy ? "Reading..." : "Read Status"}
           </button>
           <button
             type="button"
@@ -227,7 +235,7 @@ export default function AdminSubjectPool(): JSX.Element {
             disabled={busy || !appIdInput || !addrInput}
             onClick={onReadBoxes}
           >
-            {busy ? "Reading…" : "Read Boxes"}
+            {busy ? "Reading..." : "Read Boxes"}
           </button>
         </div>
 

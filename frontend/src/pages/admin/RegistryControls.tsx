@@ -239,24 +239,32 @@ export default function RegistryControls(): JSX.Element {
 
   return (
     <main className="mx-auto max-w-3xl p-6 space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Registry Controls</h1>
-        <p className="text-sm text-neutral-600">
-          Send admin method calls to the registry contract on Algorand TestNet.
-        </p>
-        <div className="text-sm text-neutral-600 space-y-1">
-          <div>Connected wallet: <code>{shortAddr(activeAddress)}</code></div>
-          <div>
-            Admin wallet:{" "}
-            {adminAddr ? (
-              <a className="underline" href={explorerAddr(adminAddr)} target="_blank" rel="noreferrer">
-                {adminAddr}
-              </a>
-            ) : (
-              <span className="text-neutral-500">Not loaded</span>
-            )}
+      <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold">Registry Controls</h1>
+          <p className="text-sm text-neutral-600">
+            Send admin method calls to the registry contract on Algorand TestNet.
+          </p>
+          <div className="text-sm text-neutral-600 space-y-1">
+            <div>Connected wallet: <code>{shortAddr(activeAddress)}</code></div>
+            <div>
+              Admin wallet:{" "}
+              {adminAddr ? (
+                <a className="underline" href={explorerAddr(adminAddr)} target="_blank" rel="noreferrer">
+                  {adminAddr}
+                </a>
+              ) : (
+                <span className="text-neutral-500">Not loaded</span>
+              )}
+            </div>
           </div>
         </div>
+        <a
+          href="/admin/subject-pool-indexer"
+          className="text-sm text-blue-600 underline md:mt-1"
+        >
+          Subject Pool (Indexer)
+        </a>
       </header>
 
       <section className="rounded border p-4 space-y-4">
