@@ -1,31 +1,44 @@
-﻿import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import algosdk from "algosdk";
-import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
+import { PROVIDER_ID, useWallet } from "@txnlab/use-wallet";
 import { feeFor } from "../../features/registry/fees";
 import { addrBytes, bLink, bLinkPending, bPaymentCipher } from "../../features/registry/boxes";
-import { abiAppArgs } from "../../features/registry/abi";
+import { abiAppArgs, mLinkBegin, mLinkFinish } from "../../features/registry/abi";
 
 const ALGOD_URL = (import.meta.env.VITE_ALGOD_URL as string | undefined) || "http://localhost:4001";
 const ALGOD_TOKEN = (import.meta.env.VITE_ALGOD_TOKEN as string | undefined) || "a".repeat(64);
 const encoder = new TextEncoder();
 
+type LinkSuccess = {
+  groupTxId: string;
+  paymentAddress: string;
+  experimentAddress: string;
+};
+
 const normalizeSigned = (signed: (Uint8Array | ArrayLike<number>)[]): Uint8Array[] =>
   signed.map((blob) => (blob instanceof Uint8Array ? blob : new Uint8Array(blob)));
 
+const shortAddress = (addr: string): string =>
+  (addr.length <= 12 ? addr : `${addr.slice(0, 6)}...${addr.slice(-4)}`);
+
 export default function LinkWallets(): JSX.Element {
-  const { providers, clients, activeAddress, signTransactions } = useWallet();
+  const { providers, clients, activeAccount, activeAddress, signTransactions } = useWallet();
   const [appIdInput, setAppIdInput] = useState<string>("");
   const [cipher, setCipher] = useState<string>("ENC");
   const [paymentAddress, setPaymentAddress] = useState<string>("");
   const [experimentAddress, setExperimentAddress] = useState<string>("");
-  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [success, setSuccess] = useState<LinkSuccess | null>(null);
 
   const algodClient = useMemo(() => new algosdk.Algodv2(ALGOD_TOKEN, ALGOD_URL, ""), []);
-  const peraProvider = useMemo(() => providers?.find((p) => p.metadata.id === PROVIDER_ID.PERA), [providers]);
+  const peraProvider = useMemo(
+    () => providers?.find((p) => p.metadata.id === PROVIDER_ID.PERA),
+    [providers]
+  );
   const peraClient = clients?.[PROVIDER_ID.PERA];
-  const peraAccounts = peraProvider?.accounts || [];
+  const peraAccounts = peraProvider?.accounts ?? [];
+  const activeAddr = activeAddress || activeAccount?.address;
 
   const handleConnect = useCallback(async () => {
     if (!peraProvider) {
@@ -50,33 +63,40 @@ export default function LinkWallets(): JSX.Element {
     }
   }, [peraProvider, peraClient]);
 
-  const ensureActiveAccount = useCallback(async (addr: string) => {
-    const provider = peraProvider;
-    if (!provider) throw new Error("Wallet provider unavailable");
-    const belongs = provider.accounts?.some((a) => a.address === addr);
-    if (!belongs) {
-      throw new Error("Address not available in connected wallet");
-    }
-    if (!provider.isActive) {
-      try { provider.setActiveProvider(); } catch {}
-    }
-    try {
-      provider.setActiveAccount?.(addr);
-    } catch (err) {
-      console.warn("setActiveAccount failed", err);
-    }
-  }, [peraProvider]);
+  const ensureActiveAccount = useCallback(
+    async (addr: string) => {
+      if (!peraProvider) throw new Error("Wallet provider unavailable");
+      const belongs = peraProvider.accounts?.some((acct) => acct.address === addr);
+      if (!belongs) throw new Error("Address not available in connected wallet");
+      if (!peraProvider.isActive) {
+        try {
+          peraProvider.setActiveProvider();
+        } catch {
+          /* noop */
+        }
+      }
+      try {
+        peraProvider.setActiveAccount?.(addr);
+      } catch {
+        /* optional */
+      }
+    },
+    [peraProvider]
+  );
 
-  const signWithAddress = useCallback(async (addr: string, txn: algosdk.Transaction) => {
-    if (!signTransactions) throw new Error("Wallet signing unavailable");
-    await ensureActiveAccount(addr);
-    const signed = await signTransactions([txn.toByte()]);
-    return normalizeSigned(signed)[0];
-  }, [ensureActiveAccount, signTransactions]);
+  const signWithAddress = useCallback(
+    async (addr: string, txn: algosdk.Transaction) => {
+      if (!signTransactions) throw new Error("Wallet signing unavailable");
+      await ensureActiveAccount(addr);
+      const signed = await signTransactions([txn.toByte()]);
+      return normalizeSigned(signed)[0];
+    },
+    [ensureActiveAccount, signTransactions]
+  );
 
   const handleLink = useCallback(async () => {
     if (!signTransactions) {
-      setError("Connect wallet first");
+      setError("Connect both wallets first");
       return;
     }
     const appId = Number(appIdInput);
@@ -95,7 +115,7 @@ export default function LinkWallets(): JSX.Element {
 
     setBusy(true);
     setError(null);
-    setStatus(null);
+    setSuccess(null);
 
     try {
       const baseSp = await algodClient.getTransactionParams().do();
@@ -104,14 +124,14 @@ export default function LinkWallets(): JSX.Element {
 
       const payBytes = addrBytes(paymentAddress);
       const expBytes = addrBytes(experimentAddress);
-      const cipherBytes = encoder.encode(cipher || "ENC");
       const pendingKey = bLinkPending(payBytes);
+      const cipherBytes = encoder.encode(cipher || "ENC");
 
       const txn0 = algosdk.makeApplicationNoOpTxnFromObject({
         sender: paymentAddress,
         appIndex: appId,
         suggestedParams: sp0,
-        appArgs: abiAppArgs("link_payment_begin", [cipherBytes]),
+        appArgs: abiAppArgs(mLinkBegin.name, [cipherBytes]),
         boxes: [{ appIndex: appId, name: pendingKey }],
       });
 
@@ -119,7 +139,7 @@ export default function LinkWallets(): JSX.Element {
         sender: experimentAddress,
         appIndex: appId,
         suggestedParams: sp1,
-        appArgs: abiAppArgs("link_finish", [paymentAddress]),
+        appArgs: abiAppArgs(mLinkFinish.name, [paymentAddress]),
         boxes: [
           { appIndex: appId, name: bLink(expBytes) },
           { appIndex: appId, name: bPaymentCipher(expBytes) },
@@ -131,103 +151,97 @@ export default function LinkWallets(): JSX.Element {
       txn0.group = gid;
       txn1.group = gid;
 
-      const signed0 = await signWithAddress(paymentAddress, txn0);
-      const signed1 = await signWithAddress(experimentAddress, txn1);
-      const response = await algodClient.sendRawTransaction([signed0, signed1]).do();
-      const txId = (response as { txId?: string; txid?: string }).txId || (response as { txid?: string }).txid;
-      if (!txId) throw new Error("Unable to retrieve transaction ID");
-      await algosdk.waitForConfirmation(algodClient, txId, 4);
-      setStatus(txId);
+      const paymentSigned = await signWithAddress(paymentAddress, txn0);
+      const experimentSigned = await signWithAddress(experimentAddress, txn1);
+
+      const tx0Id = txn0.txID();
+      await algodClient.sendRawTransaction([paymentSigned, experimentSigned]).do();
+      await algosdk.waitForConfirmation(algodClient, tx0Id, 4);
+
+      setSuccess({
+        groupTxId: tx0Id,
+        paymentAddress,
+        experimentAddress,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
     } finally {
       setBusy(false);
     }
-  }, [signTransactions, appIdInput, paymentAddress, experimentAddress, cipher, algodClient, signWithAddress]);
+  }, [
+    signTransactions,
+    appIdInput,
+    paymentAddress,
+    experimentAddress,
+    cipher,
+    algodClient,
+    signWithAddress,
+  ]);
+
+  const explorerTxUrl = (txId: string) => `https://testnet.algoexplorer.io/tx/${txId}`;
+  const connectLabel = peraProvider?.isConnected ? "Reconnect Pera Wallet" : "Connect Pera Wallet";
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Link Wallets</h1>
-        <p className="text-sm text-neutral-600">Establish a dual-wallet link for the Registry application.</p>
+        <p className="text-sm text-neutral-600">Run the optional dual-wallet link for the Registry app.</p>
+        <p className="text-xs text-neutral-500">Optional now; enables private payout wallet later.</p>
       </header>
 
-      <section className="rounded border p-4 space-y-3">
-        <button className="rounded border px-3 py-1 text-xs" type="button" onClick={handleConnect}>
-          Connect Pera Wallet
-        </button>
+      <section className="space-y-3 rounded border p-4">
+        <div className="flex items-center gap-3 text-sm">
+          <button
+            className="rounded border px-3 py-1 text-xs"
+            type="button"
+            onClick={handleConnect}
+          >
+            {connectLabel}
+          </button>
+          <span className="text-xs text-neutral-600">Accounts detected: {peraAccounts.length}</span>
+        </div>
+
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Application ID</span>
           <input
             value={appIdInput}
-            onChange={(e) => setAppIdInput(e.target.value.replace(/[^\d]/g, ""))}
+            onChange={(event) => setAppIdInput(event.target.value.replace(/[^\d]/g, ""))}
             className="rounded border px-3 py-2"
             inputMode="numeric"
             pattern="\d*"
             placeholder="e.g. 12345"
           />
         </label>
+
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Cipher bytes</span>
+          <span className="font-medium">Cipher</span>
           <input
             value={cipher}
-            onChange={(e) => setCipher(e.target.value)}
+            onChange={(event) => setCipher(event.target.value)}
             className="rounded border px-3 py-2"
+            placeholder="ENC"
           />
         </label>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2 rounded border p-4">
-          <h2 className="text-lg font-medium">Payment wallet</h2>
-          <p className="text-xs text-neutral-600">Account that initiates the link.</p>
-          <select
-            className="w-full rounded border px-3 py-2 text-sm"
-            value={paymentAddress}
-            onChange={(e) => setPaymentAddress(e.target.value)}
-          >
-            <option value="">Choose account</option>
-            {peraAccounts.map((acct) => (
-              <option key={acct.address} value={acct.address}>{acct.address}</option>
-            ))}
-          </select>
-          {activeAddress && (
-            <button
-              className="rounded border px-3 py-1 text-xs"
-              type="button"
-              onClick={() => setPaymentAddress(activeAddress)}
-            >
-              Use active ({activeAddress.slice(0, 6)}…)
-            </button>
-          )}
-          {paymentAddress && <p className="text-xs text-neutral-600">Selected: <code>{paymentAddress}</code></p>}
-        </div>
-
-        <div className="space-y-2 rounded border p-4">
-          <h2 className="text-lg font-medium">Experiment wallet</h2>
-          <p className="text-xs text-neutral-600">Account that completes the link.</p>
-          <select
-            className="w-full rounded border px-3 py-2 text-sm"
-            value={experimentAddress}
-            onChange={(e) => setExperimentAddress(e.target.value)}
-          >
-            <option value="">Choose account</option>
-            {peraAccounts.map((acct) => (
-              <option key={acct.address} value={acct.address}>{acct.address}</option>
-            ))}
-          </select>
-          {activeAddress && (
-            <button
-              className="rounded border px-3 py-1 text-xs"
-              type="button"
-              onClick={() => setExperimentAddress(activeAddress)}
-            >
-              Use active ({activeAddress.slice(0, 6)}…)
-            </button>
-          )}
-          {experimentAddress && <p className="text-xs text-neutral-600">Selected: <code>{experimentAddress}</code></p>}
-        </div>
+        <WalletColumn
+          title="Payment wallet"
+          subtitle="Signs link_payment_begin"
+          accounts={peraAccounts}
+          selected={paymentAddress}
+          onSelect={setPaymentAddress}
+          activeAccountAddress={activeAddr}
+        />
+        <WalletColumn
+          title="Experiment wallet"
+          subtitle="Signs link_finish"
+          accounts={peraAccounts}
+          selected={experimentAddress}
+          onSelect={setExperimentAddress}
+          activeAccountAddress={activeAddr}
+        />
       </section>
 
       <button
@@ -236,11 +250,76 @@ export default function LinkWallets(): JSX.Element {
         onClick={handleLink}
         disabled={busy || !paymentAddress || !experimentAddress || !appIdInput.trim()}
       >
-        {busy ? "Linking..." : "Link wallets"}
+        {busy ? "Linking..." : "Link Wallets"}
       </button>
 
-      {status && <p className="text-sm text-green-700">Linked (group txid {status})</p>}
+      {success && (
+        <div className="space-y-2 rounded border border-green-200 bg-green-50 p-4 text-sm">
+          <div className="font-medium text-green-700">✅ Linked ✓</div>
+          <div>
+            Group tx:&nbsp;
+            <a className="underline" href={explorerTxUrl(success.groupTxId)} target="_blank" rel="noreferrer">
+              {success.groupTxId}
+            </a>
+          </div>
+          <div className="text-neutral-700">Payment: {shortAddress(success.paymentAddress)}</div>
+          <div className="text-neutral-700">Experiment: {shortAddress(success.experimentAddress)}</div>
+        </div>
+      )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
     </main>
+  );
+}
+
+type WalletColumnProps = {
+  title: string;
+  subtitle: string;
+  accounts: { address: string }[];
+  selected: string;
+  onSelect: (addr: string) => void;
+  activeAccountAddress?: string;
+};
+
+function WalletColumn({
+  title,
+  subtitle,
+  accounts,
+  selected,
+  onSelect,
+  activeAccountAddress,
+}: WalletColumnProps) {
+  return (
+    <div className="space-y-2 rounded border p-4">
+      <h2 className="text-lg font-medium">{title}</h2>
+      <p className="text-xs text-neutral-600">{subtitle}</p>
+      <select
+        className="w-full rounded border px-3 py-2 text-sm"
+        value={selected}
+        onChange={(event) => onSelect(event.target.value)}
+      >
+        <option value="">Choose account</option>
+        {accounts.map((acct) => (
+          <option key={acct.address} value={acct.address}>
+            {acct.address}
+          </option>
+        ))}
+      </select>
+      {activeAccountAddress && (
+        <button
+          className="rounded border px-3 py-1 text-xs"
+          type="button"
+          onClick={() => onSelect(activeAccountAddress)}
+        >
+          Use active ({shortAddress(activeAccountAddress)})
+        </button>
+      )}
+      {selected && (
+        <p className="text-xs text-neutral-600">
+          Selected:&nbsp;
+          <code>{selected}</code>
+        </p>
+      )}
+    </div>
   );
 }
