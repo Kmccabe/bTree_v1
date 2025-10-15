@@ -1,6 +1,7 @@
 ﻿import { useCallback, useMemo, useState } from "react";
 import algosdk, { AtomicTransactionComposer, TransactionSigner } from "algosdk";
 import { useWallet, PROVIDER_ID } from "@txnlab/use-wallet";
+import { Link } from "react-router-dom";
 import { feeFor } from "../../features/registry/fees";
 import { boxesForRegister } from "../../features/registry/boxes";
 import { mRegisterIntent } from "../../features/registry/abi";
@@ -207,7 +208,13 @@ export default function Register(): JSX.Element {
               </div>
             )}
             <div className="mt-2 text-neutral-700">
-              You’ll get an invite when you’re assigned.
+              You'll get an invite when you're assigned.
+            </div>
+            <div className="mt-2 text-xs text-neutral-600">
+              Optional:&nbsp;
+              <Link className="underline" to="/subject/link">
+                link a private payout wallet
+              </Link>
             </div>
           </div>
         )}
