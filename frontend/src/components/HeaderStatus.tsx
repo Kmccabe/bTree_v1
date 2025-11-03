@@ -1,6 +1,6 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { PROVIDER_ID, useWallet } from "@txnlab/use-wallet";
+import { useWallet } from "@txnlab/use-wallet";
 
 function shortAddress(address?: string | null): string {
   if (!address) return "";
@@ -22,14 +22,14 @@ function formatNetworkLabel(value?: string | null): string | undefined {
 type ConnectionPhase = "connected" | "connecting" | "disconnected";
 
 export default function HeaderStatus(): JSX.Element {
+  const wallet = useWallet();
   const {
     activeAddress,
     activeAccount,
     connectedAccounts,
     providers,
     clients,
-    status,
-  } = useWallet();
+  } = wallet;
 
   const activeProvider = useMemo(() => {
     return providers?.find((provider) => provider.isActive) ?? providers?.[0];
@@ -64,17 +64,33 @@ export default function HeaderStatus(): JSX.Element {
   }, [activeProvider, clients, providerId]);
 
   const address = useMemo(() => {
-    if (activeAddress) return activeAddress;
-    if (activeAccount?.address) return activeAccount.address;
-    if (connectedAccounts.length > 0) return connectedAccounts[0].address;
-    return null;
+    const addr =
+      activeAccount?.address ||
+      activeAddress ||
+      (connectedAccounts.length > 0 ? connectedAccounts[0].address : null);
+    return addr ?? null;
   }, [activeAccount, activeAddress, connectedAccounts]);
 
+  const isConnected = Boolean(address);
+  const isConnectingFlag = Boolean(
+    (wallet as any)?.isConnecting || (wallet as any)?.status === "CONNECTING"
+  );
+
+  const [showConnecting, setShowConnecting] = useState(isConnectingFlag);
+
+  useEffect(() => {
+    if (isConnectingFlag && address) {
+      const timeout = window.setTimeout(() => setShowConnecting(false), 50);
+      return () => window.clearTimeout(timeout);
+    }
+    setShowConnecting(isConnectingFlag);
+    return undefined;
+  }, [address, isConnectingFlag]);
+
   const phase: ConnectionPhase = useMemo(() => {
-    if (status === "initializing") return "connecting";
-    if (status === "active" || status === "connected") return "connected";
-    return "disconnected";
-  }, [status]);
+    if (isConnected) return "connected";
+    return showConnecting ? "connecting" : "disconnected";
+  }, [isConnected, showConnecting]);
 
   const pillStyles = useMemo<CSSProperties>(() => {
     const base: CSSProperties = {
