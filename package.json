@@ -1,6 +1,9 @@
-﻿{
+{
   "name": "btree-api",
   "private": true,
   "version": "0.0.0",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "vercel": "^48.8.1"
+  }
 }

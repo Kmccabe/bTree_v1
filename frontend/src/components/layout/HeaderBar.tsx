@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { NavLink } from 'react-router-dom';
+import HeaderStatus from '../HeaderStatus';
 
 const linkStyle: React.CSSProperties = { padding: '0.5rem 0.75rem', textDecoration: 'none' };
 const active: React.CSSProperties = { fontWeight: 700, textDecoration: 'underline' };
@@ -32,7 +33,7 @@ export default function HeaderBar(): JSX.Element {
             <NavLink to="/legal" style={({ isActive }) => ({ ...linkStyle, ...(isActive ? active : {}) })}>Legal</NavLink>
           </nav>
         </div>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {classicUrl ? (
             <a
               href={classicUrl}
@@ -51,6 +52,7 @@ export default function HeaderBar(): JSX.Element {
           ) : (
             <span style={{ color: '#6b7280' }}>(set VITE_CLASSIC_URL to enable v1 link)</span>
           )}
+          <HeaderStatus />
         </div>
       </div>
     </header>
