@@ -33,26 +33,20 @@ export default function HeaderBar(): JSX.Element {
             <NavLink to="/legal" style={({ isActive }) => ({ ...linkStyle, ...(isActive ? active : {}) })}>Legal</NavLink>
           </nav>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div className="ml-auto flex items-center gap-2 whitespace-nowrap md:gap-3">
+          <HeaderStatus />
           {classicUrl ? (
             <a
               href={classicUrl}
               target="_blank"
               rel="noreferrer"
-              style={{
-                padding: '0.4rem 0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                background: '#f9fafb',
-                textDecoration: 'none'
-              }}
+              className="inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium text-purple-700 hover:bg-purple-50"
             >
               Open classic app (v1)
             </a>
           ) : (
-            <span style={{ color: '#6b7280' }}>(set VITE_CLASSIC_URL to enable v1 link)</span>
+            <span className="text-xs text-gray-500">(set VITE_CLASSIC_URL to enable v1 link)</span>
           )}
-          <HeaderStatus />
         </div>
       </div>
     </header>

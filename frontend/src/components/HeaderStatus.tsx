@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 
 function shortAddress(address?: string | null): string {
@@ -20,6 +19,10 @@ function formatNetworkLabel(value?: string | null): string | undefined {
 }
 
 type ConnectionPhase = "connected" | "connecting" | "disconnected";
+
+function classNames(...classes: Array<string | false | null | undefined>): string {
+  return classes.filter(Boolean).join(" ");
+}
 
 export default function HeaderStatus(): JSX.Element {
   const wallet = useWallet();
@@ -92,75 +95,6 @@ export default function HeaderStatus(): JSX.Element {
     return showConnecting ? "connecting" : "disconnected";
   }, [isConnected, showConnecting]);
 
-  const pillStyles = useMemo<CSSProperties>(() => {
-    const base: CSSProperties = {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: "0.35rem",
-      borderRadius: 999,
-      fontSize: 12,
-      fontWeight: 600,
-      padding: "0 0.75rem",
-      height: 32,
-      border: "1px solid transparent",
-      transition: "background-color 120ms ease, color 120ms ease",
-      whiteSpace: "nowrap",
-    };
-    if (phase === "connecting") {
-      return {
-        ...base,
-        color: "#92400E",
-        backgroundColor: "#FEF3C7",
-        borderColor: "#FDE68A",
-      };
-    }
-    if (phase === "connected") {
-      return {
-        ...base,
-        color: "#166534",
-        backgroundColor: "#DCFCE7",
-        borderColor: "#86EFAC",
-      };
-    }
-    return {
-      ...base,
-      color: "#4B5563",
-      backgroundColor: "#F3F4F6",
-      borderColor: "#E5E7EB",
-    };
-  }, [phase]);
-
-  const badgeStyles = useMemo<CSSProperties>(
-    () => ({
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 999,
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "0 0.6rem",
-      height: 28,
-      backgroundColor: "#111827",
-      color: "#F9FAFB",
-      whiteSpace: "nowrap",
-    }),
-    []
-  );
-
-  const disconnectButtonStyles = useMemo<CSSProperties>(
-    () => ({
-      border: "1px solid #D1D5DB",
-      backgroundColor: "#FFFFFF",
-      borderRadius: 8,
-      padding: "0.4rem 0.75rem",
-      fontSize: 12,
-      fontWeight: 600,
-      color: "#111827",
-      cursor: "pointer",
-    }),
-    []
-  );
-
   const handleDisconnect = useCallback(async () => {
     const target = activeProvider ?? providers?.[0];
     try {
@@ -181,48 +115,41 @@ export default function HeaderStatus(): JSX.Element {
   }, [networkLabel, phase, providerName]);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "0.75rem",
-        justifyContent: "flex-end",
-        flexWrap: "wrap",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          flexWrap: "wrap",
-          justifyContent: "flex-end",
-        }}
+    <div className="flex items-center gap-2 whitespace-nowrap">
+      <span
+        aria-live="polite"
+        className={classNames(
+          "inline-flex h-8 items-center rounded-full px-3 text-xs font-medium",
+          phase === "connected" && "bg-green-100 text-green-800",
+          phase === "connecting" && "bg-yellow-100 text-yellow-800",
+          phase === "disconnected" && "bg-gray-100 text-gray-700"
+        )}
       >
-        <span aria-live="polite" style={pillStyles}>
-          {pillLabel}
+        {pillLabel}
+      </span>
+
+      {address && (
+        <span
+          title={address}
+          className="inline-flex h-8 max-w-[24ch] items-center overflow-hidden text-ellipsis rounded-full bg-gray-100 px-3 font-mono text-xs text-gray-800"
+        >
+          {shortAddress(address)}
         </span>
-        {address && (
-          <span
-            style={{ fontSize: 12, color: "#374151", fontWeight: 500 }}
-            title={address}
-          >
-            {shortAddress(address)}
-          </span>
-        )}
-        {networkLabel && (
-          <span style={badgeStyles} title={`Algorand ${networkLabel}`}>
-            {networkLabel}
-          </span>
-        )}
-      </div>
+      )}
+
+      {networkLabel && (
+        <span className="inline-flex h-7 items-center rounded-full bg-gray-900/90 px-2.5 text-[11px] font-semibold text-white">
+          {networkLabel}
+        </span>
+      )}
+
       {phase === "connected" && (
         <button
           type="button"
           onClick={() => {
             void handleDisconnect();
           }}
-          style={disconnectButtonStyles}
+          className="inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50"
         >
           Disconnect
         </button>
