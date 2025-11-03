@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useCallback, useMemo } from 'react';
 import { PROVIDER_ID, useWallet } from '@txnlab/use-wallet';
 
@@ -62,8 +62,6 @@ const secondaryActionStyle: React.CSSProperties = {
 };
 
 export default function Landing(): JSX.Element {
-  const classicUrl =
-    (import.meta as any).env?.VITE_CLASSIC_URL as string | undefined;
   const {
     activeAddress,
     activeAccount,
@@ -156,36 +154,14 @@ export default function Landing(): JSX.Element {
     <main style={{ padding: '2rem 0' }}>
       {/* Hero */}
       <section style={{ marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '2.75rem', lineHeight: 1.1, margin: 0 }}>bTree — Trust Game</h1>
-        <p style={{ marginTop: '0.75rem', fontSize: '1.125rem', maxWidth: 720 }}>
-          Run and participate in on-chain trust-game experiments. This v2 site provides
-          a clean, professional interface; the current wallet flow runs on the classic app (v1).
-        </p>
-
+        <h1 style={{ fontSize: '2.75rem', lineHeight: 1.1, margin: 0 }}>Welcome to bTree</h1>
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
-          {/* Primary CTA — internal navigation */}
-          <NavLink
-            to="/subject"
-            style={primaryActionStyle}
+          <Link
+            to="/about"
+            style={secondaryActionStyle}
           >
-            Join as Subject
-          </NavLink>
-
-          {/* Secondary CTA — open classic/v1 for experimenter */}
-          {classicUrl ? (
-            <a
-              href={classicUrl}
-              target="_blank"
-              rel="noreferrer"
-              style={secondaryActionStyle}
-            >
-              Run an Experiment (v1)
-            </a>
-          ) : (
-            <span style={{ alignSelf: 'center', color: '#6b7280' }}>
-              (Set <code>VITE_CLASSIC_URL</code> to enable the v1 link)
-            </span>
-          )}
+            What is bTree?
+          </Link>
         </div>
       </section>
 
@@ -200,11 +176,8 @@ export default function Landing(): JSX.Element {
       >
         <article style={cardStyle}>
           <h2 style={{ fontSize: '1.35rem', margin: 0 }}>
-            Would you like to be a subject?
+            Sign-up or Sign-in
           </h2>
-          <p style={{ margin: 0, color: '#4b5563', fontSize: '0.95rem', lineHeight: 1.6 }}>
-            Connect your Algorand wallet to opt into the bTree registry and join upcoming trust-game sessions.
-          </p>
           <button
             type="button"
             onClick={handleConnect}
@@ -228,11 +201,8 @@ export default function Landing(): JSX.Element {
 
         <article style={cardStyle}>
           <h2 style={{ fontSize: '1.35rem', margin: 0 }}>
-            Welcome to bTree
+            Get your wallet here
           </h2>
-          <p style={{ margin: 0, color: '#4b5563', fontSize: '0.95rem', lineHeight: 1.6 }}>
-            We run verifiable economic experiments on Algorand. If you need a wallet, follow our quick-start guide to install and fund one in minutes.
-          </p>
           <a
             href={walletGuideUrl}
             target="_blank"
@@ -241,33 +211,9 @@ export default function Landing(): JSX.Element {
           >
             Get Wallet
           </a>
-          <p style={{ margin: 0, fontSize: '0.85rem', color: '#4b5563' }}>
-            The guide covers Pera Wallet setup for TestNet and links to additional resources.
-          </p>
         </article>
       </section>
 
-      {/* How it works */}
-      <section aria-labelledby="how-it-works">
-        <h2 id="how-it-works" style={{ fontSize: '1.5rem', margin: 0, marginBottom: '0.75rem' }}>
-          How it works
-        </h2>
-        <ol style={{ paddingLeft: '1.25rem', margin: 0, display: 'grid', gap: '0.5rem', maxWidth: 820 }}>
-          <li>
-            <strong>Connect &amp; join</strong> — Subjects join an open session and register (opt-in).
-          </li>
-          <li>
-            <strong>Play</strong> — S1 invests <code>s</code>; S2 returns <code>r</code> with rules enforced on-chain.
-          </li>
-          <li>
-            <strong>Results</strong> — The app logs events and payouts; CSV export supports analysis.
-          </li>
-        </ol>
-
-        <p style={{ marginTop: '0.75rem', color: '#4b5563' }}>
-          Today, wallet flows run on the classic app (v1). As v2 matures, those actions will move here.
-        </p>
-      </section>
     </main>
   );
 }

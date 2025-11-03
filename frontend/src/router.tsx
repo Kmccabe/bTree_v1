@@ -5,6 +5,7 @@ import { useWallet, PROVIDER_ID } from '@txnlab/use-wallet'; // NEW
 
 // Pages
 import Landing from './pages/Landing';
+import About from './pages/About';
 // import Subject from './pages/Subject'; // replaced by nested subject routes below
 import NotFound from './pages/NotFound';
 import DocsHome from './pages/DocsHome';
@@ -170,6 +171,7 @@ export const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Landing /> },
+      { path: 'about', element: <About /> },
 
       // Subject dashboard with nested subpages
       {
