@@ -1,3 +1,4 @@
+// frontend/src/components/HeaderStatus.tsx
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@txnlab/use-wallet";
 
@@ -10,7 +11,7 @@ function shortAddress(address?: string | null): string {
 function formatNetworkLabel(value?: string | null): string | undefined {
   if (!value) return undefined;
   const normalized = value.toLowerCase();
-  if (normalized.includes("mainnet")) return "MainNet";
+  if (normalized.includes("mainnet")) return "TestNet".replace("Test", "Main"); // "MainNet"
   if (normalized.includes("testnet")) return "TestNet";
   if (normalized.includes("betanet")) return "BetaNet";
   if (normalized.includes("sandbox")) return "Sandbox";
@@ -26,51 +27,39 @@ function classNames(...classes: Array<string | false | null | undefined>): strin
 
 export default function HeaderStatus(): JSX.Element {
   const wallet = useWallet();
-  const {
-    activeAddress,
-    activeAccount,
-    connectedAccounts,
-    providers,
-    clients,
-  } = wallet;
+  const { activeAddress, activeAccount, connectedAccounts, providers, clients } = wallet;
 
-  const activeProvider = useMemo(() => {
-    return providers?.find((provider) => provider.isActive) ?? providers?.[0];
-  }, [providers]);
+  // Active provider (assume single wallet)
+  const activeProvider = useMemo(
+    () => providers?.find((p) => (p as any).isActive) ?? providers?.[0],
+    [providers]
+  );
+  const providerId = (activeProvider as any)?.metadata?.id;
+  const providerName = (activeProvider as any)?.metadata?.name ?? "Wallet";
 
-  const providerId = activeProvider?.metadata?.id;
-  const providerName = activeProvider?.metadata?.name ?? "Wallet";
-
+  // Infer network label once
   const networkLabel = useMemo(() => {
-    const providerNetwork = (
-      activeProvider as unknown as { network?: string } | undefined
-    )?.network;
+    const providerNetwork = (activeProvider as any)?.network as string | undefined;
 
-    const providerClient =
-      providerId && clients ? (clients[providerId] as unknown) : undefined;
-
+    const providerClient = providerId && clients ? (clients as any)[providerId] : undefined;
     const clientNetwork =
-      (providerClient as { network?: string } | undefined)?.network ??
-      (providerClient as { genesisID?: string } | undefined)?.genesisID ??
-      (providerClient as { genesisId?: string } | undefined)?.genesisId ??
-      (providerClient as { genesisHash?: string } | undefined)?.genesisHash;
+      (providerClient?.network as string | undefined) ??
+      (providerClient?.genesisID as string | undefined) ??
+      (providerClient?.genesisId as string | undefined) ??
+      (providerClient?.genesisHash as string | undefined);
 
-    const envFallback =
-      (import.meta as any)?.env?.VITE_NETWORK as string | undefined;
+    const envFallback = (import.meta as any)?.env?.VITE_NETWORK as string | undefined;
 
-    const inferred =
-      providerNetwork ??
-      (typeof clientNetwork === "string" ? clientNetwork : undefined) ??
-      envFallback;
-
+    const inferred = providerNetwork ?? clientNetwork ?? envFallback;
     return formatNetworkLabel(inferred);
   }, [activeProvider, clients, providerId]);
 
+  // Derive address
   const address = useMemo(() => {
     const addr =
       activeAccount?.address ||
       activeAddress ||
-      (connectedAccounts.length > 0 ? connectedAccounts[0].address : null);
+      (connectedAccounts?.length ? connectedAccounts[0]?.address : null);
     return addr ?? null;
   }, [activeAccount, activeAddress, connectedAccounts]);
 
@@ -79,12 +68,12 @@ export default function HeaderStatus(): JSX.Element {
     (wallet as any)?.isConnecting || (wallet as any)?.status === "CONNECTING"
   );
 
+  // Debounce "connecting" flicker
   const [showConnecting, setShowConnecting] = useState(isConnectingFlag);
-
   useEffect(() => {
     if (isConnectingFlag && address) {
-      const timeout = window.setTimeout(() => setShowConnecting(false), 50);
-      return () => window.clearTimeout(timeout);
+      const t = window.setTimeout(() => setShowConnecting(false), 50);
+      return () => window.clearTimeout(t);
     }
     setShowConnecting(isConnectingFlag);
     return undefined;
@@ -98,24 +87,27 @@ export default function HeaderStatus(): JSX.Element {
   const handleDisconnect = useCallback(async () => {
     const target = activeProvider ?? providers?.[0];
     try {
-      await target?.disconnect?.();
+      await (target as any)?.disconnect?.();
     } catch (err) {
       console.warn("disconnect failed", err);
     }
   }, [activeProvider, providers]);
 
+  const shortAddr = useMemo(() => (address ? shortAddress(address) : null), [address]);
+
+  // Build a single pill label; network appears ONLY here
   const pillLabel = useMemo(() => {
     if (phase === "connecting") return "Connecting...";
     if (phase === "connected") {
-      return `Connected \u2022 ${providerName}${
-        networkLabel ? ` \u2022 ${networkLabel}` : ""
-      }`;
+      const parts = ["Connected", providerName, networkLabel].filter(Boolean);
+      const baseLabel = parts.join(" \u2022 ");
+      return shortAddr ? `${baseLabel} <${shortAddr}>` : baseLabel;
     }
     return "Not connected";
-  }, [networkLabel, phase, providerName]);
+  }, [phase, providerName, networkLabel, shortAddr]);
 
   return (
-    <div className="flex items-center gap-2 whitespace-nowrap">
+    <div className="flex items-center whitespace-nowrap">
       <span
         aria-live="polite"
         className={classNames(
@@ -124,32 +116,16 @@ export default function HeaderStatus(): JSX.Element {
           phase === "connecting" && "bg-yellow-100 text-yellow-800",
           phase === "disconnected" && "bg-gray-100 text-gray-700"
         )}
+        title={phase === "connected" ? address ?? undefined : undefined}
       >
         {pillLabel}
       </span>
 
-      {address && (
-        <span
-          title={address}
-          className="inline-flex h-8 max-w-[24ch] items-center overflow-hidden text-ellipsis rounded-full bg-gray-100 px-3 font-mono text-xs text-gray-800"
-        >
-          {shortAddress(address)}
-        </span>
-      )}
-
-      {networkLabel && (
-        <span className="inline-flex h-7 items-center rounded-full bg-gray-900/90 px-2.5 text-[11px] font-semibold text-white">
-          {networkLabel}
-        </span>
-      )}
-
       {phase === "connected" && (
         <button
           type="button"
-          onClick={() => {
-            void handleDisconnect();
-          }}
-          className="inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50"
+          onClick={() => void handleDisconnect()}
+          className="inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium text-gray-800 transition hover:bg-gray-50 ml-2"
         >
           Disconnect
         </button>
@@ -157,3 +133,4 @@ export default function HeaderStatus(): JSX.Element {
     </div>
   );
 }
+

@@ -33,7 +33,7 @@ export default function HeaderBar(): JSX.Element {
             <NavLink to="/legal" style={({ isActive }) => ({ ...linkStyle, ...(isActive ? active : {}) })}>Legal</NavLink>
           </nav>
         </div>
-        <div className="ml-auto flex items-center gap-2 whitespace-nowrap md:gap-3">
+        <div className="ml-auto flex items-center gap-3 whitespace-nowrap">
           <HeaderStatus />
           {classicUrl ? (
             <a
