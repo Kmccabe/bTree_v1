@@ -1,161 +1,167 @@
-# bTree v1 Frontend (Vercel-Ready)
+# bTree v1 Frontend (Vercel Ready)
 
-This is the TestNet web client for **bTree v1**, a decentralized platform for running
-economic and behavioral experiments on the Algorand blockchain.
-
-The frontend is built with **React + Vite + TypeScript** and communicates directly with
-Algorand nodes using public Indexer endpoints.
-It currently includes a complete **Trust Game** implementation as an example experiment.
-
-Future experiments (e.g., Dictator, Public Goods, or Risk Preference tasks) will reuse
-the same wallet logic, routing, and shared components.
+This package is the TestNet web client for **bTree v1**, a decentralized platform for running experimental-economics games on the Algorand blockchain. The app uses **React, Vite, and TypeScript** with direct Indexer access and Algorand wallet integrations to deliver reproducible Trust Game sessions and other experiment variants.
 
 ---
 
 ## Highlights
 
-* React + TypeScript + Vite; wallet integration via [`@txnlab/use-wallet`](https://github.com/TxnLab/use-wallet) (Pera).
-* Modular experiment templates (Trust Game, Dictator, etc.).
-* Direct Indexer access — no serverless API routes required.
-* TestNet by default; LocalNet reserved for SDK tests.
+- React + TypeScript + Vite with wallet connectivity via [`@txnlab/use-wallet`](https://github.com/TxnLab/use-wallet) (Pera-first flow).
+- Modular experiment features under `src/features` (Trust Game today; Dictator, Public Goods, Risk experiments planned).
+- Direct Indexer access from the browser; optional API stubs live in `api/` with a disabled copy in `api_disabled/`.
+- Built-in registration guards (`RequireWallet`, `RequireRegistration`) and a `NetworkBanner` that warns on TestNet/MainNet mismatches.
+- Default target is Algorand TestNet; LocalNet is reserved for SDK and contract testing.
+
+---
+
+## Prerequisites
+
+- Node.js **22.x** and npm
+- A Pera-compatible wallet (desktop or mobile) for local testing
+- Optional: Python 3.10+ and AlgoKit CLI if you plan to work with contracts locally
 
 ---
 
 ## Key Docs
 
-* **Example experiment:** [`frontend/docs/trust-game-design.md`](frontend/docs/trust-game-design.md)
-* **Variants:** [`frontend/docs/trust-game-variants.md`](frontend/docs/trust-game-variants.md)
-* **Manual smoke test:** [`tests/manual/SMOKE.md`](tests/manual/SMOKE.md)
+- Example experiment design: [`frontend/docs/trust-game-design.md`](frontend/docs/trust-game-design.md)
+- Additional variants: [`frontend/docs/trust-game-variants.md`](frontend/docs/trust-game-variants.md)
+- Manual smoke checklist: [`tests/manual/SMOKE.md`](../tests/manual/SMOKE.md)
+- Repo-wide overview: [`../README.md`](../README.md)
 
-**Explorer:**
-
-* LoRA (TestNet): [https://lora.algokit.io/testnet](https://lora.algokit.io/testnet)
+Explorer: [LoRA TestNet](https://lora.algokit.io/testnet)
 
 ---
 
 ## Getting Started
 
 ```bash
+cd frontend
 npm install
-cp .env.example .env.local  # then edit as needed
-npm run dev                 # Vite dev server on port 5173
+cp .env.example .env        # update values listed below
+npm run dev                 # starts Vite on http://localhost:5173
 ```
 
-### Environment Variables
+> Tip: use `npm run dev -- --host` to test on mobile devices.
 
-Client-side (`frontend/.env.example`):
+---
 
-| Variable                                             | Description                                           |
-| ---------------------------------------------------- | ----------------------------------------------------- |
-| `VITE_NETWORK`                                       | `TESTNET` or `MAINNET`; controls UI/explorer defaults |
-| `VITE_TESTNET_ALGOD_URL`, `VITE_TESTNET_INDEXER_URL` | Explorer links only                                   |
-| `VITE_TESTNET_APP_ID`                                | Optional default App ID for quick connect             |
+## Environment Variables
 
-Server-side (Vercel project settings, **optional**):
+Client-facing values live in `frontend/.env` (copied from `.env.example`):
 
-| Variable                                       | Description                       |
-| ---------------------------------------------- | --------------------------------- |
-| `TESTNET_ALGOD_URL`, `TESTNET_ALGOD_TOKEN`     | Only needed if using private node |
-| `TESTNET_INDEXER_URL`, `TESTNET_INDEXER_TOKEN` | Optional (Indexer lookups)        |
+| Variable              | Description                                                                 |
+| --------------------- | --------------------------------------------------------------------------- |
+| `VITE_NETWORK`        | Target network label: `TestNet` (default) or `MainNet`                      |
+| `VITE_REGISTRY_APP_ID`| Registry application ID used for auto-routing and subject checks            |
+| `VITE_INDEXER_URL`    | Base URL of the Algorand Indexer the UI should read from                    |
+| `VITE_INDEXER_TOKEN`  | Optional API key header for the Indexer (leave blank for public endpoints)  |
+| `VITE_TESTNET_ALGOD_URL` | Used for explorer and help links; does not gate wallet connectivity      |
+| `VITE_TESTNET_ALGOD_TOKEN` | Optional helper token for the above                                    |
+| `VITE_TESTNET_INDEXER_URL` | Optional helper URL for docs/explorer references                       |
+
+Server-side (only when deploying behind Vercel functions):
+
+| Variable                    | Description                                              |
+| --------------------------- | -------------------------------------------------------- |
+| `TESTNET_ALGOD_URL`         | Private Algod endpoint (optional)                        |
+| `TESTNET_ALGOD_TOKEN`       | Token for the Algod endpoint                             |
+| `TESTNET_INDEXER_URL`       | Private Indexer endpoint (optional)                      |
+| `TESTNET_INDEXER_TOKEN`     | Token for the private Indexer                            |
+
+---
+
+## Testing & Validation
+
+All commands run from `frontend/`:
+
+- Static type checks: `npm run typecheck`
+- Unit tests (Vitest + React Testing Library): `npm test`
+- Manual smoke test (Trust Game): follow [`../tests/manual/SMOKE.md`](../tests/manual/SMOKE.md)
+
+Vitest utilities live in `src/test/` with JSDOM setup defined in `vitest.config.ts`.
 
 ---
 
 ## Build & Deploy
 
-* **Build:** `npm run build` → outputs to `frontend/dist`
-* **Vercel settings:**
+- Production build: `npm run build` (outputs to `dist/`)
+- Preview build: `npm run preview`
+- Vercel configuration:
+  - Root directory: `frontend/`
+  - Build command: `npm run build`
+  - Output directory: `dist`
 
-  * Root Directory: `frontend/`
-  * Build Command: `npm run build`
-  * Output Directory: `dist`
+---
+
+## Wallet & Routing Behavior
+
+- The landing page watches wallet events via `useSubjectRouter`. When a wallet connects:
+  - Registered subjects are redirected to `/subject`.
+  - Unregistered subjects are sent to `/register`.
+- `RequireWallet` gate keeps subject/admin routes until a wallet connects.
+- `RequireRegistration` confirms active accounts are registered before loading the subject dashboard.
+- `NetworkBanner` shows when the connected wallet network disagrees with `VITE_NETWORK`.
 
 ---
 
 ## UI Overview
 
-### Experimenter – Deploy & Manage Experiments
+### Experimenter (deploy & manage)
 
-* Deploys a contract app (TEAL compiled from `frontend/src/teal/*.teal`).
-* Controls experimental phases (0–3).
-* Views current phase and participant state.
-* Performs **Sweep** (withdraws liquid balance in Phase 3).
-* Views historical data via Indexer and LoRA explorer.
-* Can delete app after completion (contract-guarded).
+- Deploys registry-backed experiment contracts (see `src/teal` and contract scripts).
+- Manages experiment phases, funding, and sweeps.
+- Views participant status through Indexer reads and LoRA explorer links.
 
-### Subject – Participate
+### Subject (participate)
 
-* Connects wallet and selects an experiment instance (App ID).
-* Reads global/local state for transparency.
-* Executes Invest/Return or equivalent actions depending on experiment design.
+- Connects a wallet, passes registry checks, and interacts with the experiment UI (`src/components/SubjectActions.tsx` and `src/features/subject`).
+- Reads global/local state for transparency and executes Invest/Return actions or other experiment-specific flows.
 
 ---
 
-## Example: Trust Game Phases & Funding
+## Example: Trust Game Phases
 
-*(Other experiments will define their own analogous flow.)*
+| Phase | Summary                                                                               |
+| ----- | ------------------------------------------------------------------------------------- |
+| 0 – Registration | S1 and S2 opt in; the app records addresses.                              |
+| 1 – Invest       | S1 invests `s` (bounded by endowment `E1`); contract calculates multiplier |
+| 2 – Return       | S2 returns `r` within allowed range; payouts distribute automatically      |
+| 3 – Done         | Creator can sweep liquid funds; deletion allowed when balances settle      |
 
-| Phase                | Description                                                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **0 – Registration** | S1/S2 opt-in; app records `s1` and `s2`.                                                                        |
-| **1 – Invest**       | S1 invests `s` (UNIT-aligned, `s ≤ E1`). App refunds `E1 − s` to S1, sets `t = m × s`, and advances to Phase 2. |
-| **2 – Return**       | S2 returns `r` (`0 ≤ r ≤ t`). Inner payments: `r → S1`, `(t − r + E2) → S2`.                                    |
-| **3 – Done**         | Optional Sweep; Delete possible (creator-only).                                                                 |
-
-Minimum balance: app must always retain ≥ 0.1 ALGO. Sweep moves only liquid balance.
+Minimum balance note: keep at least 0.1 ALGO on the app to avoid minimum-balance penalties.
 
 ---
 
 ## Blockchain Access
 
-All Algorand node and indexer requests are made directly from the browser using
-**public endpoints** (e.g., [Algonode](https://algonode.io)).
-Signed transactions are submitted securely through the user’s wallet (Pera) via
-`@txnlab/use-wallet`.
-
-No serverless API routes are required for local or TestNet deployments.
-
-For self-hosting with private Algod tokens, developers can re-enable the legacy
-`/api/*` proxy routes from earlier versions (see archived branch `serverless-proxy`).
+The frontend submits all Algorand transactions through the user's wallet (Pera) using `@txnlab/use-wallet`. Reads are performed directly against the configured Indexer URL, so no middleware is required for TestNet scenarios. If you need private infrastructure, re-enable the API routes located in `api/` and provide the server-side environment variables above.
 
 ---
 
-## Troubleshooting (Trust Game Example)
+## Troubleshooting Tips
 
-* **Invest rejected (UNIT or bounds):** ensure `s` is a multiple of `UNIT` and `s ≤ E1`.
-* **Return rejected (funding):** app liquid ≥ `t + E2`.
-* **Missing S2:** use a second wallet to opt-in as S2.
-* **History labels look odd:** viewer filters logs to printable ASCII; generic labels appear if unrecognized.
-
----
-
-## References
-
-### Example: Trust Game Implementation
-
-* TEAL programs: `frontend/src/teal/approval.teal`, `frontend/src/teal/clear.teal`
-* Client tx helpers: `frontend/src/chain/tx.ts`
-* Subject UI: `frontend/src/components/SubjectActions.tsx`
-* Admin UI: `frontend/src/components/AdminSetup2.tsx`
-* Manual smoke test: `tests/manual/SMOKE.md`
-
-For additional experiment templates, see `frontend/src/features/` and related docs under `frontend/docs/`.
+- **Invest rejected**: ensure the stake is a multiple of the UNIT and does not exceed the S1 endowment.
+- **Return rejected**: double-check that the contract retains enough liquid balance (multiplier funds plus E2).
+- **No S2 address**: connect a second wallet and opt in as the receiver before moving to Phase 2.
+- **Unexpected history labels**: explorer views fall back to generic labels when event names are unknown.
 
 ---
 
 ## Adding New Experiments
 
-Each experiment consists of:
+Each experiment follows the same pattern:
 
-1. **Smart contract:** `src/teal/<experiment>.teal`
-2. **Frontend logic:** `src/features/<experiment>`
-3. **Documentation:** `frontend/docs/<experiment>-design.md`
+1. Smart contract (TEAL or PyTeal) compiled to Algorand – see `contracts/registry` and `src/teal/`.
+2. Frontend feature module under `src/features/<experiment>` plus UI components.
+3. Documentation stored in `frontend/docs/<experiment>-design.md`.
 
-The platform handles wallet connection, registry checks, and on-chain communication
-uniformly across all experiments.
+Shared wallet, routing, and notification utilities allow rapid reuse across experiments.
 
 ---
 
-### License & Credits
+## License & Credits
 
-Developed by the **bTree Project** team to advance reproducible, on-chain experimental economics.
+Developed by the **bTree Project** team to advance reproducible, on-chain experimental economics.  
 © 2025 bTree Labs — All rights reserved.
+
