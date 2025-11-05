@@ -1,317 +1,161 @@
-﻿# bTree v1 ΓÇö Trust Game on Algorand TestNet
+﻿# bTree v1 Frontend (Vercel-Ready)
 
-[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://reactjs.org/)
-[![Algorand](https://img.shields.io/badge/Algorand-000000?logo=algorand&logoColor=white)](https://algorand.com/)
+This is the TestNet web client for **bTree v1**, a decentralized platform for running
+economic and behavioral experiments on the Algorand blockchain.
 
-A production-ready, research-oriented Trust Game implementation on Algorand TestNet. This application enables behavioral economics experiments using real cryptocurrency transactions with Pera Wallet integration and serverless infrastructure.
+The frontend is built with **React + Vite + TypeScript** and communicates directly with
+Algorand nodes using public Indexer endpoints.
+It currently includes a complete **Trust Game** implementation as an example experiment.
 
-## ≡ƒÄ» What is the Trust Game?
-
-The Trust Game is a classic behavioral economics experiment studying trust and reciprocity between two participants:
-- **S1 (Investor)** receives an endowment and decides how much to invest
-- **S2 (Trustee)** receives the multiplied investment and decides how much to return
-- Both participants make real financial decisions with actual payouts
-
-## ≡ƒÅù∩╕Å Architecture
-
-- **Frontend**: React + TypeScript + Vite
-- **Blockchain**: Algorand TestNet with TEAL smart contracts  
-- **Wallet**: Pera Wallet integration via `@txnlab/use-wallet`
-- **Hosting**: Vercel with serverless functions
-- **API**: Proxy routes for secure Algod/Indexer access
-
-## ≡ƒôï Prerequisites
-
-- Node.js 16+ and npm
-- [Pera Wallet](https://perawallet.app/) configured for TestNet
-- TestNet ALGO for transaction fees
-- Vercel account (for deployment)
-
-## ≡ƒÜÇ Quick Start
-
-### Local Development
-
-1. **Clone and install dependencies**
-   ```bash
-   git clone https://github.com/Kmccabe/bTree_v1.git
-   cd bTree_v1
-   cd frontend && npm install
-   ```
-
-2. **Configure environment**
-   ```bash
-   cp .env.example .env.local
-   ```
-   Edit `.env.local`:
-   ```bash
-   TESTNET_ALGOD_URL=https://testnet-api.algonode.cloud
-   TESTNET_ALGOD_TOKEN=
-   VITE_NETWORK=TESTNET
-   ```
-
-3. **Start development servers**
-   ```bash
-   # Terminal 1: Serverless functions (port 3000)
-   npx vercel dev
-   
-   # Terminal 2: React app (port 5173) 
-   npm run dev
-   ```
-
-4. **Access application**
-   - Open http://localhost:5173
-   - Connect Pera Wallet (ensure TestNet mode)
-   - Use Admin panel to deploy and manage games
-
-### Production Deployment
-
-Deploy to Vercel with these settings:
-- **Root Directory**: `frontend/`
-- **Build Command**: `npm run build`
-- **Output Directory**: `dist`
-- **Environment Variables**:
-  - `TESTNET_ALGOD_URL`: Your Algod endpoint
-  - `TESTNET_ALGOD_TOKEN`: Your Algod token (if required)
-
-## ≡ƒÄ« Game Flow
-
-### Phase 0: Registration
-- Both participants (S1 and S2) connect wallets and opt into the smart contract
-- Admin can verify participant registration
-
-### Phase 1: Investment
-- S1 receives endowment `E1` and chooses investment amount `s` (where `s Γëñ E1`)
-- Smart contract refunds `E1 - s` to S1 immediately
-- Investment is multiplied: `t = m ├ù s` available for S2
-
-### Phase 2: Return Decision  
-- S2 sees the multiplied amount `t` and chooses how much `r` to return (where `0 Γëñ r Γëñ t`)
-- Payouts distributed: `r` to S1, `t - r + E2` to S2
-- Game concludes automatically
-
-### Phase 3: Completion
-- Admin can export data and clean up the smart contract
-- All transactions are recorded on-chain for transparency
-
-## ≡ƒôü Project Structure
-
-```
-bTree_v1/
-Γö£ΓöÇΓöÇ frontend/                 # Main React application
-Γöé   Γö£ΓöÇΓöÇ api/                 # Vercel serverless functions
-Γöé   Γöé   Γö£ΓöÇΓöÇ compile.ts       # TEAL compilation
-Γöé   Γöé   Γö£ΓöÇΓöÇ submit.ts        # Transaction submission
-Γöé   Γöé   Γö£ΓöÇΓöÇ pair.ts          # Game state queries
-Γöé   Γöé   ΓööΓöÇΓöÇ ...              # Other API endpoints
-Γöé   Γö£ΓöÇΓöÇ src/
-Γöé   Γöé   Γö£ΓöÇΓöÇ components/      # React UI components
-Γöé   Γöé   Γö£ΓöÇΓöÇ chain/           # Algorand utilities
-Γöé   Γöé   Γö£ΓöÇΓöÇ teal/            # Smart contract code
-Γöé   Γöé   Γö£ΓöÇΓöÇ state/           # State management
-Γöé   Γöé   ΓööΓöÇΓöÇ types/           # TypeScript definitions
-Γöé   Γö£ΓöÇΓöÇ docs/                # Detailed documentation
-Γöé   ΓööΓöÇΓöÇ public/              # Static assets
-Γö£ΓöÇΓöÇ contracts/               # PyTeal development & testing
-Γö£ΓöÇΓöÇ tests/                   # Testing procedures
-Γö£ΓöÇΓöÇ docs/                    # Project documentation
-Γöé   Γö£ΓöÇΓöÇ DATA_EXPORT.md       # Data export formats
-Γöé   ΓööΓöÇΓöÇ INTEGRITY.md         # Security considerations
-ΓööΓöÇΓöÇ infra/                   # Infrastructure configuration
-```
-
-## ≡ƒöº API Endpoints
-
-The serverless API provides secure access to Algorand:
-
-| Endpoint | Purpose | Parameters |
-|----------|---------|------------|
-| `/api/params` | Get transaction parameters | - |
-| `/api/submit` | Submit signed transactions | `txns` (base64 encoded) |
-| `/api/pair?id={appId}` | Get game state | `id` (App ID) |
-| `/api/account?addr={address}` | Get account info | `addr` (Address) |
-| `/api/compile` | Compile TEAL code | `teal` (source code) |
-| `/api/history?id={appId}` | Get transaction history | `id` (App ID) |
-| `/api/export?appId={appId}` | Export game data as CSV | `appId` (App ID) |
-
-## ≡ƒº¬ Testing
-
-### Manual Testing
-Run the complete smoke test:
-```bash
-# Follow the step-by-step guide
-cat tests/manual/SMOKE.md
-```
-
-### Smart Contract Testing
-```bash
-cd contracts
-python -m pytest test_*.py -v
-```
-
-## ≡ƒôè Data Export
-
-Games can be exported to CSV format containing:
-- Participant addresses and IDs
-- Game parameters (endowment, multiplier)
-- Investment and return decisions
-- Transaction IDs and block heights
-- Timestamps and payouts
-
-## ≡ƒ¢á∩╕Å Development
-
-### Smart Contract Development
-- TEAL contracts: `frontend/src/teal/*.teal`
-- PyTeal scaffolds: `contracts/trust_game_app.py`
-- Testing: `contracts/test_*.py`
-
-### Frontend Development
-```bash
-cd frontend
-npm run dev      # Development server
-npm run build    # Production build  
-npm run preview  # Preview build
-```
-
-### Code Quality
-```bash
-npm run lint     # ESLint
-npm run typecheck # TypeScript checking
-```
-## Branch status ΓÇö `feature/v2-bridge-cleanup`
-
-This V2 bridge branch intentionally limits serverless APIs.
-
-- **Enabled API:** `/api/health` (Node runtime) ΓÇö used by the Status page.
-- **Disabled APIs:** all other `/api/*` routes (moved under `frontend/api_disabled/`).  
-  UI features that call `/api/{pair,history,account,submit,pending}` will 404 on this branch.
-
-### Local dev health check
-
-- Start dev server:  
-  ```bash
-  cd frontend
-  npm run dev
-```
-Open Status page: http://localhost:5173/status
- (Algod/Indexer probes)
-
-Why this branch?
-
-WeΓÇÖre cleaning up the V1ΓåöV2 bridge, tightening guards, and keeping deploy size within hobby limits.
-Full APIs can be re-enabled later by moving files back from frontend/api_disabled/.
-
-[![Preflight](https://github.com/Kmccabe/bTree_v1/actions/workflows/preflight.yml/badge.svg)](https://github.com/Kmccabe/bTree_v1/actions/workflows/preflight.yml)
-
-## ≡ƒÉ¢ Troubleshooting
-
-
-
-### Common Issues
-
-**Wallet Connection**
-- Ensure Pera Wallet is set to TestNet
-- Check `VITE_NETWORK=TESTNET` in environment
-
-**API Errors**
-- Verify `npx vercel dev` is running for local development
-- Check Algod URL and token configuration
-
-**Transaction Failures**
-- Ensure sufficient TestNet ALGO for fees
-- Verify investment amounts are multiples of UNIT
-- Check smart contract funding levels
-
-**Network Issues**
-- Wait a few rounds for transaction confirmation
-- Use "Load globals/Read pair state" to refresh data
-
-## Status & Alerts
-
-- Health summary lives at `/status` (UI) and `/api/health` (JSON).
-- Optional alerts via `/api/alert/health` + Vercel Cron (every 5 min).
-
-### Enable Telegram alerts
-
-1. Create a bot with **@BotFather** ΓåÆ `/newbot`, copy the **token**.
-2. Create a group/channel, add the bot, send one message.
-3. Visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` and note the `chat.id`.
-
-Set these in Vercel **(Preview + Production)**:
-HEALTH_ALERT_DEST=telegram
-TELEGRAM_BOT_TOKEN=<your token>
-TELEGRAM_CHAT_ID=<numeric chat id>
-HEALTH_ALERT_MIN_INTERVAL=15m
-
-
-
-## ≡ƒöù Resources
-
-- **Algorand Developer Docs**: https://developer.algorand.org/
-- **LoRA TestNet Explorer**: https://lora.algokit.io/testnet
-- **Pera Wallet**: https://perawallet.app/
-- **Vercel Documentation**: https://vercel.com/docs
-
-## ≡ƒôÜ Documentation 
-
-- **Frontend Details**: [`frontend/README.md`](frontend/README.md)
-- **Game Design**: [`frontend/docs/trust-game-design.md`](frontend/docs/trust-game-design.md)  
-- **Variants & Treatments**: [`frontend/docs/trust-game-variants.md`](frontend/docs/trust-game-variants.md)
-- **Data Export Guide**: [`docs/DATA_EXPORT.md`](docs/DATA_EXPORT.md)
-- **Security & Integrity**: [`docs/INTEGRITY.md`](docs/INTEGRITY.md)
-
-## ≡ƒñ¥ Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
-
-## ≡ƒôä License
-
-ISC License - see [LICENSE](LICENSE) file for details.
-
-## ≡ƒöÆ Security
-
-- No private keys or secrets stored in client code
-- All Algod access via serverless proxy functions  
-- Smart contracts enforce game rules and validate transactions
-- Real financial transactions - use TestNet for development
+Future experiments (e.g., Dictator, Public Goods, or Risk Preference tasks) will reuse
+the same wallet logic, routing, and shared components.
 
 ---
 
-**ΓÜá∩╕Å Disclaimer**: This is experimental software for research purposes. Always test thoroughly on TestNet before any mainnet usage.
+## Highlights
 
-## Upgrade Paths (POC → Next)
+* React + TypeScript + Vite; wallet integration via [`@txnlab/use-wallet`](https://github.com/TxnLab/use-wallet) (Pera).
+* Modular experiment templates (Trust Game, Dictator, etc.).
+* Direct Indexer access — no serverless API routes required.
+* TestNet by default; LocalNet reserved for SDK tests.
 
-### 1) Optional Subject Linking (now)
-- New page: **/subject/link** (TestNet)
-- Flow (2-txn group):
-  1. `link_payment_begin(byte[])` from **payment** wallet
-  2. `link_finish(address)` from **experiment** wallet
-- Boxes on success:
-  - `link:<exp>` = payment address
-  - `payment_cipher:<exp>` = cipher
-  - `link_pending:<pay>` cleared
-- Status: **optional** — if not linked, payouts default to the experiment wallet.
+---
 
-### 2) Admin Controls (TestNet)
-- Page: **/admin/registry-controls**
-- Actions: Open / Close / Add Capacity / Set Reward
-- Requires the admin wallet (app creator) to be connected.
+## Key Docs
 
-### 3) Subject Pool Views
-- **Direct Algod**: **/admin/subject-pool** (read status; inspect `profile:` / `payment_cipher:` per wallet)
-- **Indexer roster**: **/admin/subject-pool-indexer** (lists all `register_intent` senders; export CSV)
+* **Example experiment:** [`frontend/docs/trust-game-design.md`](frontend/docs/trust-game-design.md)
+* **Variants:** [`frontend/docs/trust-game-variants.md`](frontend/docs/trust-game-variants.md)
+* **Manual smoke test:** [`tests/manual/SMOKE.md`](tests/manual/SMOKE.md)
 
-### 4) Future (not yet)
-- Require-link toggle (soft gate in UI, optional hard gate in contract)
-- Batch payout script: use `link:<exp>` if present, else experiment address
-- UI polish: shared admin/subject layout, shadcn/ui components, better empty/error states
+**Explorer:**
 
-TestNet ENV
-VITE_ALGOD_URL=https://testnet-api.algonode.cloud
+* LoRA (TestNet): [https://lora.algokit.io/testnet](https://lora.algokit.io/testnet)
 
-VITE_ALGOD_TOKEN=
+---
+
+## Getting Started
+
+```bash
+npm install
+cp .env.example .env.local  # then edit as needed
+npm run dev                 # Vite dev server on port 5173
+```
+
+### Environment Variables
+
+Client-side (`frontend/.env.example`):
+
+| Variable                                             | Description                                           |
+| ---------------------------------------------------- | ----------------------------------------------------- |
+| `VITE_NETWORK`                                       | `TESTNET` or `MAINNET`; controls UI/explorer defaults |
+| `VITE_TESTNET_ALGOD_URL`, `VITE_TESTNET_INDEXER_URL` | Explorer links only                                   |
+| `VITE_TESTNET_APP_ID`                                | Optional default App ID for quick connect             |
+
+Server-side (Vercel project settings, **optional**):
+
+| Variable                                       | Description                       |
+| ---------------------------------------------- | --------------------------------- |
+| `TESTNET_ALGOD_URL`, `TESTNET_ALGOD_TOKEN`     | Only needed if using private node |
+| `TESTNET_INDEXER_URL`, `TESTNET_INDEXER_TOKEN` | Optional (Indexer lookups)        |
+
+---
+
+## Build & Deploy
+
+* **Build:** `npm run build` → outputs to `frontend/dist`
+* **Vercel settings:**
+
+  * Root Directory: `frontend/`
+  * Build Command: `npm run build`
+  * Output Directory: `dist`
+
+---
+
+## UI Overview
+
+### Experimenter – Deploy & Manage Experiments
+
+* Deploys a contract app (TEAL compiled from `frontend/src/teal/*.teal`).
+* Controls experimental phases (0–3).
+* Views current phase and participant state.
+* Performs **Sweep** (withdraws liquid balance in Phase 3).
+* Views historical data via Indexer and LoRA explorer.
+* Can delete app after completion (contract-guarded).
+
+### Subject – Participate
+
+* Connects wallet and selects an experiment instance (App ID).
+* Reads global/local state for transparency.
+* Executes Invest/Return or equivalent actions depending on experiment design.
+
+---
+
+## Example: Trust Game Phases & Funding
+
+*(Other experiments will define their own analogous flow.)*
+
+| Phase                | Description                                                                                                     |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **0 – Registration** | S1/S2 opt-in; app records `s1` and `s2`.                                                                        |
+| **1 – Invest**       | S1 invests `s` (UNIT-aligned, `s ≤ E1`). App refunds `E1 − s` to S1, sets `t = m × s`, and advances to Phase 2. |
+| **2 – Return**       | S2 returns `r` (`0 ≤ r ≤ t`). Inner payments: `r → S1`, `(t − r + E2) → S2`.                                    |
+| **3 – Done**         | Optional Sweep; Delete possible (creator-only).                                                                 |
+
+Minimum balance: app must always retain ≥ 0.1 ALGO. Sweep moves only liquid balance.
+
+---
+
+## Blockchain Access
+
+All Algorand node and indexer requests are made directly from the browser using
+**public endpoints** (e.g., [Algonode](https://algonode.io)).
+Signed transactions are submitted securely through the user’s wallet (Pera) via
+`@txnlab/use-wallet`.
+
+No serverless API routes are required for local or TestNet deployments.
+
+For self-hosting with private Algod tokens, developers can re-enable the legacy
+`/api/*` proxy routes from earlier versions (see archived branch `serverless-proxy`).
+
+---
+
+## Troubleshooting (Trust Game Example)
+
+* **Invest rejected (UNIT or bounds):** ensure `s` is a multiple of `UNIT` and `s ≤ E1`.
+* **Return rejected (funding):** app liquid ≥ `t + E2`.
+* **Missing S2:** use a second wallet to opt-in as S2.
+* **History labels look odd:** viewer filters logs to printable ASCII; generic labels appear if unrecognized.
+
+---
+
+## References
+
+### Example: Trust Game Implementation
+
+* TEAL programs: `frontend/src/teal/approval.teal`, `frontend/src/teal/clear.teal`
+* Client tx helpers: `frontend/src/chain/tx.ts`
+* Subject UI: `frontend/src/components/SubjectActions.tsx`
+* Admin UI: `frontend/src/components/AdminSetup2.tsx`
+* Manual smoke test: `tests/manual/SMOKE.md`
+
+For additional experiment templates, see `frontend/src/features/` and related docs under `frontend/docs/`.
+
+---
+
+## Adding New Experiments
+
+Each experiment consists of:
+
+1. **Smart contract:** `src/teal/<experiment>.teal`
+2. **Frontend logic:** `src/features/<experiment>`
+3. **Documentation:** `frontend/docs/<experiment>-design.md`
+
+The platform handles wallet connection, registry checks, and on-chain communication
+uniformly across all experiments.
+
+---
+
+### License & Credits
+
+Developed by the **bTree Project** team to advance reproducible, on-chain experimental economics.
+© 2025 bTree Labs — All rights reserved.
