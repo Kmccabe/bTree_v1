@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useCallback, useMemo } from 'react';
 import { PROVIDER_ID, useWallet } from '@txnlab/use-wallet';
 
@@ -158,14 +158,6 @@ export default function Landing(): JSX.Element {
         <p className="mt-4 max-w-3xl text-base md:text-lg text-gray-700 dark:text-gray-200 leading-relaxed text-center md:text-left mx-auto md:mx-0">
           bTree is a decentralized research platform where you can earn money by participating in transparent, verifiable economic and social science experiments. Every decision you make advances scientific understanding, while you build your own on-chain behavioral profile and reputation. Join bTree today to help shape the future of research, earn money, and become part of a global community of trusted subjects.
         </p>
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
-          <Link
-            to="/about"
-            style={secondaryActionStyle}
-          >
-            What is bTree?
-          </Link>
-        </div>
       </section>
 
       <section
@@ -193,13 +185,7 @@ export default function Landing(): JSX.Element {
               {statusLine}
             </p>
           )}
-          <p style={{ margin: 0, marginTop: '0.75rem', fontSize: '0.85rem', color: '#4b5563' }}>
-            Ready to continue? Visit the{' '}
-            <NavLink to="/subject/register" style={{ color: '#1d4ed8', textDecoration: 'underline' }}>
-              subject registration
-            </NavLink>{' '}
-            page.
-          </p>
+
         </article>
 
         <article style={cardStyle}>
