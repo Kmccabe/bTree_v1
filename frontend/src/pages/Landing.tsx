@@ -155,6 +155,9 @@ export default function Landing(): JSX.Element {
       {/* Hero */}
       <section style={{ marginBottom: '2.5rem' }}>
         <h1 style={{ fontSize: '2.75rem', lineHeight: 1.1, margin: 0 }}>Welcome to bTree</h1>
+        <p className="mt-4 max-w-3xl text-base md:text-lg text-gray-700 dark:text-gray-200 leading-relaxed text-center md:text-left mx-auto md:mx-0">
+          bTree is a decentralized research platform where you can earn money by participating in transparent, verifiable economic and social science experiments. Every decision you make advances scientific understanding, while you build your own on-chain behavioral profile and reputation. Join bTree today to help shape the future of research, earn money, and become part of a global community of trusted subjects.
+        </p>
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
           <Link
             to="/about"
