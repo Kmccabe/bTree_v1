@@ -1,4 +1,5 @@
 import React from "react";
+import { usePrimaryWalletConnect } from "../../hooks/usePrimaryWalletConnect";
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
@@ -19,6 +20,8 @@ const cardStyle: React.CSSProperties = {
 };
 
 export default function SignupPage2(): JSX.Element {
+  const { handleConnect, isConnecting } = usePrimaryWalletConnect();
+
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-12">
       <p className="text-sm text-gray-600 dark:text-gray-300">Sign up: Page 2 of 2</p>
@@ -71,9 +74,11 @@ export default function SignupPage2(): JSX.Element {
           </p>
           <button
             type="button"
-            className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl border px-6 text-sm font-medium text-gray-800 dark:text-gray-100 hover:bg-purple-50 dark:hover:bg-neutral-800"
+            onClick={handleConnect}
+            disabled={isConnecting}
+            className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#0b0d16] text-white px-6 text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            Connect Wallet
+            {isConnecting ? "Connecting..." : "Connect Wallet"}
           </button>
         </article>
       </section>

@@ -1,7 +1,8 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { PROVIDER_ID, useWallet } from '@txnlab/use-wallet';
 import algosdk from 'algosdk';
+import { usePrimaryWalletConnect } from '../hooks/usePrimaryWalletConnect';
 
 const walletGuideUrl = 'https://www.canva.com/design/DAGmIGnFLIQ/2wxMPSMRW1d4Gj87W9pRVA/view?utm_content=DAGmIGnFLIQ&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=hf388731d15#1';
 const ALGOD_URL = (import.meta.env.VITE_ALGOD_URL as string | undefined) || 'https://testnet-api.algonode.cloud';
@@ -186,6 +187,8 @@ export default function Landing(): JSX.Element {
       ? 'account is not registered'
       : 'could not verify registration';
 
+  const { handleConnect, isConnecting } = usePrimaryWalletConnect();
+
   const navigate = useNavigate();
   const location = useLocation();
   const lastNav = useRef<{ addr?: string; status?: 'registered' | 'not_registered' } | null>(null);
@@ -212,31 +215,6 @@ export default function Landing(): JSX.Element {
     lastNav.current = { addr: address, status: regStatus };
     navigate(target, { replace: true });
   }, [address, regStatus, location.pathname, location.state, navigate]);
-
-  const handleConnect = useCallback(async () => {
-    const target = peraProvider ?? providers?.[0];
-    const peraClient = clients?.[PROVIDER_ID.PERA];
-    if (!target) {
-      console.warn('Wallet provider not initialized yet');
-      return;
-    }
-    try {
-      await target.connect();
-      if (!target.isActive) target.setActiveProvider?.();
-    } catch (err: any) {
-      const msg = String(err?.message || err).toLowerCase();
-      if (msg.includes('currently connected') && peraClient) {
-        try {
-          await peraClient.reconnect(() => {});
-          if (!target.isActive) target.setActiveProvider?.();
-        } catch (e) {
-          console.error('Reconnect failed:', e);
-        }
-      } else {
-        console.error('Connect failed:', err);
-      }
-    }
-  }, [clients, peraProvider, providers]);
 
   return (
     <main style={{ padding: '2rem 0' }}>
@@ -275,9 +253,14 @@ export default function Landing(): JSX.Element {
           <button
             type="button"
             onClick={handleConnect}
-            style={primaryActionStyle}
+            disabled={isConnecting}
+            style={{
+              ...primaryActionStyle,
+              opacity: isConnecting ? 0.7 : 1,
+              cursor: isConnecting ? 'not-allowed' : 'pointer'
+            }}
           >
-            Connect Wallet
+            {isConnecting ? 'Connecting...' : 'Connect Wallet'}
           </button>
           {statusLine && (
             <p style={{ margin: 0, marginTop: '0.5rem', fontSize: '0.75rem', color: '#6b7280' }}>
