@@ -34,6 +34,10 @@ export default function SignupPage2(): JSX.Element {
 
   const { freshness, isChecking: isFreshnessChecking } = useAccountFreshness(address);
   const { handleConnect, isConnecting } = usePrimaryWalletConnect();
+  const isJoinEnabled = useMemo(
+    () => !!address && !isFreshnessChecking && freshness === "new",
+    [address, isFreshnessChecking, freshness]
+  );
 
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-12">
@@ -56,26 +60,6 @@ export default function SignupPage2(): JSX.Element {
         a new account from your existing wallet and then click the Join-Now button using your new account.
       </p>
 
-      {address && (
-        <div
-          className={`mb-6 rounded-md border px-4 py-3 text-sm font-medium ${
-            freshness === "used"
-              ? "border-amber-300 bg-amber-50 text-amber-800"
-              : freshness === "new"
-              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-              : "border-gray-200 bg-gray-50 text-gray-700"
-          }`}
-        >
-          {isFreshnessChecking
-            ? "Checking account activity..."
-            : freshness === "used"
-            ? "This account has previous on-chain activity; for privacy we recommend a new account."
-            : freshness === "new"
-            ? "This account appears new."
-            : "Unable to verify account activity."}
-        </div>
-      )}
-
       <section style={gridStyle}>
         <article style={cardStyle}>
           <h2 className="text-2xl font-semibold text-gray-900">Join bTree</h2>
@@ -84,12 +68,38 @@ export default function SignupPage2(): JSX.Element {
           </p>
           <button
             type="button"
-            disabled
-            aria-disabled="true"
-            className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl bg-gray-300 dark:bg-neutral-700 text-gray-500 cursor-not-allowed px-6 text-sm font-medium"
+            disabled={!isJoinEnabled}
+            aria-disabled={!isJoinEnabled}
+            title={!isJoinEnabled ? "Join is available only with a brand-new account." : undefined}
+            className={
+              "mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl px-6 text-sm font-medium " +
+              (isJoinEnabled
+                ? "bg-[#0b0d16] text-white"
+                : "bg-gray-300 dark:bg-neutral-700 text-gray-500 cursor-not-allowed")
+            }
           >
             Join-Now
           </button>
+          <div
+            className={
+              "mt-2 rounded-md border px-3 py-2 text-sm " +
+              (isFreshnessChecking
+                ? "border-gray-200 bg-gray-50 text-gray-700"
+                : freshness === "used"
+                ? "border-amber-300 bg-amber-50 text-amber-800"
+                : freshness === "new"
+                ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                : "border-gray-200 bg-gray-50 text-gray-700")
+            }
+          >
+            {isFreshnessChecking
+              ? "Checking account activity..."
+              : freshness === "used"
+              ? "This account has previous on-chain activity and cannot be used."
+              : freshness === "new"
+              ? "This account appears new and can be used."
+              : "Unable to verify account activity."}
+          </div>
         </article>
 
         <article style={cardStyle}>
