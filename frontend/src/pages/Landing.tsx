@@ -1,5 +1,5 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { PROVIDER_ID, useWallet } from '@txnlab/use-wallet';
 import algosdk from 'algosdk';
 
@@ -70,6 +70,8 @@ const secondaryActionStyle: React.CSSProperties = {
   textDecoration: 'none',
   cursor: 'pointer'
 };
+
+const landingPaths = new Set<string>(['/', '/home']);
 
 export default function Landing(): JSX.Element {
   const {
@@ -183,6 +185,33 @@ export default function Landing(): JSX.Element {
       : regStatus === 'not_registered'
       ? 'account is not registered'
       : 'could not verify registration';
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  const lastNav = useRef<{ addr?: string; status?: 'registered' | 'not_registered' } | null>(null);
+
+  useEffect(() => {
+    if (!landingPaths.has(location.pathname)) return;
+
+    const hasSkipFlag =
+      !!location.state &&
+      typeof location.state === 'object' &&
+      (location.state as { skipLandingRedirect?: boolean }).skipLandingRedirect;
+
+    if (hasSkipFlag) {
+      navigate(location.pathname, { replace: true, state: null });
+      return;
+    }
+
+    if (!address) return;
+    if (regStatus !== 'registered' && regStatus !== 'not_registered') return;
+
+    if (lastNav.current?.addr === address && lastNav.current?.status === regStatus) return;
+
+    const target = regStatus === 'registered' ? '/subject/dashboard' : '/subject/signup';
+    lastNav.current = { addr: address, status: regStatus };
+    navigate(target, { replace: true });
+  }, [address, regStatus, location.pathname, location.state, navigate]);
 
   const handleConnect = useCallback(async () => {
     const target = peraProvider ?? providers?.[0];

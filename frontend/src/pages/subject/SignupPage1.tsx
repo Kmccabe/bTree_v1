@@ -80,12 +80,12 @@ export default function SignupPage1(): JSX.Element {
             We will use your email to notify you about upcoming experiments or events on bTree. If you don’t want to
             submit an email, click the Opt-Out button below.  You can still participate in experiments by logging in and check for open experiments.
           </p>
-          <button
-            type="button"
+          <Link
+            to="/subject/signup/2"
             className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl border px-6 text-sm font-medium text-gray-800 dark:text-gray-100 hover:bg-purple-50 dark:hover:bg-neutral-800"
           >
             Opt-Out of Email Notifications
-          </button>
+          </Link>
         </article>
       </section>
 

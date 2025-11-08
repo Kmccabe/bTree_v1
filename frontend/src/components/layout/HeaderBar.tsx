@@ -25,7 +25,13 @@ export default function HeaderBar(): JSX.Element {
             bTree v2
           </NavLink>
           <nav aria-label="Main" style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-            <NavLink to="/" style={({ isActive }) => ({ ...linkStyle, ...(isActive ? active : {}) })}>Home</NavLink>
+            <NavLink
+              to="/"
+              state={{ skipLandingRedirect: true }}
+              style={({ isActive }) => ({ ...linkStyle, ...(isActive ? active : {}) })}
+            >
+              Home
+            </NavLink>
             <NavLink to="/about" style={({ isActive }) => ({ ...linkStyle, ...(isActive ? active : {}) })}>About</NavLink>
             <NavLink to="/subject" style={({ isActive }) => ({ ...linkStyle, ...(isActive ? active : {}) })}>Subject</NavLink>
             <NavLink to="/admin" style={({ isActive }) => ({ ...linkStyle, ...(isActive ? active : {}) })}>Admin</NavLink>
