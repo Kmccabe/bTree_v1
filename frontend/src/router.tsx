@@ -17,6 +17,7 @@ import Consent from './pages/legal/Consent';
 import Status from './pages/Status';
 import Register from "./pages/subject/Register";
 import LinkWallets from "./pages/subject/LinkWallets";
+import SignupPage1 from "./pages/subject/SignupPage1";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminSubjectPool from "./pages/admin/SubjectPool";
 import RegistryControls from "./pages/admin/RegistryControls";
@@ -186,6 +187,7 @@ export const router = createBrowserRouter([
           { path: 'link', element: <LinkWallets /> },
         ],
       },
+      { path: 'subject/signup', element: <SignupPage1 /> },
 
       // Existing pages
       { path: 'docs', element: <DocsHome /> },
