@@ -7,7 +7,7 @@ export default function SignupPage1(): JSX.Element {
       <div className="text-center">
         <p className="text-sm text-gray-600 dark:text-gray-300">Sign up: Page 1 of 2</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">
-          Join the bTree community, earn money and advance science
+          Join the bTree community. Earn money and advance science.
         </h1>
         <p className="mt-3 max-w-3xl mx-auto text-base sm:text-lg text-gray-700 dark:text-gray-200 leading-relaxed">
           We are preparing a simple, privacy-conscious enrollment flow. Page one will collect a
@@ -40,7 +40,7 @@ export default function SignupPage1(): JSX.Element {
             This preview shows the first step of the subject sign-up process.
           </p>
           <label className="mt-4 block">
-            <span className="sr-only">Email address</span>
+            <span className="sr-only">Enter Email address</span>
             <input
               type="email"
               placeholder="_Not Implemented Yet_"
@@ -51,7 +51,7 @@ export default function SignupPage1(): JSX.Element {
             />
           </label>
           <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">
-            When you press Send, we will send you a verification email and add you as a subject.
+            When you click Send Email, we will send you a verification email and add you as a subject.
           </p>
           <button
             type="button"
@@ -78,13 +78,13 @@ export default function SignupPage1(): JSX.Element {
           <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Why Your Email?</h2>
           <p className="mt-2 text-gray-700 dark:text-gray-200">
             We will use your email to notify you about upcoming experiments or events on bTree. If you don’t want to
-            submit an email, click the button below.  You can still participate by logging in and check for open experiments.
+            submit an email, click the Opt-Out button below.  You can still participate in experiments by logging in and check for open experiments.
           </p>
           <button
             type="button"
             className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-xl border px-6 text-sm font-medium text-gray-800 dark:text-gray-100 hover:bg-purple-50 dark:hover:bg-neutral-800"
           >
-            Opt Out of Email Notifications
+            Opt-Out of Email Notifications
           </button>
         </article>
       </section>
