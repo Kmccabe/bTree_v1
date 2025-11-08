@@ -215,7 +215,18 @@ export default function Landing(): JSX.Element {
       <section style={{ marginBottom: '2.5rem' }}>
         <h1 style={{ fontSize: '2.75rem', lineHeight: 1.1, margin: 0 }}>Welcome to bTree</h1>
         <p className="mt-4 max-w-3xl text-base md:text-lg text-gray-700 dark:text-gray-200 leading-relaxed text-center md:text-left mx-auto md:mx-0">
-          bTree is a decentralized research platform where you can earn money by participating in transparent, verifiable economic and social science experiments. Every decision you make advances scientific understanding, while you build your own on-chain behavioral profile and reputation. Join bTree today to help shape the future of research, earn money, and become part of a global community of trusted subjects.
+          bTree connects researchers with citizen scientists to run economics experiments on the Algorand blockchain.
+          As a citizen scientist you can participate in experiments and earn money with the knowledge that every
+          decision you make helps advance our scientific understanding of the world.  At the same time you build
+          your own on-chain behavioral profile and scientific reputation.
+        </p>
+        <p className="mt-4 max-w-3xl text-base md:text-lg text-gray-700 dark:text-gray-200 leading-relaxed text-center md:text-left mx-auto md:mx-0">
+          If you already joined WELCOME BACK.  Connect your wallet account to go to your Citizen Scientist Dashboard.
+        </p>
+        <p className="mt-3 max-w-3xl text-base md:text-lg text-gray-700 dark:text-gray-200 leading-relaxed text-center md:text-left mx-auto md:mx-0">
+          If you want to be a citizen scientist, join bTree today and help shape the future of research, earn money, and become part of a global community.
+          To start you must connect your wallet account. This is how you will make decisions on the blockchain and building your reputation.  If you don't
+          have a wallet you can get a trusted wallet below.
         </p>
       </section>
 
