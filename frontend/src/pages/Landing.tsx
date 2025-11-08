@@ -161,8 +161,8 @@ export default function Landing(): JSX.Element {
         if (alive) setRegStatus('registered');
       } catch (err: any) {
         const status = err?.response?.status ?? err?.status ?? err?.code;
-        const msg = String(err?.message || '');
-        if (status === 404 || /not found|box does not exist/i.test(msg)) {
+        const msg = String(err?.message || '').toLowerCase();
+        if (status === 404 || /not found|box does not exist/.test(msg)) {
           if (alive) setRegStatus('not_registered');
         } else {
           console.error('[bTree] registry check failed', { status, msg, err });

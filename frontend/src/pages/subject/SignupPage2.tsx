@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useMemo } from "react";
+import { useWallet } from "@txnlab/use-wallet";
 import { usePrimaryWalletConnect } from "../../hooks/usePrimaryWalletConnect";
+import { useAccountFreshness } from "../../hooks/useAccountFreshness";
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
   gap: "1.5rem",
   marginBottom: "2.5rem",
-  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
 };
 
 const cardStyle: React.CSSProperties = {
@@ -20,6 +22,17 @@ const cardStyle: React.CSSProperties = {
 };
 
 export default function SignupPage2(): JSX.Element {
+  const { activeAddress, activeAccount, connectedAccounts } = useWallet();
+  const address = useMemo(() => {
+    if (activeAddress) return activeAddress;
+    if (activeAccount?.address) return activeAccount.address;
+    if (Array.isArray(connectedAccounts) && connectedAccounts.length > 0) {
+      return connectedAccounts[0]?.address;
+    }
+    return undefined;
+  }, [activeAddress, activeAccount, connectedAccounts]);
+
+  const { freshness, isChecking: isFreshnessChecking } = useAccountFreshness(address);
   const { handleConnect, isConnecting } = usePrimaryWalletConnect();
 
   return (
@@ -42,6 +55,26 @@ export default function SignupPage2(): JSX.Element {
         with an existing wallet and account, you must get a new account. Use the Get-Account button to learn how to get
         a new account from your existing wallet and then click the Join-Now button using your new account.
       </p>
+
+      {address && (
+        <div
+          className={`mb-6 rounded-md border px-4 py-3 text-sm font-medium ${
+            freshness === "used"
+              ? "border-amber-300 bg-amber-50 text-amber-800"
+              : freshness === "new"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+              : "border-gray-200 bg-gray-50 text-gray-700"
+          }`}
+        >
+          {isFreshnessChecking
+            ? "Checking account activity..."
+            : freshness === "used"
+            ? "This account has previous on-chain activity; for privacy we recommend a new account."
+            : freshness === "new"
+            ? "This account appears new."
+            : "Unable to verify account activity."}
+        </div>
+      )}
 
       <section style={gridStyle}>
         <article style={cardStyle}>
