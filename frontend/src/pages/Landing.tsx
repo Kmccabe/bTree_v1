@@ -1,9 +1,19 @@
-﻿import React from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { useCallback, useMemo } from 'react';
 import { PROVIDER_ID, useWallet } from '@txnlab/use-wallet';
+import algosdk from 'algosdk';
 
 const walletGuideUrl = 'https://www.canva.com/design/DAGmIGnFLIQ/2wxMPSMRW1d4Gj87W9pRVA/view?utm_content=DAGmIGnFLIQ&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=hf388731d15#1';
+const ALGOD_URL = (import.meta.env.VITE_ALGOD_URL as string | undefined) || 'https://testnet-api.algonode.cloud';
+const ALGOD_TOKEN = (import.meta.env.VITE_ALGOD_TOKEN as string | undefined) || '';
+const REGISTRY_APP_ID = Number(import.meta.env.VITE_REGISTRY_APP_ID);
+const encoder = new TextEncoder();
+
+const addrBytes = (addr: string): Uint8Array => algosdk.decodeAddress(addr).publicKey;
+const bnProfile = (addr: string): Uint8Array =>
+  new Uint8Array([...encoder.encode('profile:'), ...addrBytes(addr)]);
+
+type RegStatus = 'idle' | 'checking' | 'registered' | 'not_registered' | 'error';
 
 function shortAddress(address?: string | null): string {
   if (!address) return '';
@@ -86,6 +96,8 @@ export default function Landing(): JSX.Element {
   );
 
   const providerId = primaryProvider?.metadata?.id;
+  const algod = useMemo(() => new algosdk.Algodv2(ALGOD_TOKEN, ALGOD_URL, ''), []);
+  const [regStatus, setRegStatus] = useState<RegStatus>('idle');
 
   const networkLabel = useMemo(() => {
     const providerNetwork = (
@@ -124,6 +136,53 @@ export default function Landing(): JSX.Element {
     const suffix = networkLabel ? ` (${networkLabel})` : '';
     return `Connected as ${shortAddress(address)}${suffix}`;
   }, [address, networkLabel]);
+
+  useEffect(() => {
+    if (!address) {
+      setRegStatus('idle');
+      return;
+    }
+    if (!Number.isFinite(REGISTRY_APP_ID) || REGISTRY_APP_ID <= 0) {
+      console.error('REGISTRY_APP_ID invalid:', import.meta.env.VITE_REGISTRY_APP_ID);
+      setRegStatus('error');
+      return;
+    }
+
+    let alive = true;
+    (async () => {
+      setRegStatus('checking');
+      const boxName = bnProfile(address);
+      console.debug('[bTree] registry check', { ALGOD_URL, REGISTRY_APP_ID, address });
+      try {
+        await algod.getApplicationBoxByName(REGISTRY_APP_ID, boxName).do();
+        if (alive) setRegStatus('registered');
+      } catch (err: any) {
+        const status = err?.response?.status ?? err?.status ?? err?.code;
+        const msg = String(err?.message || '');
+        if (status === 404 || /not found|box does not exist/i.test(msg)) {
+          if (alive) setRegStatus('not_registered');
+        } else {
+          console.error('[bTree] registry check failed', { status, msg, err });
+          if (alive) setRegStatus('error');
+        }
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [address, algod]);
+
+  const registrationCopy =
+    !address || regStatus === 'idle'
+      ? null
+      : regStatus === 'checking'
+      ? 'Checking registration...'
+      : regStatus === 'registered'
+      ? 'account is registered'
+      : regStatus === 'not_registered'
+      ? 'account is not registered'
+      : 'could not verify registration';
 
   const handleConnect = useCallback(async () => {
     const target = peraProvider ?? providers?.[0];
@@ -183,6 +242,11 @@ export default function Landing(): JSX.Element {
           {statusLine && (
             <p style={{ margin: 0, marginTop: '0.5rem', fontSize: '0.75rem', color: '#6b7280' }}>
               {statusLine}
+            </p>
+          )}
+          {registrationCopy && (
+            <p style={{ margin: 0, marginTop: '0.4rem', fontSize: '0.8rem', color: '#374151' }}>
+              {registrationCopy}
             </p>
           )}
 
