@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { EscrowCard } from "../../features/admin/EscrowCard";
 
 const cards = [
   {
@@ -24,6 +25,9 @@ export default function AdminHome(): JSX.Element {
       </header>
 
       <section className="grid gap-4 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <EscrowCard />
+        </div>
         {cards.map((card) => (
           <Link
             key={card.title}
