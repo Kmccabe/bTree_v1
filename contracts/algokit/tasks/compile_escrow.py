@@ -8,18 +8,21 @@ from pathlib import Path
 from algosdk.encoding import is_valid_address
 from algosdk.v2client.algod import AlgodClient
 
-repo_root = Path(__file__).resolve().parents[2]
+# Correct path resolution
+_here = Path(__file__).resolve()
+contracts_dir = _here.parents[2]            # .../<repo>/contracts
+repo_root = contracts_dir.parent            # .../<repo>
 sys.path.insert(0, str(repo_root))
 
 from contracts.bank_account_escrow import compile_program  # noqa: E402
 
-ARTIFACTS_DIR = repo_root / "contracts" / "artifacts"
+ARTIFACTS_DIR = contracts_dir / "artifacts"
 TEAL_PATH = ARTIFACTS_DIR / "bank_account_escrow.teal"
 ADDRESS_PATH = ARTIFACTS_DIR / "bank_account_escrow.address.txt"
 
 
 def _write_teal() -> str:
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     teal = compile_program()
     TEAL_PATH.write_text(teal, encoding="utf-8")
     print(f"Wrote TEAL to {TEAL_PATH}")
