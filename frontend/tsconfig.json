@@ -1,4 +1,5 @@
-﻿{
+﻿// For TS7 migration notes, see https://aka.ms/ts6 ; Vercel TS may not support ignoreDeprecations yet.
+{
   "compilerOptions": {
     "target": "ES2020",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
@@ -14,8 +15,7 @@
     "isolatedModules": true,
     "types": ["vite/client", "node"],
     "baseUrl": ".",                       // TEMP: keep absolute imports working
-    "paths": { "*": ["./src/*", "*"] },   // TEMP: map src/*; migrate to Vite alias later
-    "ignoreDeprecations": "6.0"           // Silence TS6 deprecation warnings
+    "paths": { "*": ["./src/*", "*"] }         // Silence TS6 deprecation warnings
   },
   "include": ["src"],
   "exclude": [
