@@ -3,9 +3,8 @@
     "target": "ES2020",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "baseUrl": "./src",
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -13,8 +12,19 @@
     "skipLibCheck": true,
     "noEmit": true,
     "isolatedModules": true,
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",                       // TEMP: keep absolute imports working
+    "paths": { "*": ["./src/*", "*"] },   // TEMP: map src/*; migrate to Vite alias later
+    "ignoreDeprecations": "6.0"           // Silence TS6 deprecation warnings
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "vitest.config.ts",
+    "src/setupTests.ts"
+  ]
 }
