@@ -1,0 +1,6 @@
+[tasks]
+compile-escrow = "python -m contracts.algokit.tasks.compile_escrow"
+
+# Requires AlgoKit >= 2.2.x and an active profile (localnet recommended):
+#   algokit localnet start
+#   algokit config set profile=localnet

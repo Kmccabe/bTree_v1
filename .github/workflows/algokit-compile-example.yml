@@ -1,0 +1,25 @@
+# name: algokit-compile-example
+# on: [workflow_dispatch]
+# jobs:
+#   compile:
+#     runs-on: ubuntu-latest   # Docker required for localnet
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.11'
+#       - name: Install AlgoKit 2.2.x
+#         run: |
+#           python -m pip install --user pipx
+#           python -m pipx ensurepath
+#           pipx install "algokit==2.2.*"
+#       - name: Start localnet
+#         run: algokit localnet start
+#       - name: Compile escrow via AlgoKit
+#         run: algokit task compile-escrow
+#       - name: Upload artifacts
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: escrow-artifacts
+#           path: contracts/artifacts/
+# # NOTE: Docker-capable runner required; skip on Windows hosted runners.

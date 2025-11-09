@@ -13,6 +13,29 @@ propagate the resulting address into the frontend environment.
 
 ## Compile Workflow
 
+### Compile via AlgoKit (recommended)
+
+Requires AlgoKit 2.2.x and an active profile (localnet recommended).
+
+1. Install AlgoKit:
+   ```bash
+   pipx install "algokit==2.2.*"
+   ```
+2. Start localnet & select profile:
+   ```bash
+   algokit localnet start
+   algokit config set profile=localnet
+   ```
+3. Run the compile task:
+   ```bash
+   algokit task compile-escrow
+   ```
+4. Artifacts (same as legacy path):
+   - `contracts/artifacts/bank_account_escrow.teal`
+   - `contracts/artifacts/bank_account_escrow.address.txt`
+
+### Legacy compile path
+
 1. Ensure the Algorand CLI (`goal`) is installed **or** export the following so the script can call an Algod compile endpoint as fallback:
    - `ALGOD_ADDRESS`
    - `ALGOD_TOKEN`

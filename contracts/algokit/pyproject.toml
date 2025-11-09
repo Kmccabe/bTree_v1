@@ -1,0 +1,10 @@
+[project]
+name = "bTree-algokit-escrow"
+version = "0.1.0"
+description = "AlgoKit tasks for compiling the bank-account escrow LogicSig"
+requires-python = ">=3.11"
+dependencies = ["py-algorand-sdk>=2.6"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"

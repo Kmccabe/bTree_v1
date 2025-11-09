@@ -73,6 +73,20 @@ Root files of note: `requirements-dev.txt` (Python tooling), `package.json` (sha
 - PyTeal smart contracts reside in `contracts/registry` with AlgoKit deployment helpers and ABI definitions.
 - Compiled TEAL/ABI artifacts output to `contracts/artifacts`.
 - Operational scripts in `scripts/` manage registry deployment, fee tuning, funding, and QR generation. Install dependencies via `pip install -r requirements-dev.txt`.
+- Bank account escrow LogicSig design notes live in [`contracts/README_bank_account_escrow.md`](contracts/README_bank_account_escrow.md).
+- Bank-account escrow LogicSig:
+  - **AlgoKit path (recommended):**
+    ```
+    pipx install "algokit==2.2.*" && algokit --version
+    algokit localnet start
+    algokit config set profile=localnet
+    algokit task compile-escrow
+    ```
+  - **Legacy path (still works):**
+    ```
+    python contracts/escrow_compile.py
+    ```
+    Requires `goal` or `ALGOD_*` env vars for a compile-enabled Algod.
 
 ## Docs & Links
 
@@ -84,4 +98,3 @@ Root files of note: `requirements-dev.txt` (Python tooling), `package.json` (sha
 ## License & Credits
 
 © 2025 bTree Labs — All rights reserved.
-
