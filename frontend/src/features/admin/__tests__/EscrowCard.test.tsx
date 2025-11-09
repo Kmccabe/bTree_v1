@@ -1,7 +1,9 @@
 // frontend/src/features/admin/__tests__/EscrowCard.test.tsx
 import "@testing-library/jest-dom";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ToastProvider } from "../../../components/Toaster";
 
 // 1) Mock the escrow API BEFORE importing the component (no outer vars in factory)
 vi.mock("../../escrow/api", () => ({
@@ -16,6 +18,10 @@ vi.mock("../../escrow/api", () => ({
 import * as escrowApi from "../../escrow/api";
 import { EscrowCard } from "../EscrowCard";
 
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <ToastProvider>{children}</ToastProvider>
+);
+
 describe("EscrowCard", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -28,7 +34,7 @@ describe("EscrowCard", () => {
 
   it("renders not-configured state when no address", () => {
     (escrowApi.getEscrowAddress as unknown as vi.Mock).mockReturnValue(null);
-    render(<EscrowCard />);
+    render(<EscrowCard />, { wrapper });
 
     expect(screen.getByText(/Escrow \(Compile & Fund\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Not configured/i)).toBeInTheDocument();
@@ -39,7 +45,7 @@ describe("EscrowCard", () => {
     (escrowApi.getEscrowAddress as unknown as vi.Mock).mockReturnValue("ADDR");
     (escrowApi.getEscrowBalance as unknown as vi.Mock).mockResolvedValue(0n);
 
-    render(<EscrowCard />);
+    render(<EscrowCard />, { wrapper });
     await waitFor(() => expect(screen.getByText(/Needs funding/i)).toBeInTheDocument());
     expect(screen.getByText(/0\.0000 ALGO/)).toBeInTheDocument();
   });
@@ -48,7 +54,7 @@ describe("EscrowCard", () => {
     (escrowApi.getEscrowAddress as unknown as vi.Mock).mockReturnValue("ADDR");
     (escrowApi.getEscrowBalance as unknown as vi.Mock).mockResolvedValue(2_000_000n);
 
-    render(<EscrowCard />);
+    render(<EscrowCard />, { wrapper });
     await waitFor(() => expect(screen.getByText(/Ready/i)).toBeInTheDocument());
     expect(screen.getByText(/2\.0000 ALGO/)).toBeInTheDocument();
   });
@@ -59,7 +65,7 @@ describe("EscrowCard", () => {
       .mockRejectedValueOnce(new Error("Indexer offline"))
       .mockResolvedValueOnce(2_000_000n);
 
-    render(<EscrowCard />);
+    render(<EscrowCard />, { wrapper });
     await waitFor(() =>
       expect(screen.getByText(/Unable to determine balance/i)).toBeInTheDocument()
     );
@@ -72,7 +78,7 @@ describe("EscrowCard", () => {
     (escrowApi.getEscrowAddress as unknown as vi.Mock).mockReturnValue("ADDR123");
     (escrowApi.getEscrowBalance as unknown as vi.Mock).mockResolvedValue(0n);
 
-    render(<EscrowCard />);
+    render(<EscrowCard />, { wrapper });
     await waitFor(() => expect(screen.getByLabelText(/copy escrow address/i)).toBeInTheDocument());
     fireEvent.click(screen.getByLabelText(/copy escrow address/i));
 

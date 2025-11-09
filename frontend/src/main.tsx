@@ -6,6 +6,9 @@ import { WalletProvider, useInitializeProviders, PROVIDER_ID } from "@txnlab/use
 import { PeraWalletConnect } from "@perawallet/connect";
 import { router } from "./router";
 import "./index.css";
+import { ToastProvider } from "@/components/Toaster";
+
+// ← ADDED
 
 const networkEnv = (import.meta.env.VITE_NETWORK as string | undefined)?.toUpperCase() ?? "TESTNET";
 const providerNetwork = networkEnv === "MAINNET" ? "MainNet" : "TestNet";
@@ -34,10 +37,12 @@ function WalletApp(): JSX.Element {
 }
 
 const root = document.getElementById("root");
-if (!root) throw new Error("Missing <div id=\"root\"> in index.html");
+if (!root) throw new Error('Missing <div id="root"> in index.html');
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <WalletApp />
+    <ToastProvider>        {/* ← ADDED */}
+      <WalletApp />
+    </ToastProvider>       {/* ← ADDED */}
   </React.StrictMode>
 );

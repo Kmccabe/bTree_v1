@@ -14,8 +14,12 @@
     "noEmit": true,
     "isolatedModules": true,
     "types": ["vite/client", "node"],
-    "baseUrl": ".",                       // TEMP: keep absolute imports working
-    "paths": { "*": ["./src/*", "*"] }         // Silence TS6 deprecation warnings
+    "baseUrl": "src",
+    "paths": {
+      "@/*": ["*"],
+      "*": ["*"]
+    }
+      // Silence TS6 deprecation warnings
   },
   "include": ["src"],
   "exclude": [

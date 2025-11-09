@@ -74,3 +74,31 @@ After a real compile:
    VITE_BANK_ESCROW_ADDR=<REAL_ESCROW_ADDRESS>
    ```
 3. Fund the escrow with ~5 ALGO from the sponsor wallet and verify the TestNet balance before using it in registration flows.
+
+## Compile Log Streaming (Admin UI)
+
+The Admin dashboard can stream compile logs in two modes:
+
+- **Chunked (default)** — server returns newline-delimited text where the final line is JSON status, e.g.:
+  ```
+  starting algokit compile
+  step 1/3: building...
+  step 2/3: linking...
+  step 3/3: artifact ready
+  {"ok":true,"escrow_addr":"XPLQ...7S3"}
+  ```
+- **SSE (`?watch=1`)** — `text/event-stream` with progress blocks followed by a `event: done` payload:
+  ```
+  data: starting algokit compile
+
+  data: step 1/3: building...
+
+  data: step 2/3: linking...
+
+  data: step 3/3: artifact ready
+
+  event: done
+  data: {"ok":true,"escrow_addr":"XPLQ...7S3"}
+  ```
+
+Configure the frontend via `VITE_COMPILE_STREAM_MODE=chunk` (or `sse`). If malformed JSON or network errors occur, the UI marks the compile as failed. Clipboard buttons show toasts (“Copied log (N lines)” / “Copy failed — try again or select text manually”).
