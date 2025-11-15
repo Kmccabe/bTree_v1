@@ -72,10 +72,22 @@ export async function* compileEscrowStream(signal?: AbortSignal): AsyncGenerator
 }
 
 export async function* mockCompileEscrowStream(signal?: AbortSignal): AsyncGenerator<LogEvent> {
-  for (let i = 1; i <= 40; i++) {
+  const total = Number(
+    Number.isFinite(Number(import.meta.env.VITE_DEV_MOCK_LINES)) &&
+      Number(import.meta.env.VITE_DEV_MOCK_LINES) > 0
+      ? import.meta.env.VITE_DEV_MOCK_LINES
+      : 120
+  );
+  const delay = Number(
+    Number.isFinite(Number(import.meta.env.VITE_DEV_MOCK_DELAY_MS)) &&
+      Number(import.meta.env.VITE_DEV_MOCK_DELAY_MS) >= 0
+      ? import.meta.env.VITE_DEV_MOCK_DELAY_MS
+      : 200
+  );
+  for (let i = 1; i <= total; i++) {
     if (signal?.aborted) return;
-    yield `step ${i}/40: working`;
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    yield `step ${i}/${total}: working`;
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
   if (signal?.aborted) return;
   yield { done: true, ok: true, escrow: "XPLQ...7S3" };

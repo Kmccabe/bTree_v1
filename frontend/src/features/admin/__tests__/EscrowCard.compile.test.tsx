@@ -16,10 +16,11 @@ vi.mock("../../escrow/api", () => ({
 
 vi.mock("../../../lib/api/compileEscrowStream", () => ({
   compileEscrowStream: vi.fn(),
+  mockCompileEscrowStream: vi.fn(),
 }));
 
 import * as escrowApi from "../../escrow/api";
-import { compileEscrowStream } from "../../../lib/api/compileEscrowStream";
+import { compileEscrowStream, mockCompileEscrowStream } from "../../../lib/api/compileEscrowStream";
 import { EscrowCard } from "../EscrowCard";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
@@ -27,12 +28,26 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 const mockStream = (events: Array<string | { done: true; ok: boolean; escrow?: string }>) => {
-  (compileEscrowStream as unknown as vi.Mock).mockImplementationOnce(async function* () {
+  const impl = async function* () {
     for (const event of events) {
       yield event;
     }
-  });
+  };
+  (compileEscrowStream as unknown as vi.Mock).mockImplementationOnce(impl);
+  (mockCompileEscrowStream as unknown as vi.Mock).mockImplementationOnce(impl);
 };
+
+const getStreamCallCount = () =>
+  (compileEscrowStream as unknown as vi.Mock).mock.calls.length +
+  (mockCompileEscrowStream as unknown as vi.Mock).mock.calls.length;
+
+beforeAll(() => {
+  vi.stubEnv("VITE_DEV_MOCK_COMPILE", "0");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("EscrowCard compile streaming", () => {
   beforeEach(() => {
@@ -63,7 +78,7 @@ describe("EscrowCard compile streaming", () => {
     await waitFor(() => expect(screen.getByText(/\[done] compile succeeded/i)).toBeInTheDocument());
     expect(screen.getByText(/Escrow: XPLQ\.\.\.7S3/)).toBeInTheDocument();
     expect(onCompiled).toHaveBeenCalledWith("XPLQ...7S3");
-    expect(compileEscrowStream).toHaveBeenCalled();
+    expect(getStreamCallCount()).toBeGreaterThan(0);
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: /Cancel/i })).not.toBeInTheDocument()
     );
@@ -176,6 +191,6 @@ describe("EscrowCard compile streaming", () => {
     fireEvent.click(compileBtn);
     fireEvent.click(compileBtn);
     await waitFor(() => expect(screen.getByText(/\[done] compile succeeded/)).toBeInTheDocument());
-    expect(compileEscrowStream).toHaveBeenCalledTimes(1);
+    expect(getStreamCallCount()).toBe(1);
   });
 });

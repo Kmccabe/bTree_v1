@@ -18,8 +18,7 @@ import {
 
 const TRUNCATED_LABEL = "[truncated] showing last 2000 lines";
 const NEAR_BOTTOM_EPSILON = 48;
-const USE_MOCK_COMPILE = import.meta.env.VITE_DEV_MOCK_COMPILE === "1";
-const COMPILE_STREAM = USE_MOCK_COMPILE ? mockCompileEscrowStream : compileEscrowStream;
+const SHOULD_USE_MOCK = () => import.meta.env.VITE_DEV_MOCK_COMPILE === "1";
 
 type FetchState = {
   balance?: bigint;
@@ -32,7 +31,7 @@ type CompileStatus = "idle" | "running" | "success" | "failed" | "canceled";
 const FUND_STATUS_META: Record<EscrowStatus, { label: string; className: string }> = {
   not_configured: { label: "Not configured", className: "bg-gray-100 text-gray-700" },
   needs_funding: { label: "Needs funding (<1 ALGO)", className: "bg-amber-100 text-amber-800" },
-  ready: { label: "Ready (=1 ALGO)", className: "bg-emerald-100 text-emerald-800" },
+  ready: { label: "Ready (>=1 ALGO)", className: "bg-emerald-100 text-emerald-800" },
   unknown: { label: "Status unknown", className: "bg-slate-100 text-slate-700" },
 };
 
@@ -177,12 +176,13 @@ export function EscrowCard(props?: EscrowCardProps): JSX.Element {
     setCompileStatus("running");
     setIsNearBottom(true);
 
+    const streamFn = SHOULD_USE_MOCK() ? mockCompileEscrowStream : compileEscrowStream;
     const controller = new AbortController();
     abortRef.current = controller;
     let completed = false;
 
     try {
-      for await (const event of COMPILE_STREAM(controller.signal)) {
+      for await (const event of streamFn(controller.signal)) {
         if (controller.signal.aborted) break;
         if (typeof event === "string") {
           pushLog(event);
