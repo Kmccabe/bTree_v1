@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "dependencies": {
+    "@types/express": "^5.0.5",
+    "express": "^5.1.0",
     "vercel": "^48.8.1"
   }
 }

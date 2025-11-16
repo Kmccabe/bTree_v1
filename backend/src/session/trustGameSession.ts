@@ -80,6 +80,10 @@ export interface GameInstance {
 type SubjectParticipationKey = string;
 type GameInstanceKey = string;
 
+function makeSubjectKey(experimentId: string, subjectId: string): SubjectParticipationKey {
+  return `${experimentId}:${subjectId}`;
+}
+
 export class SessionManager {
   private subjects: Map<SubjectParticipationKey, SubjectParticipation>;
   private games: Map<GameInstanceKey, GameInstance>;
@@ -95,18 +99,55 @@ export class SessionManager {
     wallet: string;
     treatmentTiming: TreatmentTiming;
   }): SubjectParticipation {
-    throw new Error("Not implemented (Step 1)");
+    const key = makeSubjectKey(params.experimentId, params.subjectId);
+    const existing = this.subjects.get(key);
+
+    if (existing) {
+      existing.wallet = params.wallet;
+      existing.updatedAt = new Date();
+      return existing;
+    }
+
+    const timestamp = new Date();
+    const created: SubjectParticipation = {
+      subjectId: params.subjectId,
+      experimentId: params.experimentId,
+      wallet: params.wallet,
+      outerState: SubjectOuterState.Waiting,
+      role: SubjectRole.None,
+      gameId: null,
+      innerStateS1: InnerStateS1.None,
+      innerStateS2: InnerStateS2.None,
+      treatmentTiming: params.treatmentTiming,
+      payoff: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    this.subjects.set(key, created);
+    return created;
   }
 
   public getSubjectParticipation(experimentId: string, subjectId: string): SubjectParticipation | undefined {
-    throw new Error("Not implemented (Step 1)");
+    const key = makeSubjectKey(experimentId, subjectId);
+    return this.subjects.get(key);
   }
 
   public listSubjects(params: {
     experimentId: string;
     outerState?: SubjectOuterState;
   }): SubjectParticipation[] {
-    throw new Error("Not implemented (Step 1)");
+    const results: SubjectParticipation[] = [];
+    for (const subject of this.subjects.values()) {
+      if (subject.experimentId !== params.experimentId) {
+        continue;
+      }
+      if (params.outerState !== undefined && subject.outerState !== params.outerState) {
+        continue;
+      }
+      results.push(subject);
+    }
+    return results;
   }
 
   public createGameInstance(params: {
@@ -126,3 +167,5 @@ export class SessionManager {
     throw new Error("Not implemented (Step 1)");
   }
 }
+
+export const sessionManager = new SessionManager();
