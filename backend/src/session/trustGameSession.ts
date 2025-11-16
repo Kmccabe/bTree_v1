@@ -80,6 +80,21 @@ export interface GameInstance {
 type SubjectParticipationKey = string;
 type GameInstanceKey = string;
 
+export interface ExperimentConfig {
+  experimentId: string;
+  s1Endowment: number;
+}
+
+export class SessionManagerError extends Error {
+  public readonly statusCode: number;
+
+  constructor(message: string, statusCode = 400) {
+    super(message);
+    this.name = "SessionManagerError";
+    this.statusCode = statusCode;
+  }
+}
+
 function makeSubjectKey(experimentId: string, subjectId: string): SubjectParticipationKey {
   return `${experimentId}:${subjectId}`;
 }
@@ -87,11 +102,13 @@ function makeSubjectKey(experimentId: string, subjectId: string): SubjectPartici
 export class SessionManager {
   private subjects: Map<SubjectParticipationKey, SubjectParticipation>;
   private games: Map<GameInstanceKey, GameInstance>;
+  private experimentConfigs: Map<string, ExperimentConfig>;
   private nextGameId: number;
 
   constructor() {
     this.subjects = new Map();
     this.games = new Map();
+    this.experimentConfigs = new Map();
     this.nextGameId = 1;
   }
 
@@ -184,6 +201,14 @@ export class SessionManager {
     return results;
   }
 
+  public setExperimentConfig(config: ExperimentConfig): void {
+    this.experimentConfigs.set(config.experimentId, config);
+  }
+
+  public getExperimentConfig(experimentId: string): ExperimentConfig | undefined {
+    return this.experimentConfigs.get(experimentId);
+  }
+
   public matchNextPair(params: {
     experimentId: string;
     treatmentTiming: TreatmentTiming;
@@ -238,6 +263,67 @@ export class SessionManager {
     return game;
   }
 
+  public applyS1SendDecision(params: { gameId: string; subjectId: string; amount: number }): GameInstance {
+    const game = this.games.get(params.gameId);
+    if (!game) {
+      throw new SessionManagerError("Game not found", 404);
+    }
+
+    if (!game.s1SubjectId) {
+      throw new SessionManagerError("Game does not have an S1 assigned", 400);
+    }
+
+    if (game.s1SubjectId !== params.subjectId) {
+      throw new SessionManagerError("This subject is not S1 in this game.", 403);
+    }
+
+    if (game.status !== GameStatus.S1AndS2Assigned) {
+      throw new SessionManagerError("Game is not waiting for S1 decision.");
+    }
+
+    if (game.X !== null) {
+      throw new SessionManagerError("S1 decision already recorded.");
+    }
+
+    const config = this.experimentConfigs.get(game.experimentId);
+    if (!config) {
+      throw new SessionManagerError("Experiment configuration not found for this game.");
+    }
+
+    if (!Number.isInteger(params.amount)) {
+      throw new SessionManagerError("Amount must be an integer.");
+    }
+
+    if (params.amount < 0 || params.amount > config.s1Endowment) {
+      throw new SessionManagerError(`Amount must be between 0 and ${config.s1Endowment}.`);
+    }
+
+    const timestamp = new Date();
+
+    game.X = params.amount;
+    game.status = GameStatus.S1Decided;
+    game.updatedAt = timestamp;
+    this.games.set(params.gameId, game);
+
+    const s1Participation = this.getSubjectParticipation(game.experimentId, game.s1SubjectId);
+    if (s1Participation) {
+      s1Participation.innerStateS1 = InnerStateS1.WaitingForS2;
+      s1Participation.updatedAt = timestamp;
+      this.subjects.set(makeSubjectKey(s1Participation.experimentId, s1Participation.subjectId), s1Participation);
+    }
+
+    if (game.s2SubjectId) {
+      const s2Participation = this.getSubjectParticipation(game.experimentId, game.s2SubjectId);
+      if (s2Participation) {
+        s2Participation.innerStateS2 = InnerStateS2.Decision;
+        s2Participation.updatedAt = timestamp;
+        this.subjects.set(makeSubjectKey(s2Participation.experimentId, s2Participation.subjectId), s2Participation);
+      }
+    }
+
+    return game;
+  }
+
   public createGameInstance(params: {
     experimentId: string;
     treatmentTiming: TreatmentTiming;
@@ -256,12 +342,7 @@ export class SessionManager {
   }
 
   public getGame(gameId: string): GameInstance | undefined {
-    for (const game of this.games.values()) {
-      if (game.gameId === gameId) {
-        return game;
-      }
-    }
-    return undefined;
+    return this.games.get(gameId);
   }
 
   public listGames(experimentId: string): GameInstance[] {
