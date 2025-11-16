@@ -1,9 +1,35 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useSubjectIdentity } from "../../../features/subject/useSubjectIdentity";
+import { enqueueSubject, DEFAULT_SESSION_ID } from "../../../features/experiments/queueService";
 
 export default function SubjectExperimentConsent(): JSX.Element {
   const navigate = useNavigate();
   const [agreed, setAgreed] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const { subjectId, walletShort, reputation } = useSubjectIdentity();
+
+  const reputationLabel = `${reputation.score} (from ${reputation.completed} experiments)`;
+  const resolvedSubjectId = subjectId ?? "pending-subject";
+  const resolvedWallet = walletShort ?? "Wallet not connected";
+
+  const handleContinue = React.useCallback(async () => {
+    if (!agreed || submitting) return;
+    setSubmitting(true);
+    try {
+      await enqueueSubject(DEFAULT_SESSION_ID, {
+        subjectId: resolvedSubjectId,
+        walletShort: resolvedWallet,
+        reputationLabel: `Rep ${reputationLabel}`,
+        joinedAt: Date.now(),
+      });
+    } catch (error) {
+      console.error("Unable to enqueue subject", error);
+    } finally {
+      setSubmitting(false);
+      navigate("/subject/experiment/waiting");
+    }
+  }, [agreed, submitting, resolvedSubjectId, resolvedWallet, reputationLabel, navigate]);
 
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-12 max-w-3xl">
@@ -77,14 +103,16 @@ export default function SubjectExperimentConsent(): JSX.Element {
           </button>
           <button
             type="button"
-            disabled={!agreed}
+            disabled={!agreed || submitting}
             className="inline-flex items-center justify-center rounded-lg bg-[#0b0d16] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#15182a] disabled:cursor-not-allowed disabled:bg-gray-400"
-            onClick={() => navigate("/subject/experiment/waiting")}
+            onClick={handleContinue}
           >
-            Agree & Continue
+            {submitting ? "Processing..." : "Agree & Continue"}
           </button>
         </div>
       </section>
     </main>
   );
 }
+
+

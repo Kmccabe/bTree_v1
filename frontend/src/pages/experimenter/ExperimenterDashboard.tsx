@@ -1,11 +1,8 @@
 import React from "react";
 import { Card, CardContent } from "../../components/ui/card";
+import { getQueuedSubjects, formatJoinedLabel, DEFAULT_SESSION_ID } from "../../features/experiments/queueService";
+import type { QueuedSubject } from "../../features/experiments/queueService";
 
-const waitingSubjects = [
-  { id: "subj-001", walletShort: "5LHX...YD5U", reputation: "Rep 0 (0 experiments)", joined: "1 min ago" },
-  { id: "subj-002", walletShort: "ABCD...1234", reputation: "Rep 5 (2 experiments)", joined: "3 min ago" },
-  { id: "subj-003", walletShort: "Z9PQ...88PL", reputation: "Rep 12 (4 experiments)", joined: "5 min ago" },
-];
 
 export default function ExperimenterDashboard(): JSX.Element {
   type ExperimentSummary = {
@@ -27,6 +24,7 @@ export default function ExperimenterDashboard(): JSX.Element {
   const [showFaq, setShowFaq] = React.useState(false);
   const [currentExperiment, setCurrentExperiment] = React.useState<ExperimentSummary | null>(null);
   const [deployError, setDeployError] = React.useState<string | null>(null);
+  const [waitingSubjects, setWaitingSubjects] = React.useState<QueuedSubject[]>([]);
 
   const numericUnit = Number(unit) || 0;
   const numericM = Number(m) || 0;
@@ -73,6 +71,25 @@ export default function ExperimenterDashboard(): JSX.Element {
         return value;
     }
   };
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const loadQueue = async () => {
+      const subjects = await getQueuedSubjects(DEFAULT_SESSION_ID);
+      if (isMounted) {
+        setWaitingSubjects(subjects);
+      }
+    };
+
+    loadQueue();
+    const intervalId = window.setInterval(loadQueue, 5000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-12">
@@ -275,23 +292,31 @@ export default function ExperimenterDashboard(): JSX.Element {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {waitingSubjects.map(subject => (
-                    <tr key={subject.id} className="align-middle">
-                      <td className="py-3 pr-4 font-semibold text-gray-900 dark:text-gray-50">{subject.id}</td>
-                      <td className="py-3 pr-4 font-mono text-sm text-gray-600 dark:text-gray-300">{subject.walletShort}</td>
-                      <td className="py-3 pr-4">{subject.reputation}</td>
-                      <td className="py-3 pr-4">{subject.joined}</td>
-                      <td className="py-3 text-right">
-                        <button
-                          type="button"
-                          className="inline-flex items-center rounded-lg bg-[#0b0d16] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm hover:bg-[#15182a]"
-                          onClick={() => {}}
-                        >
-                          Add to Session
-                        </button>
+                  {waitingSubjects.length === 0 ? (
+                    <tr>
+                      <td className="py-6 text-center text-sm text-gray-500 dark:text-gray-400" colSpan={5}>
+                        No subjects currently waiting.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    waitingSubjects.map(subject => (
+                      <tr key={`${subject.subjectId}-${subject.joinedAt}`} className="align-middle">
+                        <td className="py-3 pr-4 font-semibold text-gray-900 dark:text-gray-50">{subject.subjectId}</td>
+                        <td className="py-3 pr-4 font-mono text-sm text-gray-600 dark:text-gray-300">{subject.walletShort}</td>
+                        <td className="py-3 pr-4">{subject.reputationLabel}</td>
+                        <td className="py-3 pr-4">{formatJoinedLabel(subject.joinedAt)}</td>
+                        <td className="py-3 text-right">
+                          <button
+                            type="button"
+                            className="inline-flex items-center rounded-lg bg-[#0b0d16] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm hover:bg-[#15182a]"
+                            onClick={() => {}}
+                          >
+                            Add to Session
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -313,3 +338,4 @@ export default function ExperimenterDashboard(): JSX.Element {
     </main>
   );
 }
+
