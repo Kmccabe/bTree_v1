@@ -41,13 +41,9 @@ export default function SubjectDashboard(): JSX.Element {
       <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">
         Citizen Scientist Dashboard (Welcome)
       </h1>
-      <div className="mt-4">
+      <div className="mt-4 mb-6">
         <SubjectIdentityCard />
       </div>
-      <p className="mt-2 text-gray-700 dark:text-gray-200">
-        This is your page for interacting with the bTree community.
-      </p>
-
       <section style={gridStyle}>
         <article style={cardStyle}>
           <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Action</h2>

@@ -24,6 +24,7 @@ import AdminHome from "./pages/admin/AdminHome";
 import AdminSubjectPool from "./pages/admin/SubjectPool";
 import RegistryControls from "./pages/admin/RegistryControls";
 import SubjectPoolIndexer from "./pages/admin/SubjectPoolIndexer";
+import ExperimenterDashboard from "./pages/experimenter/ExperimenterDashboard";
 
 /* ---------- Inline stubs for /subject/* (we'll move to separate files later) ---------- */
 function SubjectLayout() {
@@ -192,6 +193,7 @@ export const router = createBrowserRouter([
       { path: 'subject/signup', element: <SignupPage1 /> },
       { path: 'subject/signup/2', element: <SignupPage2 /> },
       { path: 'subject/dashboard', element: <SubjectDashboard /> },
+      { path: 'experimenter', element: <ExperimenterDashboard /> },
 
       // Existing pages
       { path: 'docs', element: <DocsHome /> },
