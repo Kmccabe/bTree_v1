@@ -1,4 +1,5 @@
 import React from "react";
+import { SubjectIdentityCard } from "../../features/subject";
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
@@ -40,6 +41,9 @@ export default function SubjectDashboard(): JSX.Element {
       <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">
         Citizen Scientist Dashboard (Welcome)
       </h1>
+      <div className="mt-4">
+        <SubjectIdentityCard />
+      </div>
       <p className="mt-2 text-gray-700 dark:text-gray-200">
         This is your page for interacting with the bTree community.
       </p>
