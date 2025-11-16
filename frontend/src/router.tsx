@@ -20,6 +20,8 @@ import LinkWallets from "./pages/subject/LinkWallets";
 import SignupPage1 from "./pages/subject/SignupPage1";
 import SignupPage2 from "./pages/subject/SignupPage2";
 import SubjectDashboard from "./pages/subject/SubjectDashboard";
+import SubjectExperimentConsent from "./pages/subject/experiment/SubjectExperimentConsent";
+import SubjectExperimentWaiting from "./pages/subject/experiment/SubjectExperimentWaiting";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminSubjectPool from "./pages/admin/SubjectPool";
 import RegistryControls from "./pages/admin/RegistryControls";
@@ -193,6 +195,8 @@ export const router = createBrowserRouter([
       { path: 'subject/signup', element: <SignupPage1 /> },
       { path: 'subject/signup/2', element: <SignupPage2 /> },
       { path: 'subject/dashboard', element: <SubjectDashboard /> },
+      { path: 'subject/experiment/consent', element: <SubjectExperimentConsent /> },
+      { path: 'subject/experiment/waiting', element: <SubjectExperimentWaiting /> },
       { path: 'experimenter', element: <ExperimenterDashboard /> },
 
       // Existing pages

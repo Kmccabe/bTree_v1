@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { SubjectIdentityCard } from "../../features/subject";
 
 const gridStyle: React.CSSProperties = {
@@ -36,6 +37,8 @@ const countdownItemStyle: React.CSSProperties = {
 };
 
 export default function SubjectDashboard(): JSX.Element {
+  const navigate = useNavigate();
+
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-12">
       <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">
@@ -103,6 +106,7 @@ export default function SubjectDashboard(): JSX.Element {
           <button
             type="button"
             className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#0b0d16] text-white px-6 text-sm font-medium"
+            onClick={() => navigate("/subject/experiment/consent")}
           >
             Enter Experiment
           </button>
@@ -111,3 +115,5 @@ export default function SubjectDashboard(): JSX.Element {
     </main>
   );
 }
+
+
